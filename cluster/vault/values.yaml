@@ -79,11 +79,11 @@ server:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
     hosts:
-      - host: "vault.lab.example.invalid"   # TODO: track lab_domain
+      - host: "vault.eightbitsaxlounge.com"   # tracks lab_domain
     tls:
       - secretName: vault-tls
         hosts:
-          - "vault.lab.example.invalid"
+          - "vault.eightbitsaxlounge.com"
 
 ui:
   enabled: true

@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 # Native arm64 on a GitHub-hosted runner: no QEMU emulation, and no load on a
-# 1 GB Pi. Self-hosted runners exist because of network position, not compute
+# Pi. Self-hosted runners exist because of network position, not compute
 # (§3.3) — nothing about an image build needs to be inside VLAN 20.
 permissions:
   contents: read

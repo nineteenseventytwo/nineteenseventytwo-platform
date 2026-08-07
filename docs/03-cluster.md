@@ -19,8 +19,10 @@ and that discipline is what makes the cluster reproducible rather than merely
 documented.
 
 `1972-console` stays out of the cluster. It builds the cluster, so putting it in
-creates a circular dependency, and 1 GB will not take a kubelet plus a runner.
-[ADR-0007](decisions/ADR-0007-console-outside-cluster.md).
+creates a circular dependency — a rebuild would need the cluster already
+running to run the runner that rebuilds it. All four boards are the same
+hardware now, so that circular-dependency argument is the whole reason, not a
+resource constraint. [ADR-0007](decisions/ADR-0007-console-outside-cluster.md).
 
 ## CNI vs service mesh
 
@@ -75,6 +77,7 @@ Sync waves order the dependencies:
 | 40–50 | External Secrets → Vault |
 | 60–80 | monitoring → ARC controller → scale sets |
 | 90–95 | CRs that need the operators above, then `policy/` |
+| 100 | `apps/` — one Application per app/environment, auto-discovered by an `ApplicationSet` |
 
 Cilium is special: the cluster has no working datapath until it is installed,
 and Argo CD runs *on* that datapath. So the playbook installs it and the
@@ -114,15 +117,21 @@ either scan alone.
 
 ## The shared-cluster boundary
 
-This is the actual reason the repo was split, so it is explicit rather than
-implicit — see [`policy/`](../policy/) and
-[ADR-0004](decisions/ADR-0004-platform-owns-tenant-namespaces.md).
+This repo owns everything that touches the cluster — including, since
+[ADR-0012](decisions/ADR-0012-platform-owns-app-workloads.md), the application
+workloads themselves. App repos own their Dockerfile and CI, and publish an
+image to GHCR. Nothing about the cluster is theirs to touch: no kubeconfig, no
+`kubectl`, no deploy step.
 
-`platform` creates `eightbitsaxlounge-dev` and `-prod`, a ServiceAccount per
-environment with a Role scoped to that namespace, and a ResourceQuota. The
-resulting kubeconfig goes into Vault; the app repo's pipeline reads it and
-cannot touch anything else.
+`platform` creates `eightbitsaxlounge-dev` and `-prod` with a ResourceQuota and
+LimitRange in [`policy/tenants/`](../policy/tenants/) — the guardrails, applied
+at sync wave 95. The Deployments, Services and Ingresses that actually run
+inside those namespaces live in [`apps/eightbitsaxlounge/`](../apps/) and
+reconcile at wave 100, one sync-wave later, so a workload never lands before
+its quota does. Bumping an app to a new image tag is a PR against the manifest
+here, reviewed the same way any other change to this repo is.
 
-Namespace *creation* living here is the change that makes the quota and RBAC
-enforceable rather than advisory. On 2 GB nodes, that matters: one runaway
-Deployment should not be able to evict Prometheus.
+This goes further than the usual "platform owns the namespace, app owns what's
+in it" split — see ADR-0012 for why, and what it costs: an app release is now
+two PRs in two repos (bump the version in the app repo, bump the tag here)
+instead of one deploy step the app repo controls end to end.

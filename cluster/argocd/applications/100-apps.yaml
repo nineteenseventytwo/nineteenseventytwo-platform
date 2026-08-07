@@ -1,0 +1,56 @@
+---
+# Auto-discovers application workloads. Every directory two levels under
+# apps/ (apps/<name>/<env>/) becomes its own Argo CD Application — adding a
+# new app or environment is "create the directory, add manifests, open a PR",
+# with no Application YAML to hand-write. See apps/README.md and ADR-0012.
+#
+# Deliberately generates no Applications until apps/ has content — a git
+# generator with zero matches is not an error, it is an empty ApplicationSet.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+        revision: main
+        directories:
+          - path: apps/*/*
+  template:
+    metadata:
+      # apps/eightbitsaxlounge/dev -> app-eightbitsaxlounge-dev
+      name: "app-{{index .path.segments 1}}-{{index .path.segments 2}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "100"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+        targetRevision: main
+        path: "{{.path.path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        # eightbitsaxlounge-dev — must already exist via policy/tenants/,
+        # which is why CreateNamespace is NOT set below. A workload landing
+        # in a namespace with no quota is the exact failure this is meant to
+        # prevent.
+        namespace: "{{index .path.segments 1}}-{{index .path.segments 2}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 10m

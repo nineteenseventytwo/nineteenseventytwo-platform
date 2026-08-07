@@ -6,7 +6,7 @@
 # most of what follows is turning things down rather than on.
 
 global:
-  domain: "argocd.lab.example.invalid"   # TODO: track lab_domain
+  domain: "argocd.eightbitsaxlounge.com"   # tracks lab_domain in ansible group_vars
 
 crds:
   install: true
@@ -22,8 +22,9 @@ configs:
     # DNS-01. `make argocd-sync` forces a reconcile when you cannot wait.
     timeout.reconciliation: 180s
   cm:
-    # Argo CD manages the platform repo only. Tenant repos deploy through their
-    # own scoped kubeconfig; they do not get an Argo project here.
+    # Argo CD manages this repo only, including application workloads under
+    # apps/ (ADR-0012). App repos publish images to GHCR; they hold no cluster
+    # credential and get no Argo project of their own.
     application.resourceTrackingMethod: annotation
     resource.exclusions: |
       - apiGroups: ["cilium.io"]
@@ -50,7 +51,7 @@ server:
   ingress:
     enabled: true
     ingressClassName: nginx
-    hostname: "argocd.lab.example.invalid"   # TODO: track lab_domain
+    hostname: "argocd.eightbitsaxlounge.com"   # tracks lab_domain
     tls: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod

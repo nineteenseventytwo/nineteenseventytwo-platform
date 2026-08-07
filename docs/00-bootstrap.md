@@ -18,7 +18,7 @@ the MACs in `ansible/inventory/lab/hosts.yml`:
 
 | Host | MAC (eth0) | Address |
 |---|---|---|
-| `1972-console` | `d8:3a:dd:8e:2d:d7` | `192.168.20.201` |
+| `1972-console` | *(pending — new RPi 5 board; run `ip a` after first boot and update `ansible/inventory/lab/hosts.yml`)* | `192.168.20.201` |
 | `1972-master-1` | `d8:3a:dd:eb:19:52` | `192.168.20.202` |
 | `1972-worker-1` | `2c:cf:67:40:d6:92` | `192.168.20.203` |
 | `1972-worker-2` | `2c:cf:67:40:d7:a1` | `192.168.20.204` |
@@ -40,6 +40,9 @@ make bootstrap-render HOST=1972-master-1
 Copy `build/1972-master-1/user-data` and `network-config` onto the FAT boot
 partition (`system-boot` when mounted on a workstation) and boot.
 
+All four boards are RPi 5s now, so there is no longer a mixed fleet to keep
+straight when imaging — the same steps apply to every node.
+
 ## 3. Two Pi-specific gotchas
 
 ### Memory cgroups
@@ -54,19 +57,6 @@ rather than letting the kubelet fail with an unclear one.
 needs a monitor and a keyboard.
 
 `1972-console` does not need this — it is not a cluster node.
-
-### SSD boot on the RPi 4
-
-`1972-console` is an RPi 4, which only boots from USB if its EEPROM
-`BOOT_ORDER` says to try USB before SD. Check this **before** you retire its SD
-card, not after:
-
-```bash
-rpi-eeprom-config          # BOOT_ORDER should have 4 (USB) before 1 (SD)
-sudo rpi-eeprom-config --edit
-```
-
-The RPi 5s are fine out of the box.
 
 ### Swap
 

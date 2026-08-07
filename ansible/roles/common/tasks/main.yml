@@ -113,6 +113,8 @@
 - name: Report EEPROM boot order reminder
   ansible.builtin.debug:
     msg: >-
-      {{ inventory_hostname }} is an RPi 4. Confirm `rpi-eeprom-config` has
-      BOOT_ORDER trying USB before SD *before* you retire its SD card.
+      {{ inventory_hostname }} is flagged requires_eeprom_boot_order. Confirm
+      `rpi-eeprom-config` has BOOT_ORDER trying USB before SD *before* you
+      retire its SD card. (No current host sets this flag — it exists for
+      whichever board needs it next, e.g. an RPi 4 added back to the fleet.)
   when: requires_eeprom_boot_order | default(false)

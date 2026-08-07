@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 # Runs on GitHub-hosted runners only. Lint needs no LAN reachability, so
-# putting it on a 1 GB Pi buys nothing and costs the Pi.
+# putting it on a Pi buys nothing and costs the Pi.
 permissions:
   contents: read
 

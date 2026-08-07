@@ -31,7 +31,7 @@ rotates, and what happens if it leaks.
 | Vault recovery keys | Password manager, split across two entries | `generate-root`, rekey | On personnel change | Full Vault takeover via root token generation. Not unseal keys — auto-unseal is KMS. |
 | AWS KMS key / IAM principal | AWS; creds in `vault-kms` Secret | Vault's seal | Quarterly (IAM keys); KMS key never | Vault cannot unseal if revoked; cannot be decrypted without it if stolen alone. |
 | Cloudflare API token | Vault `kv/platform/cloudflare` | `Zone:DNS:Edit` on one zone | Semi-annual | DNS records for one zone — enough to mis-issue certificates for it. Scope to the single zone, never account-wide. |
-| Tenant kubeconfigs | Vault `kv/tenants/*` | One namespace each | Annual | One tenant namespace. This is what the RBAC scoping buys. |
+| App secrets (env vars, API keys) | Vault `kv/tenants/<name>/*` | One namespace each, via `ExternalSecret` | Per-app | Whatever that app's config holds. No app repo can read another's — see [ADR-0012](decisions/ADR-0012-platform-owns-app-workloads.md); there is no tenant kubeconfig anymore, only this. |
 | Grafana admin password | Vault `kv/platform/grafana` | Grafana | Annual | Dashboards and datasource credentials. |
 | Break-glass SSH key | Offline, on `1972-console` | All nodes | Never (audited) | Root-equivalent. Exists precisely for when Vault is the thing that is down. |
 
@@ -131,8 +131,6 @@ rate limits, and it is how mTLS gets bootstrapped if a mesh ever arrives.
 ## Open items
 
 - **Replace the `.sops.yaml` placeholder recipients** before the first encrypt.
-- **Set `lab_domain`** — until it is a real Cloudflare-hosted zone, DNS-01
-  issuance fails with NXDOMAIN on the `_acme-challenge` record.
 - **Set the KMS key ID** in `cluster/vault/values.yaml`.
 - Once Vault is live, the only secrets left in GitHub should be the age key and
   the GitHub App key. Audit that this is true.

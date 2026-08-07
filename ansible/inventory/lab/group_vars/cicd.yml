@@ -1,5 +1,8 @@
 ---
-# 1972-console: bootstrap node and break-glass runner host.
+# 1972-console: bootstrap node and break-glass runner host. RPi 5 / 2 GB / SSD
+# — the same hardware as the cluster nodes. Kept out of the cluster for
+# architectural reasons (ADR-0007: it is what builds the cluster, so joining
+# it creates a circular dependency), not because it lacks the resources.
 
 kubelet_node: false
 longhorn_node: false
@@ -23,6 +26,8 @@ runner_labels:
 runner_mount_docker_socket: true
 runner_user: "github-runner"
 
-# 1 GB of RAM. Two ephemeral runner containers plus dockerd is already the
-# ceiling; do not add a kubelet.
-console_memory_guard_mb: 1024
+# 2 GB of RAM. Real headroom over the previous 1 GB board, but still not
+# enough to add a kubelet on top of the runner containers and dockerd — that
+# is an architectural decision (ADR-0007) now, not a resource one, but the
+# guard stays as a sanity check either way.
+console_memory_guard_mb: 2048

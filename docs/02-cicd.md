@@ -2,8 +2,10 @@
 
 ## Where things run
 
-This split matters more than anything else here, because `1972-console` has
-**1 GB of RAM**.
+This split matters on its own merits, independent of what `1972-console`
+weighs in at: self-hosted runners exist for LAN reachability, not compute, so
+build work has no business running there regardless of the board underneath
+it.
 
 | Job | Runs on | Why |
 |---|---|---|
@@ -94,8 +96,10 @@ Before the cluster exists. `ansible/roles/runner_host` renders a compose stack;
 queueing" is a non-problem — that is the entire point of the org
 ([ADR-0001](decisions/ADR-0001-github-org.md)).
 
-Two replicas, 320 MB memory limit each. On a 1 GB host that limit is what turns
-"console fell over" into "one job failed".
+Two replicas, 640 MB memory limit each. On a 2 GB host that limit is still what
+turns "console fell over" into "one job failed" — there's room for a third
+replica if concurrency ever matters more than the spare headroom, but it isn't
+on by default.
 
 ### Target — ARC in-cluster
 

@@ -1,9 +1,12 @@
 ---
-# Tenant: nineteenseventytwo-eightbitsaxlounge
+# Tenant: eightbitsaxlounge
 #
-# The app repo owns everything INSIDE these namespaces. It does not own the
-# namespaces themselves, their quotas, or its own RBAC — that is what makes the
-# quota enforceable rather than advisory.
+# Guardrails only. The actual workload manifests (Deployments, Services,
+# Ingresses) live in apps/eightbitsaxlounge/ and are reconciled by the same
+# Argo CD instance that reconciles this file — see ADR-0012. Keeping the
+# guardrails here, applied one sync-wave before the workloads, means a
+# namespace always has its quota and default-deny policy before anything is
+# ever scheduled into it.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -83,95 +86,6 @@ spec:
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 768Mi}
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-dev
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-prod
----
-# Role, not ClusterRole. The app repo's pipeline can manage workloads in its own
-# namespace and nothing else — it cannot read Secrets in another tenant, cannot
-# create namespaces, and cannot see cluster-scoped resources at all.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-dev
-rules:
-  - apiGroups: [""]
-    resources: [pods, services, configmaps, secrets, persistentvolumeclaims, serviceaccounts]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [apps]
-    resources: [deployments, statefulsets, daemonsets, replicasets]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [batch]
-    resources: [jobs, cronjobs]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [networking.k8s.io]
-    resources: [ingresses, networkpolicies]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [external-secrets.io]
-    resources: [externalsecrets]
-    verbs: [get, list, watch, create, update, patch, delete]
-  # Deliberately absent: resourcequotas, limitranges, roles, rolebindings.
-  # A tenant that can edit its own quota does not have a quota.
-  - apiGroups: [""]
-    resources: [pods/log, pods/exec, events]
-    verbs: [get, list, watch, create]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-prod
-rules:
-  - apiGroups: [""]
-    resources: [pods, services, configmaps, secrets, persistentvolumeclaims, serviceaccounts]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [apps]
-    resources: [deployments, statefulsets, daemonsets, replicasets]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [batch]
-    resources: [jobs, cronjobs]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [networking.k8s.io]
-    resources: [ingresses, networkpolicies]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [external-secrets.io]
-    resources: [externalsecrets]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [""]
-    resources: [pods/log, events]
-    verbs: [get, list, watch]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-dev
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: deployer}
-subjects:
-  - kind: ServiceAccount
-    name: deployer
-    namespace: eightbitsaxlounge-dev
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: deployer
-  namespace: eightbitsaxlounge-prod
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: deployer}
-subjects:
-  - kind: ServiceAccount
-    name: deployer
-    namespace: eightbitsaxlounge-prod
----
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -197,8 +111,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
-    # Same-namespace traffic. Cross-namespace allow-pairs are the app repo's to
-    # add, in its own manifests, one pair at a time.
+    # Same-namespace traffic. A workload manifest under apps/eightbitsaxlounge/
+    # that needs a cross-namespace allow-pair adds its own NetworkPolicy
+    # alongside its Deployment — this file only carries the tenant baseline.
     - from:
         - podSelector: {}
   egress:

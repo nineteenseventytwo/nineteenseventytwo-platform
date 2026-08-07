@@ -6,7 +6,7 @@ Contains `ansible-core`, the pinned collections from
 [`requirements.yml`](requirements.yml), `kubectl`, `helm`, `sops` and `age`.
 
 Built on a **GitHub-hosted `ubuntu-24.04-arm`** runner — native arm64, no QEMU,
-and no load on a 1 GB Pi. Self-hosted runners exist for network position, not
+and no load on a Pi. Self-hosted runners exist for network position, not
 compute (§3.3), so nothing about this image is built in the lab.
 
 ## Use

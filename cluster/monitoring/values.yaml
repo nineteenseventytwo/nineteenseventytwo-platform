@@ -65,10 +65,10 @@ grafana:
     ingressClassName: nginx
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-    hosts: ["grafana.lab.example.invalid"]   # TODO: track lab_domain
+    hosts: ["grafana.eightbitsaxlounge.com"]   # tracks lab_domain
     tls:
       - secretName: grafana-tls
-        hosts: ["grafana.lab.example.invalid"]
+        hosts: ["grafana.eightbitsaxlounge.com"]
   admin:
     existingSecret: grafana-admin
     userKey: admin-user

@@ -12,9 +12,12 @@ a node end to end.**
 | `init-kubernetes.yaml`, `k8s-*.yaml` | `cluster/` values + `ansible/playbooks/30-cluster.yml` | Flannel manifest dropped; Cilium replaces it |
 | `k8s-flannel.yaml` | Deleted | See [ADR-0003](decisions/ADR-0003-cni-cilium-no-mesh.md) |
 | `k8s-metallb.yaml` | `cluster/metallb/` | Pool moves from `192.168.68.240-250` to `192.168.20.240-250` |
-| `k8s-namespaces.yaml` | **Split** | Namespace + quota + RBAC → here; workloads stay in the app repo ([ADR-0004](decisions/ADR-0004-platform-owns-tenant-namespaces.md)) |
+| `k8s-namespaces.yaml` | `policy/tenants/eightbitsaxlounge.yaml` | Namespace + quota + limits + default-deny. Gains the pieces the original never had (PSS labels, ResourceQuota) |
 | `k8s-storage.yaml` | `cluster/longhorn/` | Now a pinned Helm release with explicit replica and rebuild limits |
 | `k8s-ingress-nginx.yaml` | `cluster/ingress-nginx/` | Gains a pinned LoadBalancer IP so Unbound overrides stay valid |
+| `chat/chat-deploy.yaml`, `midi/midi-api-deploy.yaml`, `security/security-deploy.yaml`, `overlay/overlay-deploy.yaml`, `state/state-nats.yaml`, `db/db-couchdb.yaml` | `apps/eightbitsaxlounge/{dev,prod}/` | **New as of [ADR-0012](decisions/ADR-0012-platform-owns-app-workloads.md).** Not a mechanical copy — each needs its `image:` repointed at GHCR, its resource requests sized to fit inside the quota in `policy/tenants/eightbitsaxlounge.yaml`, and any Secret it reads converted to an `ExternalSecret` against Vault. Do this per-service, verifying each one deploys before moving to the next; see [`apps/README.md`](../apps/README.md). |
+| `chat/chat-set-environment.yaml`, `midi/midi-data-*.yaml`, `midi/midi-request-*.yaml` | Stays in the app repo | Data/runtime operations against a running deployment, not cluster config |
+| `monitoring/k8s-monitoring.yaml` (app repo) | Superseded | `cluster/monitoring/` (kube-prometheus-stack) already scrapes every namespace; check for app-specific dashboards worth keeping before deleting |
 | `init-pc.yaml` | Keep in the app repo | The Windows/PowerShell SSH setup is still needed for `midi-api`; the PC is on a tagged trunk (VLAN 10 Windows / VLAN 20 Linux) |
 | `init-gpu-node.yaml`, `init-gpu-access.yaml` | Out of scope | [ADR-0011](decisions/ADR-0011-arm64-only.md) — stays with composer for now |
 | `scripts/ansible-vault-init.sh` | Retired | Replaced by SOPS+age ([ADR-0008](decisions/ADR-0008-sops-age.md)) |
@@ -44,7 +47,7 @@ Fits the rebuild timeline's Phases 2–3.
 | 5–6 | kubeadm + Cilium + join workers + default-deny + Kubescape baseline | Empty hardened cluster; before/after scan committed |
 | 7 | Argo CD, MetalLB, ingress-nginx, cert-manager, Longhorn | First HTTPS ingress with a real Let's Encrypt certificate |
 | 8 | Vault + KMS auto-unseal + ESO; migrate SOPS secrets in | Nothing sensitive left in GitHub except the age key and the App key |
-| 9 | ARC scale sets; SSH CA cutover; tenant namespaces + RBAC | App repo deploys to its own namespace with a scoped token |
+| 9 | ARC scale sets; SSH CA cutover; tenant namespace + quota; migrate the app's Deployments into `apps/eightbitsaxlounge/` | eightbitsaxlounge running in-cluster, reconciled by Argo CD, with no cluster credential of any kind in the app repo |
 
 ## Do this in week 1, not week 9
 
@@ -58,15 +61,14 @@ wait for the migration.
 
 Questions this repo does not answer, carried forward from the plan:
 
-1. **`1972-console` EEPROM boot order** — confirm the RPi 4 will boot from USB
-   before retiring its SD card. `ansible/roles/common` prints a reminder; it
-   cannot check it for you from inside a running system reliably.
-2. **`lab_domain`** — set to a real Cloudflare-hosted zone. Until then DNS-01
-   issuance fails and every ingress hostname is a placeholder.
-3. **`.sops.yaml` recipients** — replace both placeholders before the first
+1. **`1972-console`'s MAC address** — the board was replaced (RPi 4/1 GB →
+   RPi 5/2 GB/SSD, matching the cluster nodes). `ansible/inventory/lab/hosts.yml`
+   has a placeholder; run `ip a` after first boot, update it, and match the Kea
+   reservation for `192.168.20.201` before rendering its cloud-init.
+2. **`.sops.yaml` recipients** — replace both placeholders before the first
    encrypt.
-4. **KMS key ID** in `cluster/vault/values.yaml`.
-5. **Chart versions** in `cluster/*/values.yaml` were pinned when this repo was
+3. **KMS key ID** in `cluster/vault/values.yaml`.
+4. **Chart versions** in `cluster/*/values.yaml` were pinned when this repo was
    written. Verify with `helm search repo <chart> --versions` before the first
    apply; the `helm` lint job will catch a values key the pinned version does
    not have.
