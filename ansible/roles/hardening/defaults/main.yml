@@ -1,0 +1,45 @@
+---
+# sshd. Password auth is already off from cloud-init; this makes it enforced
+# state rather than first-boot state, and adds the CA hook for Phase D.
+hardening_ssh_port: 22
+hardening_ssh_allow_users:
+  - "{{ admin_user }}"
+hardening_ssh_ca_key_path: /etc/ssh/ca.pub
+# Flip to true once bootstrap/ssh/ca.pub exists (Phase D). Until then nodes
+# trust authorized_keys only.
+hardening_ssh_trust_ca: false
+
+# ufw. The firewall between VLANs is OPNsense's job; this is defence in depth
+# on the node itself, and it is what stops a compromised pod from reaching a
+# neighbour's sshd.
+hardening_ufw_enabled: true
+hardening_ufw_default_incoming: deny
+hardening_ufw_default_outgoing: allow
+
+# Kubernetes control plane and node ports, per the upstream port requirements.
+hardening_ufw_cluster_rules:
+  - { port: "6443", proto: tcp, comment: "kube-apiserver" }
+  - { port: "2379:2380", proto: tcp, comment: "etcd" }
+  - { port: "10250", proto: tcp, comment: "kubelet API" }
+  - { port: "10256", proto: tcp, comment: "kube-proxy health" }
+  - { port: "30000:32767", proto: tcp, comment: "NodePort range" }
+  - { port: "4240", proto: tcp, comment: "cilium health" }
+  - { port: "8472", proto: udp, comment: "cilium vxlan" }
+  - { port: "51871", proto: udp, comment: "cilium wireguard" }
+  - { port: "7946", proto: tcp, comment: "metallb memberlist" }
+  - { port: "7946", proto: udp, comment: "metallb memberlist" }
+
+hardening_sysctls:
+  # Standard network hardening. Note ip_forward is deliberately absent here —
+  # kube_prereqs sets it to 1 on cluster nodes and would fight this role.
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.all.accept_source_route: 0
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  fs.protected_hardlinks: 1
+  fs.protected_symlinks: 1

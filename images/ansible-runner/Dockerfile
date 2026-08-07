@@ -1,0 +1,71 @@
+# ansible-runner — the artefact with real reuse value.
+#
+# Run from CI, from 1972-console, and from a laptop. Versioned and pinned
+# independently of anything GitHub does, which is exactly why it is separate
+# from the gha-runner image: a collection bump should not force a runner
+# rebuild, and a runner CVE should not force an Ansible revalidation.
+FROM python:3.12-slim-bookworm
+
+# Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
+ARG ANSIBLE_CORE_VERSION=2.18.1
+ARG KUBECTL_VERSION=v1.32.0
+ARG HELM_VERSION=v3.16.3
+ARG SOPS_VERSION=v3.9.2
+ARG AGE_VERSION=v1.2.1
+ARG TARGETARCH=arm64
+
+LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nineteenseventytwo-platform" \
+      org.opencontainers.image.description="ansible-core + collections + kubectl + helm + sops + age" \
+      org.opencontainers.image.licenses="MIT"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ANSIBLE_HOST_KEY_CHECKING=True \
+    ANSIBLE_FORCE_COLOR=1
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y \
+      ca-certificates curl git openssh-client rsync \
+      sshpass jq shellcheck \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+      "ansible-core==${ANSIBLE_CORE_VERSION}" \
+      ansible-lint \
+      yamllint \
+      kubernetes \
+      jmespath \
+      netaddr \
+      passlib
+
+# kubectl and helm: the deploy-cluster jobs need both, and installing them here
+# rather than in the workflow keeps the "CI runs the same thing you do"
+# property that the Makefile depends on.
+RUN curl -fsSLo /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
+ && chmod +x /usr/local/bin/kubectl \
+ && curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+      | tar -xz -C /tmp \
+ && mv "/tmp/linux-${TARGETARCH}/helm" /usr/local/bin/helm \
+ && rm -rf "/tmp/linux-${TARGETARCH}"
+
+# sops + age: Tier 0 secrets. Without these the vars plugin cannot decrypt
+# group_vars and every playbook fails on an undefined variable instead of a
+# clear "cannot decrypt" error.
+RUN curl -fsSLo /usr/local/bin/sops \
+      "https://github.com/getsops/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.${TARGETARCH}" \
+ && chmod +x /usr/local/bin/sops \
+ && curl -fsSL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-${TARGETARCH}.tar.gz" \
+      | tar -xz -C /tmp \
+ && mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/ \
+ && rm -rf /tmp/age
+
+COPY requirements.yml /tmp/requirements.yml
+RUN ansible-galaxy collection install -r /tmp/requirements.yml -p /usr/share/ansible/collections \
+ && rm /tmp/requirements.yml
+
+ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
+
+WORKDIR /work
+ENTRYPOINT []
+CMD ["ansible-playbook", "--version"]

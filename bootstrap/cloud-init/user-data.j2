@@ -1,0 +1,94 @@
+#cloud-config
+# Rendered from bootstrap/cloud-init/user-data.j2 for {{ inventory_hostname }}.
+# Do not edit the rendered copy — edit the template and re-run
+#   make bootstrap-render HOST={{ inventory_hostname }}
+
+hostname: {{ inventory_hostname }}
+fqdn: {{ inventory_hostname }}.{{ lab_domain }}
+prefer_fqdn_over_hostname: false
+manage_etc_hosts: true
+
+# Exactly one human account. No default `ubuntu` user, no password auth.
+users:
+  - name: {{ admin_user }}
+    gecos: "platform admin"
+    groups: [adm, sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - "{{ admin_ssh_public_key }}"
+
+ssh_pwauth: false
+disable_root: true
+
+timezone: {{ lab_timezone }}
+locale: {{ lab_locale }}
+
+package_update: true
+package_upgrade: false   # Ansible's `common` role owns upgrades, so they are logged
+packages:
+  - python3
+  - python3-apt
+  - chrony
+  - ca-certificates
+  - curl
+  - gnupg
+
+write_files:
+  # Hardened before the first interactive login, not after.
+  - path: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      PubkeyAuthentication yes
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+      MaxAuthTries 3
+      LoginGraceTime 20
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+      AllowUsers {{ admin_user }}
+      # Phase D replaces the authorized_keys model with a Vault SSH CA:
+      # TrustedUserCAKeys /etc/ssh/ca.pub
+
+  - path: /etc/apt/apt.conf.d/99-no-recommends
+    owner: root:root
+    permissions: '0644'
+    content: |
+      APT::Install-Recommends "false";
+      APT::Install-Suggests "false";
+
+  - path: /etc/cloud/cloud-init.disabled.README
+    owner: root:root
+    permissions: '0644'
+    content: |
+      This host was provisioned by nineteenseventytwo-platform/bootstrap.
+      Node configuration is owned by Ansible; do not hand-edit.
+
+{% if kubelet_node | default(false) %}
+bootcmd:
+  # kubelet refuses to start without memory cgroups, and the Pi kernel does not
+  # enable them by default. One line, no wrapping — a wrapped cmdline.txt is an
+  # unbootable Pi. Guarded so a re-run does not append twice.
+  - |
+    CMDLINE=/boot/firmware/cmdline.txt
+    if [ -f "$CMDLINE" ] && ! grep -q 'cgroup_enable=memory' "$CMDLINE"; then
+      sed -i '1 s/$/ cgroup_enable=memory cgroup_memory=1/' "$CMDLINE"
+      touch /var/run/cgroup-cmdline-changed
+    fi
+
+runcmd:
+  # Only reboot if bootcmd actually changed the cmdline this boot.
+  - [ sh, -c, 'test -f /var/run/cgroup-cmdline-changed && reboot || true' ]
+{% endif %}
+
+power_state:
+  mode: reboot
+  condition: test ! -f /var/run/cgroup-cmdline-changed
+  message: "cloud-init complete, rebooting into the hardened baseline"

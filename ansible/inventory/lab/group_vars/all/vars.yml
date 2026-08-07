@@ -1,0 +1,78 @@
+---
+# Lab-wide variables. Anything secret goes in secrets.sops.yml alongside this
+# file (SOPS+age, decrypted by the community.sops vars plugin at run time).
+
+ansible_user: mchellmer
+admin_user: mchellmer
+
+# ---------------------------------------------------------------------------
+# Network — VLAN 20. Must agree with the OPNsense config; see
+# docs/01-network-validation.md for the tests that prove it.
+# ---------------------------------------------------------------------------
+lab_vlan_id: 20
+lab_subnet: "192.168.20.0/24"
+lab_prefix_length: 24
+lab_gateway: "192.168.20.1"
+lab_dns:
+  - "192.168.20.1"          # Unbound on OPNsense
+lab_mtu: 1500
+lab_dhcp_pool: "192.168.20.100-192.168.20.199"
+lab_metallb_pool: "192.168.20.240-192.168.20.250"
+
+# TODO: replace with the real Cloudflare-hosted zone before cert-manager's
+# DNS-01 issuer can work. Everything that needs a name references this one var,
+# so it is a single edit. Until then internal names resolve but Let's Encrypt
+# issuance will fail with an NXDOMAIN on the _acme-challenge record.
+lab_domain: "eightbitsaxlounge.com"
+
+lab_timezone: "America/Chicago"
+lab_locale: "en_US.UTF-8"
+
+# VLAN 10 — your workstation side. Referenced by the hardening role's ufw rules
+# so SSH is reachable from the workstation and nowhere else.
+workstation_subnet: "192.168.10.0/24"
+
+# ---------------------------------------------------------------------------
+# GitHub / registry
+# ---------------------------------------------------------------------------
+github_org: "nineteenseventytwo"
+registry: "ghcr.io/nineteenseventytwo"
+
+ansible_runner_image: "{{ registry }}/ansible-runner"
+gha_runner_image: "{{ registry }}/gha-runner"
+
+# ---------------------------------------------------------------------------
+# Versions. Pinned so replaying an old commit does what it did then.
+# ---------------------------------------------------------------------------
+# Matches what eightbitsaxlounge/server runs today; bump deliberately.
+kubernetes_version: "1.35"
+containerd_version: "latest"
+cilium_version: "1.17.5"
+
+# Cilium replaces Flannel, so pick a pod CIDR that does not collide with the
+# lab subnet or with Cilium's default cluster-pool.
+kubernetes_pod_cidr: "10.244.0.0/16"
+kubernetes_service_cidr: "10.96.0.0/12"
+kubernetes_apiserver_extra_sans:
+  - "kubernetes.{{ lab_domain }}"
+  - "1972-master-1.{{ lab_domain }}"
+
+# Cilium kube-proxy replacement needs these because the API server cannot be
+# reached through a Service that does not exist yet. Ship standard mode first
+# if the cluster build is fighting you; the migration is supported. §4.3.
+cilium_kube_proxy_replacement: false
+
+# ---------------------------------------------------------------------------
+# Egress proxy. Not enforced yet, but written down so Phase B does not fight it
+# when it is. Three separate configs are needed when this flips on: shell env,
+# the docker daemon, and containerd. See the `docker` role.
+# ---------------------------------------------------------------------------
+egress_proxy_enabled: false
+egress_proxy_url: "http://192.168.20.1:3128"
+egress_proxy_no_proxy:
+  - "localhost"
+  - "127.0.0.1"
+  - "{{ lab_subnet }}"
+  - "{{ kubernetes_pod_cidr }}"
+  - "{{ kubernetes_service_cidr }}"
+  - ".{{ lab_domain }}"

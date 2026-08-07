@@ -1,0 +1,19 @@
+---
+runner_home: /opt/github-runner
+runner_image: "{{ gha_runner_image }}:{{ runner_image_tag }}"
+runner_image_tag: "2.331.0"
+runner_ephemeral: true
+runner_replicas: 2
+runner_scope: org
+runner_user: github-runner
+runner_labels:
+  - self-hosted
+  - linux
+  - arm64
+  - lab-network
+runner_mount_docker_socket: true
+
+# Runners hold no durable state (§3.1). The only thing worth persisting is a
+# buildx cache directory, and even that is optional — the registry-backed cache
+# is the real answer.
+runner_workdir: /opt/github-runner/_work

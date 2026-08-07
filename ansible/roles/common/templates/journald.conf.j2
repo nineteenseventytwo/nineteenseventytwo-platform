@@ -1,0 +1,8 @@
+# Managed by ansible/roles/common. Do not edit on the host.
+[Journal]
+Storage=persistent
+Compress=yes
+SystemMaxUse={{ common_journald_max_use }}
+SystemMaxFileSize={{ common_journald_max_file_size }}
+MaxRetentionSec={{ common_journald_max_retention }}
+ForwardToSyslog=no

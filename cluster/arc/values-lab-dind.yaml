@@ -1,0 +1,30 @@
+---
+# chart: 0.14.0  (gha-runner-scale-set)
+#
+# lab-dind: for jobs that genuinely must build a container locally. Almost
+# nothing should — image builds belong on GitHub-hosted ubuntu-24.04-arm
+# runners, which are native arm64 and cost the lab nothing (§3.3).
+#
+# dind runs a privileged container. That is strictly better than mounting the
+# host docker socket (which is root on the *host*), but it is still privileged,
+# which is why this scale set is separate and scaled to zero.
+githubConfigUrl: "https://github.com/nineteenseventytwo"
+githubConfigSecret: arc-github-app
+
+minRunners: 0
+maxRunners: 1
+
+runnerScaleSetName: lab-dind
+
+containerMode:
+  type: "dind"
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:2.331.0
+        command: ["/home/runner/run.sh"]
+        resources:
+          requests: {cpu: 200m, memory: 512Mi}
+          limits: {memory: 1Gi}

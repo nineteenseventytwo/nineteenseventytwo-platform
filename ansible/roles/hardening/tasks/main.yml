@@ -1,0 +1,99 @@
+---
+- name: Install the hardened sshd drop-in
+  ansible.builtin.template:
+    src: 10-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "/usr/sbin/sshd -t -f %s"
+  become: true
+  notify: Restart sshd
+
+# Phase D. Nodes trust the Vault SSH CA instead of a list of keys: no
+# authorized_keys drift, revocation that works, and an audit trail.
+- name: Install the SSH CA public key
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../bootstrap/ssh/ca.pub"
+    dest: "{{ hardening_ssh_ca_key_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: hardening_ssh_trust_ca | bool
+  notify: Restart sshd
+
+- name: Apply sysctl hardening
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/60-hardening.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ hardening_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  become: true
+
+- name: Configure ufw
+  when: hardening_ufw_enabled | bool
+  become: true
+  block:
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: Set default policies
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: incoming, policy: "{{ hardening_ufw_default_incoming }}" }
+        - { direction: outgoing, policy: "{{ hardening_ufw_default_outgoing }}" }
+
+    # SSH from the workstation VLAN only. VLAN 20 -> VLAN 10 is blocked at
+    # OPNsense; this is the reciprocal restriction on the node itself.
+    - name: Allow SSH from the workstation subnet
+      community.general.ufw:
+        rule: allow
+        src: "{{ workstation_subnet }}"
+        port: "{{ hardening_ssh_port }}"
+        proto: tcp
+        comment: "ssh from VLAN 10"
+
+    - name: Allow SSH from the console node
+      community.general.ufw:
+        rule: allow
+        src: "{{ hostvars['1972-console'].ansible_host }}"
+        port: "{{ hardening_ssh_port }}"
+        proto: tcp
+        comment: "ansible from 1972-console"
+
+    # Intra-VLAN 20 traffic is switch-local — OPNsense never sees it. Node
+    # isolation here and NetworkPolicy in-cluster are the only controls that do.
+    - name: Allow cluster ports between lab nodes
+      community.general.ufw:
+        rule: allow
+        src: "{{ lab_subnet }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+        comment: "{{ item.comment }}"
+      loop: "{{ hardening_ufw_cluster_rules }}"
+      loop_control:
+        label: "{{ item.comment }} {{ item.port }}/{{ item.proto }}"
+      when: kubelet_node | default(false)
+
+    # Cilium programs its own eBPF datapath and pod traffic must not be
+    # filtered by ufw's FORWARD chain.
+    - name: Allow forwarding for pod traffic
+      community.general.ufw:
+        rule: allow
+        route: true
+        src: "{{ kubernetes_pod_cidr }}"
+      when: kubelet_node | default(false)
+
+    - name: Enable ufw
+      community.general.ufw:
+        state: enabled

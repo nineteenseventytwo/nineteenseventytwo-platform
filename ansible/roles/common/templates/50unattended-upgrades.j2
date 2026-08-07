@@ -1,0 +1,23 @@
+// Managed by ansible/roles/common. Do not edit on the host.
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+// Never let an unattended upgrade restart a node out from under the cluster.
+// Reboots are a deliberate, drained operation.
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if common_unattended_reboot else 'false' }}";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+// kubeadm/kubelet/kubectl are pinned by the kube_prereqs role; an unattended
+// minor bump of the kubelet is a genuinely bad afternoon.
+Unattended-Upgrade::Package-Blacklist {
+    "kubelet";
+    "kubeadm";
+    "kubectl";
+    "containerd";
+    "docker-ce";
+};

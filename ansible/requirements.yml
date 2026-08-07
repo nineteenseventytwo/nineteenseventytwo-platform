@@ -1,0 +1,18 @@
+---
+# Pinned so a collection release cannot change what a replay of an old commit
+# does. Bump deliberately, in a PR, with the lint job green.
+collections:
+  - name: community.general
+    version: "10.1.0"
+  - name: community.docker
+    version: "4.1.0"
+  - name: community.crypto
+    version: "2.22.3"
+  - name: community.sops
+    version: "1.9.1"
+  - name: ansible.posix
+    version: "2.0.0"
+  - name: kubernetes.core
+    version: "5.0.0"
+  - name: containers.podman
+    version: "1.16.2"

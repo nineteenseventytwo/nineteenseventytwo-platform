@@ -1,0 +1,37 @@
+---
+# chart: 0.14.0  (gha-runner-scale-set)
+#
+# Scale sets are defined by CAPABILITY, not by repo. "A runner for whichever
+# repo is queueing" is a non-problem once registration is org-scoped — that is
+# the whole point of ADR-0001.
+#
+# lab-deploy: Ansible and kubectl. No docker socket, no dind. This is the
+# common case and the least privileged one.
+githubConfigUrl: "https://github.com/nineteenseventytwo"
+githubConfigSecret: arc-github-app
+
+# Scale to zero when idle. On three 2 GB nodes, an idle runner is memory you
+# do not have.
+minRunners: 0
+maxRunners: 3
+
+runnerScaleSetName: lab-deploy
+
+containerMode:
+  type: "kubernetes"
+  kubernetesModeWorkVolumeClaim:
+    accessModes: [ReadWriteOnce]
+    storageClassName: longhorn
+    resources:
+      requests:
+        storage: 4Gi
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:2.331.0
+        command: ["/home/runner/run.sh"]
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {memory: 512Mi}

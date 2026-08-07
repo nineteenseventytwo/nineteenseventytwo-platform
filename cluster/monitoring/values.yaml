@@ -1,0 +1,107 @@
+---
+# chart: 69.2.0  (kube-prometheus-stack)
+# repo:  https://prometheus-community.github.io/helm-charts
+#
+# The heaviest thing in the cluster by some distance. Everything below is
+# trimmed for 2 GB nodes; the defaults will OOM a worker.
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 7d
+    retentionSize: 8GB
+    resources:
+      requests: {cpu: 200m, memory: 512Mi}
+      limits: {memory: 1Gi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi
+    # Pick up ServiceMonitors from every namespace, not just this one — the
+    # addons each declare their own.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeInterval: 60s        # 30s doubles the series count for little gain
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests: {cpu: 25m, memory: 64Mi}
+      limits: {memory: 128Mi}
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 2Gi
+  config:
+    # TODO: point at a real receiver. A null receiver means alerts fire into
+    # nothing, which is worse than no alerting because it looks like it works.
+    route:
+      receiver: "null"
+    receivers:
+      - name: "null"
+
+grafana:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  persistence:
+    enabled: true
+    storageClassName: longhorn
+    size: 2Gi
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts: ["grafana.lab.example.invalid"]   # TODO: track lab_domain
+    tls:
+      - secretName: grafana-tls
+        hosts: ["grafana.lab.example.invalid"]
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+prometheusOperator:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+nodeExporter:
+  enabled: true
+prometheus-node-exporter:
+  resources:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {memory: 64Mi}
+
+kubeStateMetrics:
+  enabled: true
+kube-state-metrics:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+
+# kubeadm puts these on 127.0.0.1 by default; the ClusterConfiguration in
+# kube_control_plane binds them to 0.0.0.0 so these scrape targets work.
+kubeControllerManager:
+  enabled: true
+kubeScheduler:
+  enabled: true
+kubeEtcd:
+  enabled: true
+kubeProxy:
+  # Only meaningful when Cilium is NOT replacing kube-proxy. Flip with
+  # cilium_kube_proxy_replacement.
+  enabled: true

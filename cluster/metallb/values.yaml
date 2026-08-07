@@ -1,0 +1,23 @@
+---
+# chart: 0.15.3
+# repo:  https://metallb.github.io/metallb
+#
+# L2 mode. The pool is carved out of VLAN 20 and MUST stay clear of the Kea
+# DHCP pool (.100-.199) and the node reservations (.201-.204), or you get an
+# address conflict that presents as intermittent service unavailability.
+controller:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+speaker:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+  # memberlist gossips on 7946/tcp+udp between nodes. The hardening role opens
+  # it for lab_subnet; if speakers cannot see each other you get split-brain
+  # announcements rather than an obvious failure.
+  frr:
+    enabled: false
+prometheus:
+  serviceAccount: kube-prometheus-stack-prometheus
+  namespace: monitoring

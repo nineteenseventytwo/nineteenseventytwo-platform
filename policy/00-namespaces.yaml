@@ -1,0 +1,108 @@
+---
+# Infra namespaces, created here rather than by CreateNamespace=true so their
+# Pod Security Standards labels are set from the first moment they exist.
+#
+# The apiserver's admission config (ansible/roles/kube_control_plane) enforces
+# `baseline` cluster-wide. These labels raise a namespace above that default;
+# nothing here lowers it. The four namespaces that genuinely need privileged
+# pods — cilium, longhorn, metallb, kube-system — are exempted in the apiserver
+# config instead, which is visible and auditable rather than silent.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-secrets
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    # MetalLB's speaker needs NET_RAW to send gratuitous ARP. Exempted in the
+    # apiserver admission config; labelled privileged here so the reason is
+    # visible where someone would look for it.
+    pod-security.kubernetes.io/enforce: privileged
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-system
+  labels:
+    # Longhorn mounts block devices from the host. Genuinely privileged.
+    pod-security.kubernetes.io/enforce: privileged
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-systems
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-runners
+  labels:
+    # dind runners are privileged by construction. That is why lab-dind is a
+    # separate scale set scaled to zero, and why almost nothing should use it.
+    pod-security.kubernetes.io/enforce: privileged
+    platform.nineteenseventytwo/tier: infra

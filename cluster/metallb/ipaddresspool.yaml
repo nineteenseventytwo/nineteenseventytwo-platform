@@ -1,0 +1,24 @@
+---
+# Applied after the MetalLB CRDs exist — sync-wave 1 on the Application.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lab-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    # Must match lab_metallb_pool in ansible group_vars and the range reserved
+    # on OPNsense. Three places agree by convention; the network test matrix is
+    # what catches it when they stop agreeing.
+    - 192.168.20.240-192.168.20.250
+  autoAssign: true
+  avoidBuggyIPs: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lab-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lab-pool

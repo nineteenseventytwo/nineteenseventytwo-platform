@@ -1,0 +1,17 @@
+---
+kube_control_plane_kubeconfig: /etc/kubernetes/admin.conf
+kube_control_plane_encryption_key_path: /etc/kubernetes/enc/encryption-config.yaml
+kube_control_plane_admission_config_path: /etc/kubernetes/admission/admission-config.yaml
+
+# Pod Security Standards, enforced at admission for every namespace that does
+# not opt out with labels. `baseline` cluster-wide with `restricted` warnings
+# is the setting that catches problems without breaking Longhorn and Cilium,
+# both of which legitimately need privileged pods.
+pss_default_enforce: baseline
+pss_default_audit: restricted
+pss_default_warn: restricted
+pss_exempt_namespaces:
+  - kube-system
+  - cilium-secure
+  - longhorn-system
+  - metallb-system

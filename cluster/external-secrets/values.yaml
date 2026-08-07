@@ -1,0 +1,26 @@
+---
+# chart: 0.14.4
+# repo:  https://charts.external-secrets.io
+#
+# ESO rather than the Vault CSI driver or the Agent injector: an ExternalSecret
+# materialises a normal Kubernetes Secret, so app manifests carry no
+# Vault-specific annotations and the same manifest can point at AWS Secrets
+# Manager when a workload moves to the cloud.
+installCRDs: true
+replicaCount: 1
+resources:
+  requests: {cpu: 25m, memory: 64Mi}
+  limits: {memory: 192Mi}
+webhook:
+  replicaCount: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+certController:
+  replicaCount: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+serviceMonitor:
+  enabled: true
+  namespace: monitoring

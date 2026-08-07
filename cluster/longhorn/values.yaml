@@ -1,0 +1,45 @@
+---
+# chart: 1.8.1
+# repo:  https://charts.longhorn.io
+#
+# Worker SSDs only. Two replicas across two workers: one node can go down
+# without data loss, which is the most three nodes can honestly offer.
+persistence:
+  defaultClass: true
+  defaultClassReplicaCount: 2
+  reclaimPolicy: Retain   # a deleted PVC should not silently destroy data
+
+defaultSettings:
+  defaultReplicaCount: 2
+  # The control plane is a 2 GB RPi 5 also running etcd and the API server.
+  # Keeping replicas off it is the difference between a slow cluster and an
+  # unresponsive one.
+  systemManagedComponentsNodeSelector: "node-role.kubernetes.io/worker:true"
+  createDefaultDiskLabeledNodes: true
+  defaultDataPath: /var/lib/longhorn
+  replicaSoftAntiAffinity: false      # never put both replicas on one node
+  storageOverProvisioningPercentage: 100
+  storageMinimalAvailablePercentage: 20
+  # A rebuild saturates the Pi's single 1 GbE link and starves everything else.
+  concurrentReplicaRebuildPerNodeLimit: 1
+  concurrentAutomaticEngineUpgradePerNodeLimit: 1
+  guaranteedInstanceManagerCPU: 10
+  backupstorePollInterval: 0          # no backup target configured yet
+
+longhornManager:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+longhornUI:
+  replicas: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+
+ingress:
+  enabled: false   # reach it through port-forward until an auth story exists
+
+# open-iscsi and nfs-common are installed by ansible/roles/kube_prereqs. The
+# chart can install them via a DaemonSet, but node packages belong to Ansible.
+csi:
+  kubeletRootDir: /var/lib/kubelet

@@ -1,0 +1,92 @@
+---
+# chart: 0.30.0
+# repo:  https://helm.releases.hashicorp.com
+#
+# Vault OSS seals itself on every restart. On a Pi cluster that reboots, that
+# means hand-unsealing at 11pm — so this uses AWS KMS auto-unseal. It costs
+# pennies a month, removes the manual step entirely, and exercises KMS key
+# policy, which is worth having done. ADR-0005.
+global:
+  enabled: true
+  tlsDisable: true   # terminates at ingress-nginx; revisit if Vault is exposed
+
+injector:
+  # Not used — ESO is the consumption path. The injector would add a mutating
+  # webhook and ~150Mi for a mechanism this cluster does not use.
+  enabled: false
+
+server:
+  image:
+    repository: hashicorp/vault
+    tag: "1.18.3"
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {memory: 384Mi}
+
+  dataStorage:
+    enabled: true
+    size: 4Gi
+    storageClass: longhorn
+
+  auditStorage:
+    enabled: true
+    size: 2Gi
+    storageClass: longhorn
+
+  # Single node. Raft HA across three 2 GB Pis costs more than the availability
+  # it buys here; the data is on Longhorn with two replicas either way.
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address     = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }
+
+      # Auto-unseal. Credentials come from the vault-kms Secret, projected by
+      # ESO from... nowhere, on day one. Bootstrap it from SOPS once; see
+      # docs/04-secrets.md for why that ordering is not circular.
+      seal "awskms" {
+        region     = "us-east-2"
+        kms_key_id = "REPLACE_WITH_KMS_KEY_ID"
+      }
+
+      # Audit device is enabled post-init (it cannot be set in config), see
+      # cluster/vault/README.md.
+      telemetry {
+        prometheus_retention_time = "30s"
+        disable_hostname = true
+      }
+
+  extraSecretEnvironmentVars:
+    - envName: AWS_ACCESS_KEY_ID
+      secretName: vault-kms
+      secretKey: aws_access_key_id
+    - envName: AWS_SECRET_ACCESS_KEY
+      secretName: vault-kms
+      secretKey: aws_secret_access_key
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: "vault.lab.example.invalid"   # TODO: track lab_domain
+    tls:
+      - secretName: vault-tls
+        hosts:
+          - "vault.lab.example.invalid"
+
+ui:
+  enabled: true
+
+csi:
+  enabled: false

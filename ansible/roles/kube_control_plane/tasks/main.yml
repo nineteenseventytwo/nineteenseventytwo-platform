@@ -1,0 +1,114 @@
+---
+- name: Create the control plane config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/kubernetes/enc
+    - /etc/kubernetes/admission
+  become: true
+
+# etcd stores Secrets base64-encoded, not encrypted. Anyone with the etcd data
+# directory — or a stolen SSD out of a Pi — reads every Secret in the cluster
+# unless this is configured at init time. Retrofitting it later means rewriting
+# every Secret, so it goes in now.
+- name: Generate an etcd encryption key
+  ansible.builtin.set_fact:
+    kube_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
+  when: kube_etcd_encryption_key is not defined
+  no_log: true
+
+- name: Check whether etcd encryption is already configured
+  ansible.builtin.stat:
+    path: "{{ kube_control_plane_encryption_key_path }}"
+  register: kube_encryption_stat
+  become: true
+
+- name: Write the etcd encryption config
+  ansible.builtin.template:
+    src: encryption-config.yaml.j2
+    dest: "{{ kube_control_plane_encryption_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  when: not kube_encryption_stat.stat.exists
+  no_log: true
+
+- name: Write the PSS admission config
+  ansible.builtin.template:
+    src: admission-config.yaml.j2
+    dest: "{{ kube_control_plane_admission_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+
+- name: Write the kubeadm config
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+
+- name: Check whether the control plane is already initialised
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: kube_admin_conf
+  become: true
+
+- name: Run kubeadm init
+  ansible.builtin.command:
+    cmd: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
+  become: true
+  when: not kube_admin_conf.stat.exists
+  register: kubeadm_init
+  changed_when: kubeadm_init.rc == 0
+
+- name: Install kubeconfig for the admin user
+  become: true
+  block:
+    - name: Create the .kube directory
+      ansible.builtin.file:
+        path: "/home/{{ admin_user }}/.kube"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: "0700"
+
+    - name: Copy admin.conf into place
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ admin_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: "0600"
+
+- name: Fetch the kubeconfig to the controller
+  ansible.builtin.fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ playbook_dir }}/../../build/kubeconfig"
+    flat: true
+  become: true
+  tags: [kubeconfig]
+
+# The join command carries a token that expires in 24h; regenerate rather than
+# persisting one, so a worker rebuild six months from now still works.
+- name: Generate a worker join command
+  ansible.builtin.command:
+    cmd: kubeadm token create --print-join-command
+  become: true
+  register: kubeadm_join
+  changed_when: false
+  no_log: true
+
+- name: Publish the join command to the workers
+  ansible.builtin.set_fact:
+    kube_join_command: "{{ kubeadm_join.stdout }}"
+  no_log: true

@@ -1,0 +1,49 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.17.5
+      helm:
+        releaseName: cilium
+        valueFiles:
+          - $values/cluster/cilium/values.yaml
+    - repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
+  # Cilium is installed by ansible/playbooks/30-cluster.yml before Argo CD
+  # exists — the cluster has no working datapath until it does, and Argo runs
+  # on that datapath. This Application ADOPTS the existing release so
+  # subsequent changes go through git like everything else.
+  #
+  # k8sServiceHost and the pod CIDR are set by the playbook, not here, so they
+  # are excluded from diffing rather than being duplicated and drifting.
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: cilium-config
+      jsonPointers:
+        - /data/k8s-service-host
+        - /data/k8s-service-port
+        - /data/cluster-pool-ipv4-cidr

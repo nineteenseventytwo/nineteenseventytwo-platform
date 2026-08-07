@@ -1,0 +1,35 @@
+---
+# Renders cloud-init for a single host using the lab inventory as the data
+# source. Invoked by bootstrap/cloud-init/render.sh — not run directly.
+- name: Render cloud-init for one host
+  hosts: "{{ target_host }}"
+  gather_facts: false
+  connection: local
+  vars:
+    admin_ssh_public_key: >-
+      {{ lookup('file', playbook_dir + '/../ssh/' + admin_ssh_key_name + '.pub') }}
+  tasks:
+    - name: Ensure the output directory exists
+      ansible.builtin.file:
+        path: "{{ output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render user-data
+      ansible.builtin.template:
+        src: user-data.j2
+        dest: "{{ output_dir }}/user-data"
+        mode: "0644"
+
+    - name: Render network-config
+      ansible.builtin.template:
+        src: network-config.j2
+        dest: "{{ output_dir }}/network-config"
+        mode: "0644"
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          - "Rendered {{ output_dir }}/user-data"
+          - "Rendered {{ output_dir }}/network-config"
+          - "Copy both onto the boot partition, then boot {{ inventory_hostname }}."

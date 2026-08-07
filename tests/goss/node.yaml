@@ -1,0 +1,71 @@
+---
+# Node baseline assertions. Run with goss on each host:
+#   goss -g tests/goss/node.yaml validate --format documentation
+#
+# These are the properties that, when they quietly stop being true, produce a
+# failure somewhere else entirely — a kubelet that will not start, a cluster
+# that disagrees about the time, an SSD full of journal.
+
+command:
+  swap-is-off:
+    exec: "swapon --show"
+    exit-status: 0
+    stdout: []          # any output at all means swap is back
+    title: "kubelet refuses to start with swap enabled"
+
+  memory-cgroups-enabled:
+    exec: "grep -c 'cgroup_enable=memory' /proc/cmdline"
+    exit-status: 0
+    stdout: ["1"]
+    title: "cgroup_enable=memory in cmdline.txt (cluster nodes only)"
+
+  ssh-password-auth-disabled:
+    exec: "sshd -T | grep -E '^passwordauthentication'"
+    exit-status: 0
+    stdout: ["passwordauthentication no"]
+
+  ssh-root-login-disabled:
+    exec: "sshd -T | grep -E '^permitrootlogin'"
+    exit-status: 0
+    stdout: ["permitrootlogin no"]
+
+service:
+  chrony:
+    enabled: true
+    running: true
+  containerd:
+    enabled: true
+    running: true
+  kubelet:
+    enabled: true
+  ufw:
+    enabled: true
+    running: true
+
+port:
+  tcp:22:
+    listening: true
+
+file:
+  /etc/ssh/sshd_config.d/10-hardening.conf:
+    exists: true
+    mode: "0644"
+    owner: root
+  /etc/systemd/journald.conf.d/10-limits.conf:
+    exists: true
+  /etc/sysctl.d/99-kubernetes.conf:
+    exists: true
+
+kernel-param:
+  net.bridge.bridge-nf-call-iptables:
+    value: "1"
+  net.ipv4.ip_forward:
+    value: "1"
+  kernel.dmesg_restrict:
+    value: "1"
+
+package:
+  open-iscsi:
+    installed: true      # Longhorn
+  nfs-common:
+    installed: true

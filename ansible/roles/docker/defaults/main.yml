@@ -1,0 +1,22 @@
+---
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+docker_users:
+  - "{{ admin_user }}"
+
+# On a 1 GB console, an unbounded log-driver is how you fill an SSD overnight.
+docker_daemon_options:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "20m"
+    max-file: "3"
+  live-restore: true
+  default-address-pools:
+    # Keep docker's bridges out of the lab subnet and the pod CIDR.
+    - base: "172.31.0.0/16"
+      size: 24

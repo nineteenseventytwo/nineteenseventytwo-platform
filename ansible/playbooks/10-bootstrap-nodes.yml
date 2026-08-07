@@ -1,0 +1,30 @@
+---
+# Converge every Linux node to the hardened baseline. Idempotent, and the only
+# thing that should ever change a node's configuration.
+#
+#   make deploy-nodes
+#
+# Definition of done (§3.6): a push to main runs this and all four Pis converge,
+# with no SSH from a laptop involved.
+- name: Baseline every lab node
+  hosts: cicd:cluster
+  gather_facts: true
+  serial: "{{ bootstrap_serial | default('100%') }}"
+  roles:
+    - role: common
+      tags: [common]
+    - role: hardening
+      tags: [hardening]
+
+  post_tasks:
+    - name: Verify sshd is still accepting our key after hardening
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+      tags: [hardening]
+
+- name: Install Docker on hosts that need it
+  hosts: cicd
+  gather_facts: true
+  roles:
+    - role: docker
+      tags: [docker]

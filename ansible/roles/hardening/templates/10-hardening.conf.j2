@@ -1,0 +1,38 @@
+# Managed by ansible/roles/hardening. Do not edit on the host.
+# Mirrors what cloud-init wrote at first boot, so the two never disagree.
+
+Port {{ hardening_ssh_port }}
+Protocol 2
+
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+AllowStreamLocalForwarding no
+
+MaxAuthTries 3
+MaxSessions 4
+LoginGraceTime 20
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+AllowUsers {{ hardening_ssh_allow_users | join(' ') }}
+
+LogLevel VERBOSE
+PrintMotd no
+
+{% if hardening_ssh_trust_ca %}
+# Phase D: trust certificates signed by the Vault SSH CA rather than a list of
+# keys. Certificates are 5-minute TTL; see bootstrap/ssh/sign.sh.
+TrustedUserCAKeys {{ hardening_ssh_ca_key_path }}
+{% else %}
+# Phase A: authorized_keys only. Set hardening_ssh_trust_ca once Vault's
+# ssh-client-signer engine exists and bootstrap/ssh/ca.pub is populated.
+{% endif %}

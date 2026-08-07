@@ -1,0 +1,24 @@
+---
+profile: production
+
+exclude_paths:
+  - build/
+  - cluster/
+  - policy/
+  - docs/
+  - .github/
+
+skip_list:
+  # Roles here are consumed only from this repo's playbooks; galaxy metadata
+  # would be noise.
+  - meta-no-info
+  - meta-no-tags
+
+warn_list:
+  - experimental
+
+kinds:
+  - playbook: "ansible/playbooks/*.yml"
+  - tasks: "ansible/roles/**/tasks/*.yml"
+  - handlers: "ansible/roles/**/handlers/*.yml"
+  - vars: "ansible/inventory/**/group_vars/**/*.yml"

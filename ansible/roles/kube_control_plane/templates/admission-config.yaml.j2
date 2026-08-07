@@ -1,0 +1,27 @@
+# Managed by ansible/roles/kube_control_plane. Do not edit on the host.
+# Pod Security Standards at admission. Namespace labels in policy/ can raise a
+# namespace above this baseline; nothing can silently fall below it.
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1
+      kind: PodSecurityConfiguration
+      defaults:
+        enforce: "{{ pss_default_enforce }}"
+        enforce-version: latest
+        audit: "{{ pss_default_audit }}"
+        audit-version: latest
+        warn: "{{ pss_default_warn }}"
+        warn-version: latest
+      exemptions:
+        usernames: []
+        runtimeClasses: []
+        # Cilium and Longhorn legitimately need privileged pods. Exempting the
+        # namespace is honest; weakening the cluster default to accommodate
+        # them is not.
+        namespaces:
+{% for ns in pss_exempt_namespaces %}
+          - "{{ ns }}"
+{% endfor %}

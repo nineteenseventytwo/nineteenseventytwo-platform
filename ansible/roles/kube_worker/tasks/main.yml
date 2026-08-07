@@ -1,0 +1,30 @@
+---
+- name: Check whether this node has already joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kube_worker_joined
+  become: true
+
+- name: Reset a stale join
+  ansible.builtin.command:
+    cmd: kubeadm reset -f
+  become: true
+  when:
+    - kube_worker_reset_before_join | bool
+    - kube_worker_joined.stat.exists
+  changed_when: true
+
+- name: Join the cluster
+  ansible.builtin.command:
+    cmd: "{{ hostvars['1972-master-1'].kube_join_command }} --cri-socket unix:///run/containerd/containerd.sock"
+  become: true
+  when: not kube_worker_joined.stat.exists or kube_worker_reset_before_join | bool
+  register: kube_worker_join
+  changed_when: kube_worker_join.rc == 0
+  no_log: true
+
+- name: Wait for the kubelet to come up
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+  become: true

@@ -1,0 +1,11 @@
+---
+# Everything, in dependency order. Useful as `--check --diff` to assert the
+# whole estate matches git; the numbered playbooks are what CI actually runs.
+- name: Node baseline
+  ansible.builtin.import_playbook: 10-bootstrap-nodes.yml
+
+- name: CI/CD host
+  ansible.builtin.import_playbook: 20-cicd-host.yml
+
+- name: Cluster
+  ansible.builtin.import_playbook: 30-cluster.yml

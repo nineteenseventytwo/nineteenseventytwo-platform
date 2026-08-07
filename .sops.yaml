@@ -1,0 +1,26 @@
+---
+# SOPS encrypts *values*, not files, so `git diff` on an encrypted file still
+# shows which key changed. Two recipients: your workstation age key, and a CI
+# key held as the AGE_KEY GitHub Actions secret.
+#
+# Generate a key:      age-keygen -o ~/.config/sops/age/keys.txt
+# Encrypt a new file:  sops --encrypt --in-place path/to/secrets.sops.yml
+# Edit in place:       sops path/to/secrets.sops.yml
+#
+# TODO: replace both placeholder recipients with real public keys before the
+# first `sops --encrypt`. They are inert until then — SOPS will refuse to
+# encrypt against a malformed recipient rather than silently produce a file
+# only one party can read.
+creation_rules:
+  - path_regex: \.sops\.ya?ml$
+    encrypted_regex: ^(?!apiVersion|kind|metadata|sops)
+    age: >-
+      age1PLACEHOLDER_WORKSTATION_PUBLIC_KEY,
+      age1PLACEHOLDER_CI_PUBLIC_KEY
+
+  # Kubernetes Secret manifests: leave the shape readable, encrypt only data.
+  - path_regex: \.sops\.enc\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age1PLACEHOLDER_WORKSTATION_PUBLIC_KEY,
+      age1PLACEHOLDER_CI_PUBLIC_KEY

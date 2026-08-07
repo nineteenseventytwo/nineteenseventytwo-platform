@@ -1,0 +1,35 @@
+# Rendered from bootstrap/cloud-init/network-config.j2 for {{ inventory_hostname }}.
+# cloud-init network-config v2 (netplan schema).
+#
+# ADR-0009: Kea reservations on OPNsense are authoritative for addressing.
+# DHCP here means a reimaged Pi comes up correctly with no local edits, and
+# there is exactly one place to change an address.
+version: 2
+ethernets:
+  eth0:
+{% if cloudinit_use_static | default(false) %}
+    # Static fallback — only for bringing a node up before OPNsense knows it.
+    dhcp4: false
+    addresses:
+      - {{ ansible_host }}/{{ lab_prefix_length }}
+    routes:
+      - to: default
+        via: {{ lab_gateway }}
+    nameservers:
+      addresses: [{{ lab_dns | join(', ') }}]
+      search: [{{ lab_domain }}]
+{% else %}
+    dhcp4: true
+    dhcp4-overrides:
+      # Expect {{ ansible_host }} from the Kea reservation for this MAC.
+      use-domains: true
+    dhcp6: false
+    optional: false
+{% endif %}
+    # The Pi's onboard NIC is 1500 MTU on an untagged access port (switch ports
+    # 5-8, PVID 20). If test 5 in docs/01-network-validation.md fails, set this
+    # to 1492 rather than chasing intermittent HTTPS hangs later.
+    mtu: {{ lab_mtu }}
+
+# wlan0 is deliberately absent. The lab is wired; a second default route through
+# a different VLAN is how firewall rules get quietly bypassed.

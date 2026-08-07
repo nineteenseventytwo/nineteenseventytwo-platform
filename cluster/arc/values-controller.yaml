@@ -1,0 +1,18 @@
+---
+# chart: 0.14.0  (gha-runner-scale-set-controller)
+# repo:  oci://ghcr.io/actions/actions-runner-controller-charts
+#
+# The controller only. Scale sets are separate releases — see the values-*.yaml
+# files alongside this one.
+replicaCount: 1
+resources:
+  requests: {cpu: 50m, memory: 128Mi}
+  limits: {memory: 256Mi}
+flags:
+  logLevel: info
+  logFormat: json
+  # Watch every namespace so scale sets can live in their own.
+  watchSingleNamespace: ""
+metrics:
+  controllerManagerAddr: ":8080"
+  listenerAddr: ":8080"

@@ -1,0 +1,6 @@
+# Managed by ansible/roles/kube_prereqs. Do not edit on the host.
+# containerd pulls images itself; it does not inherit the docker daemon proxy.
+[Service]
+Environment="HTTP_PROXY={{ egress_proxy_url }}"
+Environment="HTTPS_PROXY={{ egress_proxy_url }}"
+Environment="NO_PROXY={{ egress_proxy_no_proxy | join(',') }}"

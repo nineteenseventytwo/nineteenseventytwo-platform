@@ -1,0 +1,27 @@
+---
+# chart: v1.17.1
+# repo:  https://charts.jetstack.io
+crds:
+  enabled: true
+  keep: true
+replicaCount: 1
+resources:
+  requests: {cpu: 25m, memory: 64Mi}
+  limits: {memory: 192Mi}
+webhook:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+cainjector:
+  resources:
+    requests: {cpu: 25m, memory: 96Mi}
+    limits: {memory: 256Mi}
+# DNS-01 solving needs to see the *public* resolvers, not Unbound, or it will
+# check the challenge record against a view that has not propagated yet.
+dns01RecursiveNameservers: "1.1.1.1:53,9.9.9.9:53"
+dns01RecursiveNameserversOnly: true
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true
+    namespace: monitoring

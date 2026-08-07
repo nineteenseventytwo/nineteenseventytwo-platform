@@ -1,0 +1,38 @@
+---
+# For machine-to-machine services that do not need public trust. Cheaper, no
+# rate limits, and it is how mTLS gets bootstrapped later if a mesh ever
+# arrives. The root key is generated in-cluster and never leaves it.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: internal-ca-bootstrap
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: nineteenseventytwo-internal-ca
+  secretName: internal-ca-key-pair
+  duration: 43800h    # 5 years
+  renewBefore: 8760h  # 1 year
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: internal-ca-bootstrap
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca
+spec:
+  ca:
+    secretName: internal-ca-key-pair

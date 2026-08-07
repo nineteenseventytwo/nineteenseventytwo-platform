@@ -1,0 +1,25 @@
+---
+common_packages:
+  - chrony
+  - curl
+  - git
+  - gnupg
+  - htop
+  - jq
+  - unattended-upgrades
+  - apt-listchanges
+  - python3-apt
+
+# journald on a 1-2 GB Pi with an SSD will happily eat gigabytes of logs.
+common_journald_max_use: "200M"
+common_journald_max_file_size: "20M"
+common_journald_max_retention: "14day"
+
+# Upstream NTP is fine; the gateway also serves time if you prefer to keep
+# VLAN 20 egress narrower.
+common_ntp_servers:
+  - "{{ lab_gateway }}"
+  - "time.cloudflare.com"
+
+common_unattended_reboot: false
+disable_swap: false

@@ -1,0 +1,27 @@
+---
+extends: default
+
+ignore: |
+  build/
+  charts/
+  docs/plan/
+
+rules:
+  # Helm values and k8s manifests routinely exceed 80 columns.
+  line-length:
+    max: 160
+    level: warning
+  # Ansible convention is 2-space indent with sequences indented under the key.
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true

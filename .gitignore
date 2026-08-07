@@ -1,0 +1,31 @@
+# Rendered cloud-init, fetched kubeconfigs, join commands
+build/
+
+# Never commit these in the clear. Encrypted counterparts end in .sops.yml
+*.key
+*.pem
+!bootstrap/ssh/*.pub
+age.txt
+keys.txt
+kubeconfig
+*.kubeconfig
+.env
+.envrc
+
+# Decrypted-in-place accidents
+*.dec.yml
+*.dec.yaml
+
+# Ansible
+*.retry
+.ansible/
+ansible/inventory/*/host_vars/**/*.plain.yml
+
+# Helm
+charts/
+*.tgz
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

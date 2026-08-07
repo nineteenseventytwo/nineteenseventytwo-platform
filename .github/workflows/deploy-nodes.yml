@@ -1,0 +1,73 @@
+---
+name: deploy-nodes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/deploy-nodes.yml"
+  workflow_dispatch:
+    inputs:
+      check_mode:
+        description: "Dry run (--check --diff) instead of converging"
+        type: boolean
+        default: false
+
+# Definition of done for Phase B (§3.6): push to main -> hosted arm runner
+# builds and pushes ansible-runner -> self-hosted runner pulls it -> nodes
+# converge. No SSH from a laptop involved.
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-nodes        # never two converges at once
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # `lab-network` is the label that means "can reach 192.168.20.x". It is the
+    # only reason this job is self-hosted.
+    runs-on: [self-hosted, linux, arm64, lab-network]
+    environment: lab
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the ansible-runner version
+        id: version
+        run: echo "value=$(cat images/ansible-runner/version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The age key decrypts group_vars/all/secrets.sops.yml. It is one of only
+      # two secrets that stay in GitHub after Vault lands (the other is the
+      # GitHub App key) — see docs/04-secrets.md.
+      - name: Stage the age key and SSH key
+        run: |
+          mkdir -p "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"
+          printf '%s' "${{ secrets.SOPS_AGE_KEY }}" > "$RUNNER_TEMP/age/keys.txt"
+          printf '%s' "${{ secrets.ANSIBLE_SSH_KEY }}" > "$RUNNER_TEMP/ssh/id_ed25519"
+          printf '%s' "${{ secrets.ANSIBLE_KNOWN_HOSTS }}" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 700 "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"
+          chmod 600 "$RUNNER_TEMP"/age/keys.txt "$RUNNER_TEMP"/ssh/*
+
+      - name: Converge the nodes
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            -v "$RUNNER_TEMP/ssh:/root/.ssh:ro" \
+            -v "$RUNNER_TEMP/age:/root/.config/sops/age:ro" \
+            -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
+            "ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}" \
+            ansible-playbook -i ansible/inventory/lab \
+              ansible/playbooks/10-bootstrap-nodes.yml \
+              ${{ inputs.check_mode && '--check --diff' || '' }}
+
+      - name: Shred the staged credentials
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"

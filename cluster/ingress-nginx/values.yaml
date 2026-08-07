@@ -1,0 +1,41 @@
+---
+# chart: 4.12.1
+# repo:  https://kubernetes.github.io/ingress-nginx
+controller:
+  replicaCount: 2
+  service:
+    type: LoadBalancer
+    # Pin the ingress to a stable address so Unbound host overrides on OPNsense
+    # do not need updating every time the service is recreated.
+    loadBalancerIP: 192.168.20.240
+    externalTrafficPolicy: Local   # preserves client source IPs for logging
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  config:
+    use-forwarded-headers: "true"
+    enable-real-ip: "true"
+    proxy-body-size: "32m"
+    ssl-protocols: "TLSv1.2 TLSv1.3"
+    hsts: "true"
+    hsts-max-age: "31536000"
+    server-tokens: "false"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+  admissionWebhooks:
+    enabled: true
+  # Two workers, two replicas: spread them so a node reboot does not take the
+  # ingress with it.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+          app.kubernetes.io/component: controller
+defaultBackend:
+  enabled: false

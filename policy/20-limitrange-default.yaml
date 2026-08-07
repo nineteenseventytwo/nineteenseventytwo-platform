@@ -1,0 +1,23 @@
+---
+# A pod with no resource requests is scheduled as best-effort and is the first
+# thing evicted — but it is also invisible to the scheduler's accounting, so it
+# can be placed on a node with nothing left to give. On 2 GB nodes that is the
+# difference between one unhappy pod and an unresponsive node.
+#
+# These defaults apply only where a pod does not specify its own.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: monitoring
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        memory: 1Gi

@@ -1,0 +1,17 @@
+# Managed by ansible/roles/kube_control_plane. Mode 0600, never leaves the node.
+# Losing this key makes every existing Secret unreadable — back it up alongside
+# the etcd snapshot, not instead of it. See docs/04-secrets.md.
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: {{ kube_etcd_encryption_key }}
+      # identity last: reads still work for anything written before this config
+      # existed. Remove it once every Secret has been rewritten.
+      - identity: {}

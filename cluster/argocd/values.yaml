@@ -1,0 +1,73 @@
+---
+# chart: 7.8.2
+# repo:  https://argoproj.github.io/argo-helm
+#
+# Argo CD on 2 GB nodes. The defaults assume a cluster with room to spare, so
+# most of what follows is turning things down rather than on.
+
+global:
+  domain: "argocd.lab.example.invalid"   # TODO: track lab_domain
+
+crds:
+  install: true
+  keep: true   # never let an uninstall take the Applications with it
+
+configs:
+  params:
+    # Single replica of everything; HA is meaningless with one control plane.
+    server.insecure: true              # TLS terminates at ingress-nginx
+    application.namespaces: "*"
+    # Poll interval. The default 3m is fine; webhooks would be better but the
+    # lab has no inbound internet path, which is also why cert-manager uses
+    # DNS-01. `make argocd-sync` forces a reconcile when you cannot wait.
+    timeout.reconciliation: 180s
+  cm:
+    # Argo CD manages the platform repo only. Tenant repos deploy through their
+    # own scoped kubeconfig; they do not get an Argo project here.
+    application.resourceTrackingMethod: annotation
+    resource.exclusions: |
+      - apiGroups: ["cilium.io"]
+        kinds: ["CiliumIdentity", "CiliumEndpoint"]
+        clusters: ["*"]
+
+controller:
+  replicas: 1
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 512Mi}
+
+repoServer:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 384Mi}
+
+server:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: "argocd.lab.example.invalid"   # TODO: track lab_domain
+    tls: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+
+applicationSet:
+  replicas: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 192Mi}
+
+notifications:
+  enabled: false   # nothing to notify yet; re-enable with a real webhook
+
+dex:
+  enabled: false   # local admin only until an IdP exists
+
+redis:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}

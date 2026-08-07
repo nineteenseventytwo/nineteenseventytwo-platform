@@ -1,0 +1,7 @@
+# Managed by ansible/roles/docker. Do not edit on the host.
+export HTTP_PROXY="{{ egress_proxy_url }}"
+export HTTPS_PROXY="{{ egress_proxy_url }}"
+export NO_PROXY="{{ egress_proxy_no_proxy | join(',') }}"
+export http_proxy="$HTTP_PROXY"
+export https_proxy="$HTTPS_PROXY"
+export no_proxy="$NO_PROXY"

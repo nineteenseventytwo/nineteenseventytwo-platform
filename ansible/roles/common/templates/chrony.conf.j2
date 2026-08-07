@@ -1,0 +1,12 @@
+# Managed by ansible/roles/common. Do not edit on the host.
+{% for server in common_ntp_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+keyfile /etc/chrony/chrony.keys
+driftfile /var/lib/chrony/chrony.drift
+logdir /var/log/chrony
+maxupdateskew 100.0
+rtcsync
+# Pis have no RTC; allow a large step on boot rather than slewing for hours.
+makestep 1.0 3

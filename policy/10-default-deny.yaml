@@ -1,0 +1,114 @@
+---
+# Default-deny in every namespace that carries workloads.
+#
+# A NetworkPolicy selecting all pods with no ingress/egress rules denies both.
+# The DNS exception is separate and deliberate: without it, every pod in the
+# namespace fails to resolve anything, which presents as "the app is broken"
+# rather than "the policy is working".
+#
+# Note the layer this operates at. Pod-to-pod traffic between two nodes on
+# VLAN 20 is switch-local — OPNsense never sees it, so inter-workload isolation
+# is a NetworkPolicy problem and cannot be solved at the firewall.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Prometheus must reach every scrape target, so monitoring gets an explicit
+# cluster-wide egress allowance rather than a per-namespace allow-pair each
+# time something new is deployed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {}
+    - to:
+        # Node exporters and the control plane components live on host IPs, not
+        # pod IPs, so a namespaceSelector alone does not reach them.
+        - ipBlock:
+            cidr: 192.168.20.0/24
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-argocd
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # The API server, to reconcile anything at all.
+    - to:
+        - ipBlock:
+            cidr: 192.168.20.202/32
+      ports:
+        - {protocol: TCP, port: 6443}
+    # github.com, to read the repo. Egress to the internet is otherwise denied.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}

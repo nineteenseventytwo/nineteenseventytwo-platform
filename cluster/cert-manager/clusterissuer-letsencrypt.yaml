@@ -1,0 +1,45 @@
+---
+# DNS-01 through Cloudflare, not HTTP-01. This is the important choice: DNS-01
+# issues browser-trusted certificates for services with **no inbound internet
+# path at all**, which is exactly the lab's situation. HTTP-01 would require
+# exposing port 80 from VLAN 20 to the internet, which is the thing the whole
+# network design is avoiding.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: mchellmer@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: mchellmer@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        # TODO: set to the real zone once lab_domain is decided. Until then the
+        # staging issuer is the one to exercise — prod has rate limits that a
+        # misconfigured selector will burn through in an afternoon.
+        selector:
+          dnsZones:
+            - "lab.example.invalid"

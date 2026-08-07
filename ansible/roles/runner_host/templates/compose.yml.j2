@@ -1,0 +1,46 @@
+# Managed by ansible/roles/runner_host. Do not edit on the host.
+#
+# Interim topology (§3.5): compose on 1972-console, before the cluster exists.
+# Target is ARC scale sets in-cluster — but this stack stays afterwards as the
+# break-glass path, because it is how you rebuild the cluster that hosts ARC.
+#
+# Org-scoped, so "a runner for whichever repo is queueing" is a non-problem.
+# That is the whole point of the org (ADR-0001).
+services:
+  runner:
+    image: {{ runner_image }}
+    env_file: [runner.env]
+    environment:
+{% if runner_scope == 'org' %}
+      ORG_NAME: "{{ github_org }}"
+{% else %}
+      REPO_URL: "https://github.com/{{ github_org }}/{{ runner_repo }}"
+{% endif %}
+      RUNNER_SCOPE: "{{ runner_scope }}"
+      EPHEMERAL: "{{ 'true' if runner_ephemeral else 'false' }}"
+      LABELS: "{{ runner_labels | join(',') }}"
+      RUNNER_WORKDIR: "{{ runner_workdir }}"
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+{% if runner_mount_docker_socket %}
+      # ~= root on the host. Mitigated by the unprivileged runner user; removed
+      # entirely when jobs move to ARC dind.
+      - /var/run/docker.sock:/var/run/docker.sock
+{% endif %}
+      - {{ runner_workdir }}:{{ runner_workdir }}
+      # The App private key is what lets the container mint its own
+      # registration token at start. Read-only, and never in the image.
+      - {{ runner_home }}/github-app.pem:/github-app.pem:ro
+    restart: always
+    deploy:
+      replicas: {{ runner_replicas }}
+      resources:
+        limits:
+          # 1 GB host. Two runners plus dockerd is the ceiling; the limit is
+          # what turns "console fell over" into "one job failed".
+          memory: 320M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

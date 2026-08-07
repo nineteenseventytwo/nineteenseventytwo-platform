@@ -1,0 +1,64 @@
+---
+# Stand up the runner stack on 1972-console.
+#
+#   make deploy-cicd
+#
+# Runners are org-scoped, App-authenticated and ephemeral (§3.1, §3.4). Nothing
+# durable lives in a runner: state is git, the registry, and the secrets store.
+- name: Configure the CI/CD host
+  hosts: cicd
+  gather_facts: true
+
+  pre_tasks:
+    - name: Fail early if the GitHub App credentials are missing
+      ansible.builtin.assert:
+        that:
+          - github_app_id is defined
+          - github_app_private_key is defined
+        fail_msg: >-
+          github_app_id / github_app_private_key are not set. They live in
+          ansible/inventory/lab/group_vars/all/secrets.sops.yml — copy the
+          .example, fill it in, and `sops --encrypt --in-place` it.
+          See docs/02-cicd.md.
+
+  roles:
+    - role: docker
+      tags: [docker]
+    - role: runner_host
+      tags: [runner]
+
+  tasks:
+    # console -> nodes, non-interactive. Generated on the console and never
+    # checked in; that is the whole reason it is generated here and not
+    # rendered from a template.
+    - name: Generate the ansible-console SSH key
+      community.crypto.openssh_keypair:
+        path: "/home/{{ admin_user }}/.ssh/ansible-console"
+        type: ed25519
+        comment: "ansible-console"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: "0600"
+      become: true
+      register: console_key
+      tags: [ssh]
+
+    - name: Read the console public key
+      ansible.builtin.slurp:
+        src: "/home/{{ admin_user }}/.ssh/ansible-console.pub"
+      become: true
+      register: console_pubkey
+      tags: [ssh]
+
+- name: Authorise the console key on every node
+  hosts: cluster
+  gather_facts: false
+  tags: [ssh]
+  tasks:
+    - name: Install the console public key
+      ansible.posix.authorized_key:
+        user: "{{ admin_user }}"
+        key: "{{ hostvars['1972-console'].console_pubkey.content | b64decode }}"
+        state: present
+        comment: "ansible-console"
+      become: true

@@ -1,0 +1,34 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-lab-deploy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "80"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners
+  sources:
+    - repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
+      chart: gha-runner-scale-set
+      targetRevision: 0.14.0
+      helm:
+        releaseName: arc-lab-deploy
+        valueFiles:
+          - $values/cluster/arc/values-lab-deploy.yaml
+    - repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}

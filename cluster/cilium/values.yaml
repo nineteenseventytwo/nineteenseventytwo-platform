@@ -1,0 +1,75 @@
+---
+# chart: 1.17.5
+# repo:  https://helm.cilium.io/
+#
+# Cilium is the CNI and, for now, the only network layer. Istio is NOT an
+# alternative to this — a mesh sits on top of a CNI, it does not replace one.
+# ADR-0003 records why the mesh is deferred.
+#
+# k8sServiceHost / k8sServicePort / ipam / kubeProxyReplacement are injected by
+# ansible/playbooks/30-cluster.yml from the inventory, so the API server address
+# lives in exactly one place.
+
+# 3 nodes, 2 GB each.
+operator:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {memory: 512Mi}
+
+# Native routing would be faster, but it requires the underlay to route the pod
+# CIDR — which means teaching OPNsense about 10.244.0.0/16. VXLAN keeps pod
+# networking entirely inside the cluster and off the firewall's plate.
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+ipv4:
+  enabled: true
+ipv6:
+  enabled: false
+
+# Node-to-node encryption without a service mesh. This is one of the three
+# reasons Cilium is enough for now (the others being NetworkPolicy enforcement,
+# which Flannel never had, and Hubble).
+encryption:
+  enabled: true
+  type: wireguard
+  nodeEncryption: true
+
+# NetworkPolicy is the whole point: intra-VLAN 20 traffic is switch-local and
+# the firewall never sees it, so pod isolation cannot be a firewall problem.
+policyEnforcementMode: default
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    resources:
+      requests: {cpu: 25m, memory: 64Mi}
+      limits: {memory: 128Mi}
+  ui:
+    # Costs ~150Mi across two containers. Turn on when you need to look at
+    # flows; leave off the rest of the time on 2 GB nodes.
+    enabled: false
+  metrics:
+    enabled: [dns, drop, tcp, flow, port-distribution]
+
+# Cilium ships its own LB, but MetalLB in L2 mode is simpler here and is what
+# the OPNsense reservation range was carved out for.
+l2announcements:
+  enabled: false
+
+bpf:
+  masquerade: true
+
+prometheus:
+  enabled: true
+operator.prometheus:
+  enabled: true
+
+# Restarting every pod to pick up a config change is disruptive on 3 nodes.
+rollOutCiliumPods: true

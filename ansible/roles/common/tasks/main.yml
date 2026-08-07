@@ -1,0 +1,118 @@
+---
+- name: Set the hostname to the inventory name
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  become: true
+
+- name: Ensure /etc/hosts resolves our own name
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ inventory_hostname }}.{{ lab_domain }} {{ inventory_hostname }}"
+    state: present
+  become: true
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Configure unattended-upgrades
+  ansible.builtin.template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Enable the unattended-upgrades timer
+  ansible.builtin.systemd:
+    name: unattended-upgrades
+    enabled: true
+    state: started
+  become: true
+
+- name: Configure chrony
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Restart chrony
+
+# A cluster that disagrees about the time produces certificate errors that look
+# like everything except a clock problem.
+- name: Enable chrony
+  ansible.builtin.systemd:
+    name: chrony
+    enabled: true
+    state: started
+  become: true
+
+- name: Cap journald disk usage
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: /etc/systemd/journald.conf.d/10-limits.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Restart journald
+
+- name: Ensure the journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# --------------------------------------------------------------------------
+# Swap. kubelet refuses to start with swap enabled, and the failure message
+# does not say so clearly. Mask the target rather than just swapoff, otherwise
+# a reboot brings it back.
+# --------------------------------------------------------------------------
+- name: Disable swap
+  when: disable_swap | bool
+  become: true
+  block:
+    - name: Report currently active swap devices
+      ansible.builtin.command: swapon --show --noheadings
+      register: common_swap_active
+      changed_when: false
+      failed_when: false
+
+    - name: Turn off swap now
+      ansible.builtin.command: swapoff -a
+      when: common_swap_active.stdout | length > 0
+      changed_when: true
+
+    - name: Comment out any swap entries in fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#\n].*\s+swap\s+.*)$'
+        replace: '# \1  # disabled by ansible/roles/common: kubelet requires no swap'
+
+    - name: Mask swap.target so a reboot does not bring it back
+      ansible.builtin.systemd:
+        name: swap.target
+        masked: true
+
+    - name: Remove the zram swap generator if present
+      ansible.builtin.apt:
+        name: systemd-zram-generator
+        state: absent
+
+- name: Report EEPROM boot order reminder
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} is an RPi 4. Confirm `rpi-eeprom-config` has
+      BOOT_ORDER trying USB before SD *before* you retire its SD card.
+  when: requires_eeprom_boot_order | default(false)

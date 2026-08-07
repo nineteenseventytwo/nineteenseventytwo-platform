@@ -1,0 +1,66 @@
+---
+# The custom resources that only make sense once their operators exist:
+# MetalLB pools, cert-manager Issuers, the ESO ClusterSecretStore, and the
+# ExternalSecrets those Issuers consume. Sync wave 90 puts them after every
+# chart above, so the CRDs are always present first.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-manifests
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "90"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster
+    directory:
+      recurse: true
+      # Explicit include: the values.yaml files in these same directories are
+      # Helm inputs, not manifests, and Argo would try to apply them.
+      #
+      # Must stay on one line — the glob is parsed literally, so a folded
+      # scalar would insert spaces into the pattern and match nothing.
+      # yamllint disable-line rule:line-length
+      include: "{metallb/ipaddresspool.yaml,cert-manager/clusterissuer-*.yaml,cert-manager/externalsecret-*.yaml,external-secrets/clustersecretstore.yaml,arc/externalsecret-*.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+# Baseline policy: default-deny NetworkPolicies, PSS namespace labels, and the
+# per-tenant namespace + quota + RBAC. Applied once by 30-cluster.yml so the
+# cluster is never briefly open; reconciled here so it stays that way.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-policy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "95"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: policy
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

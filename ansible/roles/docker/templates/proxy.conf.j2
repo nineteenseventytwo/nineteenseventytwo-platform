@@ -1,0 +1,6 @@
+# Managed by ansible/roles/docker. Do not edit on the host.
+# The daemon reads its proxy from here, not from /etc/environment.
+[Service]
+Environment="HTTP_PROXY={{ egress_proxy_url }}"
+Environment="HTTPS_PROXY={{ egress_proxy_url }}"
+Environment="NO_PROXY={{ egress_proxy_no_proxy | join(',') }}"

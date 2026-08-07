@@ -1,0 +1,160 @@
+---
+# Memory cgroups are enabled by cloud-init at first boot. If a node was imaged
+# some other way, fail loudly here rather than letting the kubelet fail with a
+# message that does not mention cgroups.
+- name: Assert memory cgroups are enabled
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.cmdline.get('cgroup_enable', '') == 'memory'
+      - ansible_facts.cmdline.get('cgroup_memory', '') == '1'
+    fail_msg: >-
+      Memory cgroups are not enabled on {{ inventory_hostname }}. Append
+      `cgroup_enable=memory cgroup_memory=1` to /boot/firmware/cmdline.txt
+      (one line, no wrapping) and reboot. kubelet will not start without it.
+    success_msg: "memory cgroups enabled"
+  when: kubelet_node | default(false)
+
+- name: Assert swap is off
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.swaptotal_mb | int == 0
+    fail_msg: >-
+      Swap is still enabled on {{ inventory_hostname }}. The `common` role masks
+      swap.target; re-run it and reboot. kubelet refuses to start with swap on.
+  when: kubelet_node | default(false)
+
+- name: Load required kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kube_required_modules }}"
+  become: true
+
+- name: Persist required kernel modules
+  ansible.builtin.template:
+    src: modules-k8s.conf.j2
+    dest: /etc/modules-load.d/k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Apply Kubernetes sysctls
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ kube_required_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  become: true
+
+- name: Ensure the apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Install the Kubernetes apt key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Add the Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc]
+      https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /
+    filename: kubernetes
+    state: present
+  become: true
+
+- name: Install Kubernetes packages
+  ansible.builtin.apt:
+    name: "{{ kube_prereqs_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+# An unattended kubelet bump mid-cluster is a genuinely bad afternoon. The
+# common role blacklists them from unattended-upgrades; this pins them against
+# a manual `apt upgrade` too.
+- name: Hold the Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: true
+
+- name: Ensure the config and drop-in directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/containerd
+    - /etc/containerd/certs.d
+    - /etc/systemd/system/containerd.service.d
+    - /etc/systemd/system/kubelet.service.d
+  become: true
+
+- name: Configure containerd
+  ansible.builtin.template:
+    src: containerd-config.toml.j2
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Restart containerd
+
+- name: Configure the containerd egress proxy
+  ansible.builtin.template:
+    src: containerd-proxy.conf.j2
+    dest: /etc/systemd/system/containerd.service.d/proxy.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: egress_proxy_enabled | bool
+  notify: Restart containerd
+
+# Reserved memory keeps a runaway pod from evicting the kubelet on a 2 GB node.
+- name: Configure kubelet resource reservations
+  ansible.builtin.template:
+    src: kubelet-reserved.conf.j2
+    dest: /etc/systemd/system/kubelet.service.d/20-reserved.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Restart kubelet
+
+- name: Enable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Enable kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+  become: true
