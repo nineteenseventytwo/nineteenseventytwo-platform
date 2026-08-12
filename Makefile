@@ -1,8 +1,12 @@
 # Single entrypoint for the platform. CI calls these same targets.
 #
 # Everything that touches a node runs inside the ansible-runner image, so the
-# only host requirement is docker. Set RUNNER_LOCAL=1 to use a locally
-# installed ansible-playbook instead (useful on 1972-console-1 itself).
+# only host requirement is docker — the same engine the console and CI use, so
+# a target behaves identically wherever it runs. The one exception is
+# bootstrap-render(-all): pure local templating with no node contact, and the
+# only thing meant to run via podman on a workstation (see render.sh). Set
+# RUNNER_LOCAL=1 to use a locally installed ansible-playbook instead (useful
+# on 1972-console-1 itself).
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -47,7 +51,7 @@ help: ## Show this help
 .PHONY: deps
 deps: ## Verify local tooling is present
 	@missing=0; \
-	for t in docker sops age-keygen; do \
+	for t in podman sops age-keygen; do \
 	  command -v $$t >/dev/null 2>&1 || { echo "missing: $$t"; missing=1; }; \
 	done; \
 	if [ "$(RUNNER_LOCAL)" = "1" ]; then \

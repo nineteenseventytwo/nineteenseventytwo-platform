@@ -5,8 +5,11 @@
 #
 # The inventory (ansible/inventory/lab/hosts.yml) is the single source of truth
 # for hostnames, addresses and roles, so this shells out to ansible rather than
-# re-implementing the lookup. Uses the ansible-runner image unless
-# RUNNER_LOCAL=1 or ansible-playbook is already on PATH.
+# re-implementing the lookup. Uses the ansible-runner image via podman unless
+# RUNNER_LOCAL=1 or ansible-playbook is already on PATH. podman, not docker:
+# this step never touches a live node — pure local templating — and is the
+# only thing in this repo meant to run that way. Everything else (Makefile's
+# DOCKER_RUN and CI) stays docker, matching what runs on the console.
 set -euo pipefail
 
 HOST="${1:?usage: render.sh <hostname> [output-dir]}"
@@ -45,7 +48,7 @@ if [[ "${RUNNER_LOCAL:-0}" == "1" ]] || command -v ansible-playbook >/dev/null 2
 else
   ORG="${ORG:-nineteenseventytwo}"
   IMAGE="${ANSIBLE_RUNNER:-ghcr.io/${ORG}/ansible-runner:$(cat images/ansible-runner/version.txt)}"
-  docker run --rm -i \
+  podman run --rm -i \
     -v "$PWD:/work" -w /work \
     -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
     "$IMAGE" ansible-playbook "${ARGS[@]}"

@@ -27,8 +27,8 @@ lab_metallb_pool: "192.168.20.240-192.168.20.250"
 # templated from this var, so a change here means updating both places.
 lab_domain: "eightbitsaxlounge.com"
 
-lab_timezone: "America/Chicago"
-lab_locale: "en_US.UTF-8"
+lab_timezone: "Europe/London"
+lab_locale: "en_GB.UTF-8"
 
 # VLAN 10 — your workstation side. Referenced by the hardening role's ufw rules
 # so SSH is reachable from the workstation and nowhere else.
@@ -47,7 +47,7 @@ gha_runner_image: "{{ registry }}/gha-runner"
 # Versions. Pinned so replaying an old commit does what it did then.
 # ---------------------------------------------------------------------------
 # Matches what eightbitsaxlounge/server runs today; bump deliberately.
-kubernetes_version: "1.35"
+kubernetes_version: "1.36"
 containerd_version: "latest"
 cilium_version: "1.17.5"
 
