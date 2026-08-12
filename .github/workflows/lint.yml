@@ -109,7 +109,7 @@ jobs:
           output_file_path: checkov.sarif
 
       - name: Trivy filesystem scan - secrets and vulnerable pins
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
