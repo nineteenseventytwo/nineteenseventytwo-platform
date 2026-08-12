@@ -3,9 +3,9 @@
 # Deliberately does NOT contain Ansible. Baking it in means a collection bump
 # forces a runner rebuild and a runner CVE forces an Ansible revalidation; the
 # workflow instead does `docker run ansible-runner ...` from inside this one.
-FROM ghcr.io/actions/actions-runner:2.331.0
+FROM ghcr.io/actions/actions-runner:2.336.0
 
-ARG DOCKER_CLI_VERSION=27.4.1
+ARG DOCKER_CLI_VERSION=29.8.0
 ARG TARGETARCH=aarch64
 
 LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nineteenseventytwo-platform" \
