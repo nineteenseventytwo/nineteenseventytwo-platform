@@ -1,4 +1,4 @@
-# ADR-0007: `1972-console` stays out of the cluster
+# ADR-0007: `1972-console-1` stays out of the cluster
 
 **Status:** Accepted
 **Date:** 2026-08-07
@@ -11,7 +11,7 @@ below wherever this bites.
 ## Context
 
 Four Pis, all RPi 5s with 2 GB and an SSD. Hardware-wise, there is nothing left
-that distinguishes `1972-console` from `1972-master-1`, `1972-worker-1`, or
+that distinguishes `1972-console-1` from `1972-master-1`, `1972-worker-1`, or
 `1972-worker-2`.
 
 That makes the obvious instinct stronger than it used to be: four identical
@@ -19,14 +19,14 @@ boards, why not run four identical nodes.
 
 ## Context that makes it not obvious
 
-`1972-console` is what *builds* the cluster. It runs the bootstrap runner that
+`1972-console-1` is what *builds* the cluster. It runs the bootstrap runner that
 executes the Ansible that runs `kubeadm init`. That fact does not depend on
 what CPU or how much RAM the board has — it is true for any machine playing
 that role, on any hardware.
 
 ## Decision
 
-`1972-console` is not a cluster node. It is the bootstrap node and the
+`1972-console-1` is not a cluster node. It is the bootstrap node and the
 break-glass runner host.
 
 ## Consequences

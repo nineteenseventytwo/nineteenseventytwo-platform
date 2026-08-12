@@ -32,7 +32,7 @@ inventory is the single source of truth for hostnames, addresses and roles.
   connection is already hardened.
 - On the three **cluster** nodes only, appends
   `cgroup_enable=memory cgroup_memory=1` to `/boot/firmware/cmdline.txt` and
-  reboots once. kubelet will not start without it. `1972-console` skips this.
+  reboots once. kubelet will not start without it. `1972-console-1` skips this.
 - Installs a deliberately minimal package set. Ansible does the rest.
 
 ### Addressing
@@ -54,7 +54,7 @@ both. See [docs/04-secrets.md](../docs/04-secrets.md) §Tier 3.
 | Key | Lives where | Used for |
 |---|---|---|
 | `mark-workstation` (ed25519) | Windows workstation agent; private key never leaves it | VLAN 10 → VLAN 20, interactive |
-| `ansible-console` (ed25519) | Generated *on* `1972-console`, never committed | console → all nodes, non-interactive |
+| `ansible-console` (ed25519) | Generated *on* `1972-console-1`, never committed | console → all nodes, non-interactive |
 | GitHub App private key | SOPS-encrypted + org Actions secret | runner registration |
 
 Put the **public** half of `mark-workstation` at `bootstrap/ssh/mark-workstation.pub`

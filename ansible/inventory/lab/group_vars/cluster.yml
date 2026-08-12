@@ -1,5 +1,5 @@
 ---
-# Applies to control_plane + workers. Not to 1972-console (ADR-0007) and not to
+# Applies to control_plane + workers. Not to 1972-console-1 (ADR-0007) and not to
 # the Windows midi host.
 
 kubelet_node: true

@@ -1,6 +1,6 @@
 # ansible-runner — the artefact with real reuse value.
 #
-# Run from CI, from 1972-console, and from a laptop. Versioned and pinned
+# Run from CI, from 1972-console-1, and from a laptop. Versioned and pinned
 # independently of anything GitHub does, which is exactly why it is separate
 # from the gha-runner image: a collection bump should not force a runner
 # rebuild, and a runner CVE should not force an Ansible revalidation.

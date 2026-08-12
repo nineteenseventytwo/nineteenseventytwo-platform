@@ -16,7 +16,7 @@ ssh-keygen -t ed25519 -C "mark-workstation" -f ~/.ssh/mark-workstation
 cp ~/.ssh/mark-workstation.pub bootstrap/ssh/
 ```
 
-The `ansible-console` key is generated **on** `1972-console` by the
+The `ansible-console` key is generated **on** `1972-console-1` by the
 `20-cicd-host.yml` playbook and never leaves it. That is why there is no
 template for it here.
 
@@ -37,6 +37,6 @@ vault read -field=public_key ssh-client-signer/config/ca > bootstrap/ssh/ca.pub
 ./bootstrap/ssh/sign.sh 192.168.20.202
 ```
 
-Keep one break-glass static key on `1972-console`, offline, for when Vault is
+Keep one break-glass static key on `1972-console-1`, offline, for when Vault is
 the thing that is down. It is the only `authorized_keys` entry that survives the
 CA cutover.

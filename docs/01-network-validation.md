@@ -43,7 +43,7 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   test 2 fails and you spend an evening on it.
 - Reserve `192.168.20.240–250` for MetalLB; keep the Kea pool (`.100–.199`) and
   the node reservations (`.201–.204`) clear of it.
-- Unbound host overrides for `1972-console`, `1972-master-1`, `1972-worker-1`,
+- Unbound host overrides for `1972-console-1`, `1972-master-1`, `1972-worker-1`,
   `1972-worker-2` under `eightbitsaxlounge.com` (matches the fqdn cloud-init
   renders: `{{ inventory_hostname }}.{{ lab_domain }}`), plus the internal
   tool hostnames used in `cluster/*/values.yaml` — `argocd.`, `vault.`,

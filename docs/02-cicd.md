@@ -2,7 +2,7 @@
 
 ## Where things run
 
-This split matters on its own merits, independent of what `1972-console`
+This split matters on its own merits, independent of what `1972-console-1`
 weighs in at: self-hosted runners exist for LAN reachability, not compute, so
 build work has no business running there regardless of the board underneath
 it.
@@ -89,7 +89,7 @@ sops ansible/inventory/lab/group_vars/all/secrets.sops.yml
 
 ## Two topologies
 
-### Interim — compose on `1972-console`
+### Interim — compose on `1972-console-1`
 
 Before the cluster exists. `ansible/roles/runner_host` renders a compose stack;
 `make deploy-cicd` applies it. Org-scoped, so "a runner for whichever repo is
@@ -111,7 +111,7 @@ are defined by **capability**, not by repo:
 | `lab-deploy` | `self-hosted, lab-network` | Ansible + kubectl. No privileged container. |
 | `lab-dind` | `self-hosted, dind` | Jobs that must build locally. Privileged; scaled to zero. |
 
-Keep the compose stack on `1972-console` afterwards as the **break-glass path** —
+Keep the compose stack on `1972-console-1` afterwards as the **break-glass path** —
 it is how you rebuild the cluster that hosts the other runners.
 
 ## The docker socket

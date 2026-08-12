@@ -33,7 +33,7 @@ rotates, and what happens if it leaks.
 | Cloudflare API token | Vault `kv/platform/cloudflare` | `Zone:DNS:Edit` on one zone | Semi-annual | DNS records for one zone — enough to mis-issue certificates for it. Scope to the single zone, never account-wide. |
 | App secrets (env vars, API keys) | Vault `kv/tenants/<name>/*` | One namespace each, via `ExternalSecret` | Per-app | Whatever that app's config holds. No app repo can read another's — see [ADR-0012](decisions/ADR-0012-platform-owns-app-workloads.md); there is no tenant kubeconfig anymore, only this. |
 | Grafana admin password | Vault `kv/platform/grafana` | Grafana | Annual | Dashboards and datasource credentials. |
-| Break-glass SSH key | Offline, on `1972-console` | All nodes | Never (audited) | Root-equivalent. Exists precisely for when Vault is the thing that is down. |
+| Break-glass SSH key | Offline, on `1972-console-1` | All nodes | Never (audited) | Root-equivalent. Exists precisely for when Vault is the thing that is down. |
 
 ## Tier 0 — SOPS + age, and retiring ansible-vault
 
@@ -106,7 +106,7 @@ actually works, an audit log of who requested access to what and when, and
 credentials that expire before you have finished making tea. It is the on-prem
 mirror of the short-lived-credential pattern `aws configure sso` gives you.
 
-Keep **one** break-glass static key on `1972-console`, offline, for when Vault
+Keep **one** break-glass static key on `1972-console-1`, offline, for when Vault
 is the thing that is down.
 
 ## Tier 4 — TLS

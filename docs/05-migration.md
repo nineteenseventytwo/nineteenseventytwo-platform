@@ -61,7 +61,7 @@ wait for the migration.
 
 Questions this repo does not answer, carried forward from the plan:
 
-1. **`1972-console`'s MAC address** — the board was replaced (RPi 4/1 GB →
+1. **`1972-console-1`'s MAC address** — the board was replaced (RPi 4/1 GB →
    RPi 5/2 GB/SSD, matching the cluster nodes). `ansible/inventory/lab/hosts.yml`
    has a placeholder; run `ip a` after first boot, update it, and match the Kea
    reservation for `192.168.20.201` before rendering its cloud-init.

@@ -18,7 +18,7 @@ against [`cluster/`](../cluster/) — there is no `kubectl apply` from a laptop,
 and that discipline is what makes the cluster reproducible rather than merely
 documented.
 
-`1972-console` stays out of the cluster. It builds the cluster, so putting it in
+`1972-console-1` stays out of the cluster. It builds the cluster, so putting it in
 creates a circular dependency — a rebuild would need the cluster already
 running to run the runner that rebuilds it. All four boards are the same
 hardware now, so that circular-dependency argument is the whole reason, not a

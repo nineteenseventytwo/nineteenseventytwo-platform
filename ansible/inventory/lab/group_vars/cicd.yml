@@ -1,5 +1,5 @@
 ---
-# 1972-console: bootstrap node and break-glass runner host. RPi 5 / 2 GB / SSD
+# 1972-console-1: bootstrap node and break-glass runner host. RPi 5 / 2 GB / SSD
 # — the same hardware as the cluster nodes. Kept out of the cluster for
 # architectural reasons (ADR-0007: it is what builds the cluster, so joining
 # it creates a circular dependency), not because it lacks the resources.

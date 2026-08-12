@@ -12,7 +12,7 @@ inconvenient.
 | [0004](ADR-0004-platform-owns-tenant-namespaces.md) | Platform owns tenant namespaces, quotas and RBAC | Superseded by [0012](ADR-0012-platform-owns-app-workloads.md) |
 | [0005](ADR-0005-argocd-and-vault-kms.md) | Argo CD from the start; Vault with KMS auto-unseal | Accepted |
 | [0006](ADR-0006-runner-docker-socket.md) | Mount the docker socket in bootstrap runners | Accepted, with a stated exit |
-| [0007](ADR-0007-console-outside-cluster.md) | `1972-console` stays out of the cluster | Accepted |
+| [0007](ADR-0007-console-outside-cluster.md) | `1972-console-1` stays out of the cluster | Accepted |
 | [0008](ADR-0008-sops-age.md) | SOPS+age; retire ansible-vault | Accepted |
 | [0009](ADR-0009-dhcp-authority.md) | Kea reservations are authoritative for addressing | Accepted |
 | [0010](ADR-0010-fork-pr-self-hosted-runners.md) | Route `pull_request` jobs to hosted runners | Accepted |

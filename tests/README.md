@@ -35,7 +35,7 @@ curl -fsSL https://github.com/goss-org/goss/releases/latest/download/goss-linux-
 goss -g tests/goss/node.yaml validate --format documentation
 ```
 
-`memory-cgroups-enabled` will fail on `1972-console`, correctly — it is not a
+`memory-cgroups-enabled` will fail on `1972-console-1`, correctly — it is not a
 cluster node and does not need memory cgroups.
 
 ## What is deliberately not tested here

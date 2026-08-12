@@ -68,6 +68,6 @@ Put that last public key at `bootstrap/ssh/ca.pub`, set
 
 ## Break-glass
 
-Keep one static SSH key on `1972-console`, offline, for when Vault is the thing
+Keep one static SSH key on `1972-console-1`, offline, for when Vault is the thing
 that is down. It is the only `authorized_keys` entry that survives the CA
 cutover, and it is deliberate.

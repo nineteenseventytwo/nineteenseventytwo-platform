@@ -5,7 +5,7 @@
 
 ## Context
 
-The interim runner topology is docker-compose on `1972-console`, before the
+The interim runner topology is docker-compose on `1972-console-1`, before the
 cluster exists. Those runner containers need to start sibling containers — the
 whole `workflow → containerised Ansible → Pis` pattern depends on it.
 
@@ -14,7 +14,7 @@ socket, or running docker-in-docker.
 
 ## Decision
 
-Mount `/var/run/docker.sock` into the compose runners on `1972-console`.
+Mount `/var/run/docker.sock` into the compose runners on `1972-console-1`.
 
 ## Consequences
 
@@ -46,7 +46,7 @@ Once the cluster is stable, jobs move to ARC scale sets:
   locally. Still privileged, but privileged *in a pod* rather than root on a
   host with SSH keys to the cluster. Scaled to zero.
 
-The compose stack stays on `1972-console` afterwards as the break-glass path —
+The compose stack stays on `1972-console-1` afterwards as the break-glass path —
 it is how you rebuild the cluster that hosts ARC. Its exposure persists, which
 is why this ADR stays open rather than being superseded.
 

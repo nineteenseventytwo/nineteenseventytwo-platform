@@ -1,5 +1,5 @@
 ---
-# Stand up the runner stack on 1972-console.
+# Stand up the runner stack on 1972-console-1.
 #
 #   make deploy-cicd
 #
@@ -58,7 +58,7 @@
     - name: Install the console public key
       ansible.posix.authorized_key:
         user: "{{ admin_user }}"
-        key: "{{ hostvars['1972-console'].console_pubkey.content | b64decode }}"
+        key: "{{ hostvars['1972-console-1'].console_pubkey.content | b64decode }}"
         state: present
         comment: "ansible-console"
       become: true

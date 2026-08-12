@@ -66,10 +66,10 @@
     - name: Allow SSH from the console node
       community.general.ufw:
         rule: allow
-        src: "{{ hostvars['1972-console'].ansible_host }}"
+        src: "{{ hostvars['1972-console-1'].ansible_host }}"
         port: "{{ hardening_ssh_port }}"
         proto: tcp
-        comment: "ansible from 1972-console"
+        comment: "ansible from 1972-console-1"
 
     # Intra-VLAN 20 traffic is switch-local — OPNsense never sees it. Node
     # isolation here and NetworkPolicy in-cluster are the only controls that do.

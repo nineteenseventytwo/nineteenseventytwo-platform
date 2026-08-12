@@ -17,12 +17,12 @@ Argo CD. See [the boundary rule](#the-boundary-rule).
 
 | Host | Model | RAM | Address | Role |
 |---|---|---|---|---|
-| `1972-console` | RPi 5 | 2 GB | `192.168.20.201` | Bootstrap node. Break-glass runner. **Not** in the cluster. |
+| `1972-console-1` | RPi 5 | 2 GB | `192.168.20.201` | Bootstrap node. Break-glass runner. **Not** in the cluster. |
 | `1972-master-1` | RPi 5 | 2 GB | `192.168.20.202` | Control plane |
 | `1972-worker-1` | RPi 5 | 2 GB | `192.168.20.203` | Worker (Longhorn replica) |
 | `1972-worker-2` | RPi 5 | 2 GB | `192.168.20.204` | Worker (Longhorn replica) |
 
-All four boards are now identical hardware. `1972-console` still stays out of
+All four boards are now identical hardware. `1972-console-1` still stays out of
 the cluster deliberately — it builds the cluster, so putting it in creates a
 circular dependency: a rebuild would need the cluster already running to run
 the runner that rebuilds it. That argument holds regardless of hardware. See

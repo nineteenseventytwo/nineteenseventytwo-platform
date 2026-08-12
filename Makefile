@@ -2,7 +2,7 @@
 #
 # Everything that touches a node runs inside the ansible-runner image, so the
 # only host requirement is docker. Set RUNNER_LOCAL=1 to use a locally
-# installed ansible-playbook instead (useful on 1972-console itself).
+# installed ansible-playbook instead (useful on 1972-console-1 itself).
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -68,7 +68,7 @@ bootstrap-render: ## Render cloud-init for one host. Usage: make bootstrap-rende
 
 .PHONY: bootstrap-render-all
 bootstrap-render-all: ## Render cloud-init for every host in the inventory
-	@for h in 1972-console 1972-master-1 1972-worker-1 1972-worker-2; do \
+	@for h in 1972-console-1 1972-master-1 1972-worker-1 1972-worker-2; do \
 	  bootstrap/cloud-init/render.sh "$$h" "$(BUILD_DIR)/$$h"; \
 	done
 
@@ -93,7 +93,7 @@ deploy-nodes: ## Converge all nodes to the hardened baseline
 	$(PLAYBOOK) playbooks/10-bootstrap-nodes.yml
 
 .PHONY: deploy-cicd
-deploy-cicd: ## Stand up the compose runner stack on 1972-console
+deploy-cicd: ## Stand up the compose runner stack on 1972-console-1
 	$(PLAYBOOK) playbooks/20-cicd-host.yml
 
 .PHONY: images
