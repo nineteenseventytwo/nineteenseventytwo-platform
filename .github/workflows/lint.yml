@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.14"}
       - run: pip install yamllint
       - run: yamllint -c .yamllint --strict .
 
@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - run: pip install "ansible-core==2.18.1" ansible-lint
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.14"}
+      - run: pip install "ansible-core==2.21.3" ansible-lint
       - run: ansible-galaxy collection install -r ansible/requirements.yml
       - run: ansible-lint -c .ansible-lint
       - name: Inventory parses and every host resolves
@@ -42,7 +42,7 @@ jobs:
   shell:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: shellcheck
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
@@ -51,8 +51,8 @@ jobs:
   helm:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
       - name: Values files are valid YAML and charts template cleanly
         run: |
           set -euo pipefail
@@ -96,7 +96,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Checkov (IaC misconfiguration)
         uses: bridgecrewio/checkov-action@v12
@@ -109,7 +109,7 @@ jobs:
           output_file_path: checkov.sarif
 
       - name: Trivy filesystem scan - secrets and vulnerable pins
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
@@ -118,7 +118,7 @@ jobs:
           severity: HIGH,CRITICAL
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: .
