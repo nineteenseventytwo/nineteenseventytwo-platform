@@ -5,7 +5,7 @@
 # workflow instead does `docker run ansible-runner ...` from inside this one.
 FROM ghcr.io/actions/actions-runner:2.336.0
 
-ARG DOCKER_CLI_VERSION=29.8.0
+ARG DOCKER_CLI_VERSION=29.7.2
 ARG TARGETARCH=aarch64
 
 LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nineteenseventytwo-platform" \
