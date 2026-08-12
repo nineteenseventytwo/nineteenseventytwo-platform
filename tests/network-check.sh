@@ -81,8 +81,11 @@ if want 3; then
 fi
 
 # 4 ------------------------------------------------------------------------
+# GET, not HEAD/-I: ghcr.io's root path answers HEAD with 405, which looks
+# like a broken egress path but actually proves the opposite — DNS, TCP and
+# TLS all completed and the server responded.
 if want 4; then
-  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -I https://ghcr.io 2>/dev/null)
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://ghcr.io 2>/dev/null)
   if [[ "$code" =~ ^(200|301|302)$ ]]; then
     report 4 "egress TCP to ghcr.io" pass
   else
