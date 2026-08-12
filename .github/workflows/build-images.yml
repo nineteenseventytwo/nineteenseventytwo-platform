@@ -28,7 +28,7 @@ jobs:
       matrix:
         image: [ansible-runner, gha-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read the pinned version
         id: version
@@ -70,6 +70,12 @@ jobs:
       - name: Trivy scan the built image
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          # The action's container runs under amd64 emulation on arm64-hosted
+          # runners, so trivy's platform auto-detection picks amd64 — and this
+          # repo only ever pushes arm64. Without this it 404s against the
+          # image index looking for a child that was never built.
+          TRIVY_PLATFORM: linux/arm64
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.version.outputs.value }}
           format: table
