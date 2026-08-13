@@ -1,12 +1,14 @@
-# Single entrypoint for the platform. CI calls these same targets.
+# Single entrypoint for the platform. Both the workstation (by hand) and CI
+# (via `make` in a workflow step) call these same targets.
 #
-# Everything that touches a node runs inside the ansible-runner image, so the
-# only host requirement is docker — the same engine the console and CI use, so
-# a target behaves identically wherever it runs. The one exception is
-# bootstrap-render(-all): pure local templating with no node contact, and the
-# only thing meant to run via podman on a workstation (see render.sh). Set
-# RUNNER_LOCAL=1 to use a locally installed ansible-playbook instead (useful
-# on 1972-console-1 itself).
+# The container engine is chosen by who's calling, not hardcoded: podman on
+# the workstation (no docker install there by design), docker in CI. Detected
+# from GITHUB_ACTIONS, which every GitHub-hosted and self-hosted runner sets —
+# override with ENGINE=docker|podman to force one. Everything still runs the
+# same ansible-runner image either way, pulled from GHCR; only the local
+# engine invoking it differs. Set RUNNER_LOCAL=1 to skip containers entirely
+# and use a locally installed ansible-playbook instead (useful on
+# 1972-console-1 itself, where it's already on PATH).
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -20,8 +22,10 @@ INVENTORY        ?= ansible/inventory/lab
 KUBECONFIG       ?= $(HOME)/.kube/config
 BUILD_DIR        ?= build
 
+ENGINE           ?= $(if $(GITHUB_ACTIONS),docker,podman)
+
 # Mounts: repo at /work, ssh agent socket, kubeconfig for the cluster targets.
-DOCKER_RUN = docker run --rm -i \
+CONTAINER_RUN = $(ENGINE) run --rm -i \
 	-v $(PWD):/work -w /work \
 	-v $(HOME)/.ssh:/root/.ssh:ro \
 	-v $(HOME)/.config/sops/age:/root/.config/sops/age:ro \
@@ -33,9 +37,9 @@ ifeq ($(RUNNER_LOCAL),1)
   KUBECTL = kubectl
   HELM    = helm
 else
-  ANSIBLE = $(DOCKER_RUN) ansible-playbook
-  KUBECTL = $(DOCKER_RUN) kubectl
-  HELM    = $(DOCKER_RUN) helm
+  ANSIBLE = $(CONTAINER_RUN) ansible-playbook
+  KUBECTL = $(CONTAINER_RUN) kubectl
+  HELM    = $(CONTAINER_RUN) helm
 endif
 
 PLAYBOOK = $(ANSIBLE) -i $(INVENTORY)
@@ -51,7 +55,7 @@ help: ## Show this help
 .PHONY: deps
 deps: ## Verify local tooling is present
 	@missing=0; \
-	for t in podman sops age-keygen; do \
+	for t in $(ENGINE) sops age-keygen; do \
 	  command -v $$t >/dev/null 2>&1 || { echo "missing: $$t"; missing=1; }; \
 	done; \
 	if [ "$(RUNNER_LOCAL)" = "1" ]; then \
@@ -82,7 +86,7 @@ test-network: ## Run the VLAN 20 validation matrix (docs/01-network-validation.m
 
 .PHONY: test-nodes
 test-nodes: ## Assert every node matches the hardened baseline
-	$(PLAYBOOK) playbooks/site.yml --check --diff
+	$(PLAYBOOK) ansible/playbooks/site.yml --check --diff
 
 # --------------------------------------------------------------------------
 # Phase B — nodes and CI/CD
@@ -90,28 +94,41 @@ test-nodes: ## Assert every node matches the hardened baseline
 
 .PHONY: ping
 ping: ## Connectivity check against every inventory host
-	$(DOCKER_RUN) ansible -i $(INVENTORY) all -m ping
+	$(CONTAINER_RUN) ansible -i $(INVENTORY) all -m ping
 
 .PHONY: deploy-nodes
 deploy-nodes: ## Converge all nodes to the hardened baseline
-	$(PLAYBOOK) playbooks/10-bootstrap-nodes.yml
+	$(PLAYBOOK) ansible/playbooks/10-bootstrap-nodes.yml
 
 .PHONY: deploy-cicd
 deploy-cicd: ## Stand up the compose runner stack on 1972-console-1
-	$(PLAYBOOK) playbooks/20-cicd-host.yml
+	$(PLAYBOOK) ansible/playbooks/20-cicd-host.yml
 
 .PHONY: images
 images: image-ansible-runner image-gha-runner ## Build both container images locally (arm64)
 
+# build-images.yml is the real publisher (docker/build-push-action, native
+# arm64 hosted runner). These targets are for testing a Dockerfile change
+# without pushing, from whichever side is calling.
 .PHONY: image-ansible-runner
-image-ansible-runner: ## Build the ansible-runner image
+image-ansible-runner: ## Build the ansible-runner image locally
+ifeq ($(ENGINE),docker)
 	docker buildx build --platform linux/arm64 \
 	  -t $(ANSIBLE_RUNNER) images/ansible-runner --load
+else
+	podman build --platform linux/arm64 \
+	  -t $(ANSIBLE_RUNNER) images/ansible-runner
+endif
 
 .PHONY: image-gha-runner
-image-gha-runner: ## Build the gha-runner image
+image-gha-runner: ## Build the gha-runner image locally
+ifeq ($(ENGINE),docker)
 	docker buildx build --platform linux/arm64 \
 	  -t $(GHA_RUNNER) images/gha-runner --load
+else
+	podman build --platform linux/arm64 \
+	  -t $(GHA_RUNNER) images/gha-runner
+endif
 
 # --------------------------------------------------------------------------
 # Phase C — cluster
@@ -119,12 +136,12 @@ image-gha-runner: ## Build the gha-runner image
 
 .PHONY: deploy-cluster
 deploy-cluster: ## kubeadm init, Cilium, join workers, default-deny
-	$(PLAYBOOK) playbooks/30-cluster.yml
+	$(PLAYBOOK) ansible/playbooks/30-cluster.yml
 
 .PHONY: kubeconfig
 kubeconfig: ## Fetch the admin kubeconfig from the control plane to ./build/kubeconfig
 	@mkdir -p $(BUILD_DIR)
-	$(PLAYBOOK) playbooks/30-cluster.yml --tags kubeconfig
+	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags kubeconfig
 
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
@@ -155,11 +172,11 @@ lint: lint-yaml lint-ansible lint-shell ## Run every linter
 
 .PHONY: lint-yaml
 lint-yaml:
-	$(DOCKER_RUN) yamllint -c .yamllint .
+	$(CONTAINER_RUN) yamllint -c .yamllint .
 
 .PHONY: lint-ansible
 lint-ansible:
-	$(DOCKER_RUN) ansible-lint -c .ansible-lint
+	$(CONTAINER_RUN) ansible-lint -c .ansible-lint
 
 .PHONY: lint-shell
 lint-shell:

@@ -6,10 +6,11 @@
 # The inventory (ansible/inventory/lab/hosts.yml) is the single source of truth
 # for hostnames, addresses and roles, so this shells out to ansible rather than
 # re-implementing the lookup. Uses the ansible-runner image via podman unless
-# RUNNER_LOCAL=1 or ansible-playbook is already on PATH. podman, not docker:
-# this step never touches a live node — pure local templating — and is the
-# only thing in this repo meant to run that way. Everything else (Makefile's
-# DOCKER_RUN and CI) stays docker, matching what runs on the console.
+# RUNNER_LOCAL=1 or ansible-playbook is already on PATH. Always podman, not
+# ENGINE-conditional like the Makefile's CONTAINER_RUN: this step never
+# touches a live node — pure local templating, run by hand before a node
+# exists to image an SD card — so CI never calls it and the workstation's
+# podman-only rule always applies.
 set -euo pipefail
 
 HOST="${1:?usage: render.sh <hostname> [output-dir]}"
