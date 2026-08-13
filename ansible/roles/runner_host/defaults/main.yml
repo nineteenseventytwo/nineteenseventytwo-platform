@@ -1,7 +1,7 @@
 ---
 runner_home: /opt/github-runner
 runner_image: "{{ gha_runner_image }}:{{ runner_image_tag }}"
-runner_image_tag: "2.331.0"
+runner_image_tag: "2.336.0"
 runner_ephemeral: true
 runner_replicas: 2
 runner_scope: org

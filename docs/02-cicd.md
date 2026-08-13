@@ -83,7 +83,13 @@ Setup checklist:
 #   KUBECONFIG            scoped kubeconfig for the deploy-cluster job
 
 # Ansible-side (SOPS-encrypted, not a GitHub secret):
-#   github_app_id, github_app_installation_id, github_app_private_key
+#   github_app_id            numeric App ID — reserved for ARC's secret
+#                             contract in Phase C, not used by the compose
+#                             runner
+#   github_app_client_id     what the compose runner's entrypoint.sh actually
+#                             signs its JWT `iss` claim with (GitHub's current
+#                             recommendation over the numeric App ID)
+#   github_app_installation_id, github_app_private_key
 sops ansible/inventory/lab/group_vars/all/secrets.sops.yml
 ```
 

@@ -13,10 +13,12 @@
     - name: Fail early if the GitHub App credentials are missing
       ansible.builtin.assert:
         that:
-          - github_app_id is defined
+          - github_app_client_id is defined
+          - github_app_installation_id is defined
           - github_app_private_key is defined
         fail_msg: >-
-          github_app_id / github_app_private_key are not set. They live in
+          github_app_client_id / github_app_installation_id /
+          github_app_private_key are not all set. They live in
           ansible/inventory/lab/group_vars/all/secrets.sops.yml — copy the
           .example, fill it in, and `sops --encrypt --in-place` it.
           See docs/02-cicd.md.

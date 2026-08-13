@@ -16,7 +16,7 @@ USER root
 
 RUN apt-get update \
  && apt-get install --no-install-recommends -y \
-      ca-certificates curl git jq \
+      ca-certificates curl git jq openssl \
  && rm -rf /var/lib/apt/lists/*
 
 # The docker *CLI* only. The daemon is the host's, reached through the mounted
@@ -33,5 +33,11 @@ RUN curl -fsSL "https://download.docker.com/linux/static/stable/${TARGETARCH}/do
 ENV RUNNER_ALLOW_RUNASROOT=0 \
     DISABLE_AUTO_UPDATE=true
 
+# App-auth registration (docs/02-cicd.md): mints its own token at start
+# instead of taking one as an argument. See entrypoint.sh for the flow.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER runner
 WORKDIR /home/runner
+ENTRYPOINT ["/entrypoint.sh"]
