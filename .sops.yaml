@@ -15,12 +15,12 @@ creation_rules:
   - path_regex: \.sops\.ya?ml$
     encrypted_regex: ^(?!apiVersion|kind|metadata|sops)
     age: >-
-      age1PLACEHOLDER_WORKSTATION_PUBLIC_KEY,
-      age1PLACEHOLDER_CI_PUBLIC_KEY
+      age1l9mnd5fuj40t6xastz3g9r90semppr8c4auvt8aulq9h32n22acsy0s56y,
+      age1zdjc0p3xgqkyatw9yuflflkvglj2fj9t09vhyhhk3muvlc2l9egskg60sd
 
   # Kubernetes Secret manifests: leave the shape readable, encrypt only data.
   - path_regex: \.sops\.enc\.ya?ml$
     encrypted_regex: ^(data|stringData)$
     age: >-
-      age1PLACEHOLDER_WORKSTATION_PUBLIC_KEY,
-      age1PLACEHOLDER_CI_PUBLIC_KEY
+      age1l9mnd5fuj40t6xastz3g9r90semppr8c4auvt8aulq9h32n22acsy0s56y,
+      age1zdjc0p3xgqkyatw9yuflflkvglj2fj9t09vhyhhk3muvlc2l9egskg60sd
