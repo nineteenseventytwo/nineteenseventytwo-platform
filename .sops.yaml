@@ -6,14 +6,9 @@
 # Generate a key:      age-keygen -o ~/.config/sops/age/keys.txt
 # Encrypt a new file:  sops --encrypt --in-place path/to/secrets.sops.yml
 # Edit in place:       sops path/to/secrets.sops.yml
-#
-# TODO: replace both placeholder recipients with real public keys before the
-# first `sops --encrypt`. They are inert until then — SOPS will refuse to
-# encrypt against a malformed recipient rather than silently produce a file
-# only one party can read.
 creation_rules:
   - path_regex: \.sops\.ya?ml$
-    encrypted_regex: ^(?!apiVersion|kind|metadata|sops)
+    unencrypted_regex: ^(apiVersion|kind|metadata)$
     age: >-
       age1l9mnd5fuj40t6xastz3g9r90semppr8c4auvt8aulq9h32n22acsy0s56y,
       age1zdjc0p3xgqkyatw9yuflflkvglj2fj9t09vhyhhk3muvlc2l9egskg60sd
