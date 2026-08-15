@@ -89,9 +89,7 @@
       delay: 10
       become: true
 
-    # Default-deny in every namespace, before anything is deployed into them.
-    # Retrofitting default-deny onto a running cluster means finding out which
-    # flows you broke one incident at a time.
+    # Default-deny in every namespace
     - name: Apply baseline policy
       kubernetes.core.k8s:
         state: present

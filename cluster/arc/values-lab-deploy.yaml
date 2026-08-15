@@ -1,5 +1,5 @@
 ---
-# chart: 0.14.0  (gha-runner-scale-set)
+# chart: 0.14.2  (gha-runner-scale-set)
 #
 # Scale sets are defined by CAPABILITY, not by repo. "A runner for whichever
 # repo is queueing" is a non-problem once registration is org-scoped — that is

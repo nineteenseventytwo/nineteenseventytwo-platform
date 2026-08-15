@@ -1,5 +1,5 @@
 ---
-# chart: 4.12.1
+# chart: 4.15.1
 # repo:  https://kubernetes.github.io/ingress-nginx
 controller:
   replicaCount: 2

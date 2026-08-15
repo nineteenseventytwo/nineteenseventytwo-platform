@@ -86,9 +86,6 @@
     update_cache: true
   become: true
 
-# An unattended kubelet bump mid-cluster is a genuinely bad afternoon. The
-# common role blacklists them from unattended-upgrades; this pins them against
-# a manual `apt upgrade` too.
 - name: Hold the Kubernetes packages
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"

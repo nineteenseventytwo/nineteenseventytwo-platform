@@ -1,5 +1,5 @@
 ---
-# chart: 0.30.0
+# chart: 0.34.1
 # repo:  https://helm.releases.hashicorp.com
 #
 # Vault OSS seals itself on every restart. On a Pi cluster that reboots, that

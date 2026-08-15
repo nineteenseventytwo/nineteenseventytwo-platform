@@ -11,10 +11,6 @@
     - /etc/kubernetes/admission
   become: true
 
-# etcd stores Secrets base64-encoded, not encrypted. Anyone with the etcd data
-# directory — or a stolen SSD out of a Pi — reads every Secret in the cluster
-# unless this is configured at init time. Retrofitting it later means rewriting
-# every Secret, so it goes in now.
 - name: Generate an etcd encryption key
   ansible.builtin.set_fact:
     kube_control_plane_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
@@ -98,8 +94,6 @@
   become: true
   tags: [kubeconfig]
 
-# The join command carries a token that expires in 24h; regenerate rather than
-# persisting one, so a worker rebuild six months from now still works.
 - name: Generate a worker join command
   ansible.builtin.command:
     cmd: kubeadm token create --print-join-command

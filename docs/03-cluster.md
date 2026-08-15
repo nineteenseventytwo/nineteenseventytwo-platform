@@ -24,10 +24,6 @@ Cilium via Helm → join `worker-1`, `worker-2` → default-deny NetworkPolicy i
 every namespace. Run it from your workstation the first time — the self-hosted
 runner it could otherwise run from doesn't have a cluster to reach yet.
 
-`1972-console-1` is not part of this. It builds the cluster, so putting it in
-creates a circular dependency — see
-[ADR-0007](decisions/ADR-0007-console-outside-cluster.md).
-
 ## 2. Fetch and store the kubeconfig
 
 ```bash

@@ -1,5 +1,5 @@
 ---
-# chart: 1.8.1
+# chart: 1.12.1
 # repo:  https://charts.longhorn.io
 #
 # Worker SSDs only. Two replicas across two workers: one node can go down
@@ -24,7 +24,9 @@ defaultSettings:
   concurrentReplicaRebuildPerNodeLimit: 1
   concurrentAutomaticEngineUpgradePerNodeLimit: 1
   guaranteedInstanceManagerCPU: 10
-  backupstorePollInterval: 0          # no backup target configured yet
+
+defaultBackupStore:
+  pollInterval: 0
 
 longhornManager:
   resources:
@@ -32,9 +34,6 @@ longhornManager:
     limits: {memory: 256Mi}
 longhornUI:
   replicas: 1
-  resources:
-    requests: {cpu: 25m, memory: 64Mi}
-    limits: {memory: 128Mi}
 
 ingress:
   enabled: false   # reach it through port-forward until an auth story exists

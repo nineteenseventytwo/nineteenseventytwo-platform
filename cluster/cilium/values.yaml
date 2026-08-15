@@ -1,5 +1,5 @@
 ---
-# chart: 1.17.5
+# chart: 1.20.0
 # repo:  https://helm.cilium.io/
 #
 # Cilium is the CNI and, for now, the only network layer. Istio is NOT an
@@ -16,6 +16,8 @@ operator:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
+  prometheus:
+    enabled: true
 
 resources:
   requests: {cpu: 100m, memory: 256Mi}
@@ -67,8 +69,6 @@ bpf:
   masquerade: true
 
 prometheus:
-  enabled: true
-operator.prometheus:
   enabled: true
 
 # Restarting every pod to pick up a config change is disruptive on 3 nodes.
