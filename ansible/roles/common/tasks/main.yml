@@ -55,6 +55,15 @@
     state: started
   become: true
 
+- name: Ensure the journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
 - name: Cap journald disk usage
   ansible.builtin.template:
     src: journald.conf.j2
@@ -64,15 +73,6 @@
     mode: "0644"
   become: true
   notify: Restart journald
-
-- name: Ensure the journald drop-in directory exists
-  ansible.builtin.file:
-    path: /etc/systemd/journald.conf.d
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  become: true
 
 # --------------------------------------------------------------------------
 # Swap. kubelet refuses to start with swap enabled, and the failure message

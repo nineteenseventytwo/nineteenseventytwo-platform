@@ -7,7 +7,10 @@ whole repo, and the goal is that it stays that way.
 
 - Ubuntu 24.04 LTS **arm64** image (server, not desktop)
 - Raspberry Pi Imager, used only to flash the vanilla image
-- Your workstation public key at `bootstrap/ssh/mark-workstation.pub`
+- Your workstation public keys at `bootstrap/ssh/mark-workstation.pub` and
+  `bootstrap/ssh/ansible-workstation.pub` — `render.sh` refuses to render
+  with either missing. See [bootstrap/README.md](../bootstrap/README.md#ssh)
+  for what each is for.
 - The Kea reservations already created on OPNsense (see below)
 
 ## 1. Reservations first

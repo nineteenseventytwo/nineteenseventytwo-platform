@@ -39,7 +39,8 @@ Each step is a `make` target, and CI calls the same targets you do.
 
 ```bash
 # 0. One-time, on your workstation
-make deps                     # check ansible, sops, age, kubectl, helm are present
+make deps                     # check podman/docker, sops, age are present
+                               # (RUNNER_LOCAL=1 also checks ansible, kubectl, helm)
 
 # 1. Image the SSDs (per host, by hand, once)
 make bootstrap-render HOST=1972-master-1

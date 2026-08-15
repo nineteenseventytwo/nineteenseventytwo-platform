@@ -25,7 +25,8 @@ inventory is the single source of truth for hostnames, addresses and roles.
 
 ### What the rendered `user-data` does
 
-- Creates the single admin user with your workstation public key. No others.
+- Creates the single admin user with both workstation public keys
+  (`mark-workstation`, `ansible-workstation`). No others.
 - `ssh_pwauth: false` and `lock_passwd: true` — password auth is off from first
   boot, not "off once Ansible runs".
 - Writes `/etc/ssh/sshd_config.d/10-hardening.conf` so the very first SSH

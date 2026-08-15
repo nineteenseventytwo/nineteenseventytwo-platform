@@ -7,7 +7,7 @@ inconvenient.
 | ADR | Decision | Status |
 |---|---|---|
 | [0001](ADR-0001-github-org.md) | Create a `nineteenseventytwo` GitHub organisation | Accepted |
-| [0002](ADR-0002-private-repo.md) | The platform repo is private | Accepted |
+| [0002](ADR-0002-private-repo.md) | The platform repo is private | Superseded by [0013](ADR-0013-platform-repo-public.md) |
 | [0003](ADR-0003-cni-cilium-no-mesh.md) | Cilium as CNI; defer the service mesh | Accepted |
 | [0004](ADR-0004-platform-owns-tenant-namespaces.md) | Platform owns tenant namespaces, quotas and RBAC | Superseded by [0012](ADR-0012-platform-owns-app-workloads.md) |
 | [0005](ADR-0005-argocd-and-vault-kms.md) | Argo CD from the start; Vault with KMS auto-unseal | Accepted |
@@ -18,6 +18,7 @@ inconvenient.
 | [0010](ADR-0010-fork-pr-self-hosted-runners.md) | Route `pull_request` jobs to hosted runners | Accepted |
 | [0011](ADR-0011-arm64-only.md) | arm64 only; the GPU node is out of scope for now | Accepted |
 | [0012](ADR-0012-platform-owns-app-workloads.md) | Platform repo owns application workloads, not just namespaces | Accepted |
+| [0013](ADR-0013-platform-repo-public.md) | The platform repo goes public | Accepted |
 
 ## Template
 

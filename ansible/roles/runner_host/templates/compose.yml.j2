@@ -25,6 +25,12 @@ services:
 {% endif %}
       - {{ runner_host_workdir }}:{{ runner_host_workdir }}
       - {{ runner_host_home }}/github-app.pem:/github-app.pem:ro
+{% if runner_host_mount_docker_socket %}
+    group_add:
+      # Host's docker group GID, not the container image's own — they differ,
+      # and the container's non-root user needs the host's to use the socket.
+      - "{{ ansible_facts.getent_group.docker[1] }}"
+{% endif %}
     restart: always
     deploy:
       replicas: {{ runner_host_replicas }}

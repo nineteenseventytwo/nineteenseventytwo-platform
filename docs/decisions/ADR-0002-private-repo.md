@@ -1,6 +1,6 @@
 # ADR-0002: The platform repo is private
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0013](ADR-0013-platform-repo-public.md)
 **Date:** 2026-08-07
 
 ## Context

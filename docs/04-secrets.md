@@ -1,25 +1,137 @@
 # 04 — Secrets
 
-There is a bootstrapping order here, and getting it wrong is how people end up
-with Vault credentials in GitHub secrets protecting the Vault that holds the
-credentials.
+Cross-cutting, not a single phase — each tier below is set up at a different
+point in [README's "Rebuild from nothing"](../README.md#rebuild-from-nothing)
+sequence, noted per step. There is a bootstrapping order here, and getting it
+wrong is how people end up with Vault credentials in GitHub secrets
+protecting the Vault that holds the credentials.
 
-## The layers
+| Tier | Problem | Tool | Root of trust | Set up during |
+|---|---|---|---|---|
+| 0 | Config secrets before anything exists | **SOPS + age** | age private key: password manager, a GitHub Actions secret, and `/root/.config/sops/age/keys.txt` on console | Phase A/B |
+| 1 | CI → AWS | **GitHub OIDC → IAM role** | Nothing stored. Trust policy pins the org and repo. | Phase C |
+| 1b | CI → GitHub (runner registration) | **GitHub App private key** | SOPS-encrypted + org secret | Phase B — [02-cicd.md](02-cicd.md) |
+| 2 | Cluster workload secrets | **Vault OSS** + **External Secrets Operator** | Vault, auto-unsealed by AWS KMS | Phase C/D |
+| 3 | SSH access | **Vault SSH secrets engine (CA)** | Vault | Phase D |
+| 4 | TLS | **cert-manager** + Let's Encrypt DNS-01 | Cloudflare API token, held in Vault | Phase C/D |
 
-| Tier | Problem | Tool | Root of trust |
-|---|---|---|---|
-| 0 | Config secrets before anything exists | **SOPS + age** | age private key: password manager, a GitHub Actions secret, and `/root/.config/sops/age/keys.txt` on console |
-| 1 | CI → AWS | **GitHub OIDC → IAM role** | Nothing stored. Trust policy pins the org and repo. |
-| 1b | CI → GitHub (runner registration) | **GitHub App private key** | SOPS-encrypted + org secret |
-| 2 | Cluster workload secrets | **Vault OSS** + **External Secrets Operator** | Vault, auto-unsealed by AWS KMS |
-| 3 | SSH access | **Vault SSH secrets engine (CA)** | Vault |
-| 4 | TLS | **cert-manager** + Let's Encrypt DNS-01 | Cloudflare API token, held in Vault |
+## Prerequisites
 
-## Secret inventory
+- `age-keygen`, `sops` installed (`make deps` checks both)
+- A GitHub org exists to hold the `SOPS_AGE_KEY` / `KUBECONFIG` Actions
+  secrets — [ADR-0001](decisions/ADR-0001-github-org.md)
+
+## 1. Tier 0 — SOPS + age
+
+`sops` + `age`, not `ansible-vault`
+([ADR-0008](decisions/ADR-0008-sops-age.md)) — encrypts **values, not
+files**, so `git diff` on an encrypted file still shows which key changed,
+supports multiple recipients with no shared password, and is one tool across
+both Ansible and the GitOps layer.
+
+```bash
+age-keygen -o ~/.config/sops/age/keys.txt      # note the public key
+# put both public keys (yours + CI's) in .sops.yaml, then
+cp ansible/inventory/lab/group_vars/all/secrets.sops.yml{.example,}
+sops --encrypt --in-place ansible/inventory/lab/group_vars/all/secrets.sops.yml
+```
+
+`.sops.yaml` ships with placeholder recipients — SOPS refuses to encrypt
+against a malformed recipient rather than silently producing a file only one
+party can read, so it stays inert until you replace them. This tier has to be
+working before [02-cicd.md](02-cicd.md) can proceed.
+
+## 2. Tier 1b — GitHub App key
+
+Covered in [02-cicd.md § 1–2](02-cicd.md#1-create-the-github-app) — create
+the App, then `sops` the private key into `secrets.sops.yml`. Not repeated
+here.
+
+## 3. Tier 2 — Vault + KMS auto-unseal + ESO
+
+Vault OSS **seals itself on every restart**. On a Pi cluster that reboots,
+that means hand-unsealing at 11pm. **AWS KMS auto-unseal** removes the manual
+step for pennies a month, and exercises KMS key policy along the way — stated
+honestly, this makes an on-prem cluster's secrets depend on a cloud KMS. That
+is a real dependency, and it's the right trade because the alternative isn't
+"no dependency," it's "a dependency on you being awake."
+
+1. Set the KMS key ID in `cluster/vault/values.yaml`.
+2. `make bootstrap-argocd` ([03-cluster.md](03-cluster.md)) installs Vault
+   and External Secrets Operator via the normal sync waves — nothing here
+   waits on a human.
+3. Vault auto-unseals from KMS on its own.
+4. Populate Vault from the SOPS values **once**, by hand — commands in
+   [`cluster/vault/README.md`](../cluster/vault/README.md).
+
+From here, ESO authenticates to Vault with its ServiceAccount token via
+Vault's Kubernetes auth — no static Vault credential stored anywhere, which
+is exactly the trap this doc opened with. Pair Vault with **External Secrets
+Operator**, not the Vault CSI driver or the Agent injector: an
+`ExternalSecret` materialises an ordinary Kubernetes Secret, so app manifests
+carry no Vault-specific annotations, and the same manifest can point at AWS
+Secrets Manager if a workload ever moves to the cloud.
+
+## 4. Tier 3 — SSH certificates
+
+What Phase A ships are SSH **keys**. A real SSH CA signs short-lived
+**certificates**, so nodes trust the CA rather than a list of keys.
+
+1. Enable the SSH secrets engine; configure a CA and an `admin` role
+   (`allowed_users`, `ttl: 5m`, `default_extensions: permit-pty`).
+2. Set `hardening_ssh_trust_ca: true` and re-run `make deploy-nodes` — this
+   drops the CA public key on every Pi and sets `TrustedUserCAKeys` in
+   `sshd_config`.
+3. `bootstrap/ssh/sign.sh 192.168.20.202` signs your key into a 5-minute
+   certificate and connects with it.
+
+This buys no `authorized_keys` to manage or drift, revocation that actually
+works, an audit log of who requested access to what and when, and
+credentials that expire before you've finished making tea — the on-prem
+mirror of what `aws configure sso` gives you. Keep **one** break-glass static
+key on `1972-console-1`, offline, for when Vault is the thing that's down.
+
+## 5. Tier 4 — TLS
+
+cert-manager + Let's Encrypt via **DNS-01 through Cloudflare**. DNS-01 is the
+important choice: it issues browser-trusted certificates for services with
+**no inbound internet path at all**. HTTP-01 would require exposing port 80
+from VLAN 20 to the internet — the thing the whole network design avoids.
+
+1. Store a Cloudflare token scoped `Zone:DNS:Edit` on the single zone in
+   Vault; ESO projects it into the `cert-manager` namespace.
+2. Exercise `letsencrypt-staging` first — production has rate limits that a
+   misconfigured `dnsZones` selector burns through in an afternoon, and the
+   lockout lasts a week.
+3. Switch to the production issuer once staging issues cleanly.
+
+For machine-to-machine services that don't need public trust, there's an
+`internal-ca` ClusterIssuer backed by a cert-manager private CA — cheaper, no
+rate limits, and how mTLS gets bootstrapped if a mesh ever arrives.
+
+## Verify
+
+- [ ] `.sops.yaml` recipients are real, not placeholders, before the first
+      encrypt
+- [ ] KMS key ID is set in `cluster/vault/values.yaml`
+- [ ] Once Vault is live: the only secrets left in GitHub are the age key and
+      the GitHub App key — `KUBECONFIG` should be retired too
+
+## Definition of done
+
+Every credential in [the inventory](#secret-inventory) below has an owner, a
+rotation cadence, and a documented blast radius if it leaks. Nothing
+sensitive is committed in plaintext, and nothing durable lives in a runner
+([02-cicd.md](02-cicd.md#runners-hold-no-state)).
+
+---
+
+## Reference
+
+### Secret inventory
 
 The single most interview-legible artefact in the repo, and it takes twenty
-minutes to maintain. Every secret, where it lives, what it reaches, how often it
-rotates, and what happens if it leaks.
+minutes to maintain.
 
 | Secret | Lives | Reaches | Rotation | Blast radius if leaked |
 |---|---|---|---|---|
@@ -28,6 +140,7 @@ rotates, and what happens if it leaks.
 | `ansible-console` SSH key | `1972-console-1` only — generated there by `20-cicd-host.yml`, never in GitHub or git | All four Pis as `mchellmer` | Annual → **retired at Phase D** | Root-equivalent on every node (NOPASSWD sudo). The reason Tier 3 exists. Not an Actions secret: CI runs *on* the console, so it reads the key from the host rather than being handed a copy. |
 | `ansible-workstation` SSH key | Workstations only, alongside `mark-workstation`; never in GitHub or git | All four Pis as `mchellmer` | Annual → **retired at Phase D** | As above. No passphrase, because the consumer is a container with no TTY; the compensating control is that it never leaves the machine that made it. |
 | Node host keys (`known_hosts`) | Committed at `ansible/files/known_hosts`, regenerated with `make known-hosts` | — | On node reimage | None — these are public keys. Committed rather than held as an Actions secret so `host_key_checking` stays meaningfully on without a credential to distribute. |
+| `KUBECONFIG` | Org Actions secret | `deploy-cluster.yml`'s Argo CD nudge-and-wait | On cluster rebuild | Whatever RBAC the embedded credential carries — scope it, don't hand it cluster-admin. Retire once ESO/in-cluster auth makes a static kubeconfig unnecessary. |
 | etcd encryption key | `/etc/kubernetes/enc/` on `1972-master-1`, mode 0600 | Every Secret in the cluster at rest | Manual rekey (rewrites every Secret) | Reads every cluster Secret from an etcd snapshot or a stolen SSD. **Back it up with the etcd snapshot, not instead of it — losing it makes every Secret unreadable.** |
 | Vault recovery keys | Password manager, split across two entries | `generate-root`, rekey | On personnel change | Full Vault takeover via root token generation. Not unseal keys — auto-unseal is KMS. |
 | AWS KMS key / IAM principal | AWS; creds in `vault-kms` Secret | Vault's seal | Quarterly (IAM keys); KMS key never | Vault cannot unseal if revoked; cannot be decrypted without it if stolen alone. |
@@ -36,102 +149,10 @@ rotates, and what happens if it leaks.
 | Grafana admin password | Vault `kv/platform/grafana` | Grafana | Annual | Dashboards and datasource credentials. |
 | Break-glass SSH key | Offline, on `1972-console-1` | All nodes | Never (audited) | Root-equivalent. Exists precisely for when Vault is the thing that is down. |
 
-## Tier 0 — SOPS + age, and retiring ansible-vault
-
-`sops` + `age`, not `ansible-vault` ([ADR-0008](decisions/ADR-0008-sops-age.md)):
-
-- Encrypts **values, not files** — `git diff` stays readable, so a playbook
-  change can be reviewed without decrypting it.
-- Multiple recipients (your key + a CI key) with no shared password.
-- Works on Kubernetes manifests and Helm values too, so it is one tool across
-  the GitOps layer. `ansible-vault` only ever helps Ansible.
-- `age` keys are small and easy to rotate, unlike a shared vault password that
-  has been pasted into three places.
-
-```bash
-age-keygen -o ~/.config/sops/age/keys.txt      # note the public key
-# put both public keys in .sops.yaml, then
-cp ansible/inventory/lab/group_vars/all/secrets.sops.yml{.example,}
-sops --encrypt --in-place ansible/inventory/lab/group_vars/all/secrets.sops.yml
-```
-
-`.sops.yaml` ships with placeholder recipients. SOPS refuses to encrypt against
-a malformed recipient rather than silently producing a file only one party can
-read, so the placeholders are inert until replaced.
-
-## Tier 2 — Vault, and the unseal problem nobody mentions
-
-Vault OSS **seals itself on every restart**. On a Pi cluster that reboots, that
-means hand-unsealing at 11pm. **AWS KMS auto-unseal** removes the manual step
-for pennies a month, and exercises KMS key policy along the way.
-
-Stated honestly: this makes an on-prem cluster's secrets depend on a cloud KMS.
-That is a real dependency. It is the right trade because the alternative is not
-"no dependency" — it is "a dependency on you being awake".
-
-Pair Vault with **External Secrets Operator**, not the Vault CSI driver or the
-Agent injector. An `ExternalSecret` materialises an ordinary Kubernetes Secret,
-so app manifests carry no Vault-specific annotations, and the same manifest can
-point at AWS Secrets Manager when a workload moves to the cloud. That
-backend-swap property is the whole argument.
-
-### Why the bootstrap order is not circular
+### Why the Vault bootstrap order isn't circular
 
 1. SOPS+age holds the bootstrap secrets. No cluster required.
-2. Argo CD installs ESO and Vault. Vault auto-unseals from KMS — nothing waits
-   on a human.
+2. Argo CD installs ESO and Vault. Vault auto-unseals from KMS — nothing
+   waits on a human.
 3. Vault is populated from the SOPS values, **once**, by hand.
 4. Everything else reads from Vault via `ExternalSecret`.
-
-ESO authenticates to Vault with its ServiceAccount token via Vault's Kubernetes
-auth — so there is no static Vault credential stored anywhere, which is exactly
-the trap this section opened with.
-
-Post-install commands are in [`cluster/vault/README.md`](../cluster/vault/README.md).
-
-## Tier 3 — SSH certificates
-
-What Phase A ships are SSH **keys**. A real SSH CA signs short-lived
-**certificates**, so nodes trust the CA rather than a list of keys.
-
-1. Enable the SSH secrets engine; configure a CA and an `admin` role
-   (`allowed_users`, `ttl: 5m`, `default_extensions: permit-pty`).
-2. Ansible drops the CA public key on every Pi and sets `TrustedUserCAKeys` in
-   `sshd_config` — set `hardening_ssh_trust_ca: true` and re-run
-   `make deploy-nodes`.
-3. `bootstrap/ssh/sign.sh 192.168.20.202` signs your key into a 5-minute
-   certificate and connects with it.
-
-What this buys: no `authorized_keys` to manage or drift, revocation that
-actually works, an audit log of who requested access to what and when, and
-credentials that expire before you have finished making tea. It is the on-prem
-mirror of the short-lived-credential pattern `aws configure sso` gives you.
-
-Keep **one** break-glass static key on `1972-console-1`, offline, for when Vault
-is the thing that is down.
-
-## Tier 4 — TLS
-
-cert-manager + Let's Encrypt via **DNS-01 through Cloudflare**. DNS-01 is the
-important choice: it issues browser-trusted certificates for services with **no
-inbound internet path at all**, which is exactly this situation. HTTP-01 would
-require exposing port 80 from VLAN 20 to the internet — the thing the entire
-network design avoids.
-
-The Cloudflare token is scoped `Zone:DNS:Edit` on the single zone, stored in
-Vault, and projected into the `cert-manager` namespace by ESO.
-
-Exercise `letsencrypt-staging` first. Production has rate limits that a
-misconfigured `dnsZones` selector will burn through in an afternoon, and the
-lockout lasts a week.
-
-For machine-to-machine services that do not need public trust, there is an
-`internal-ca` ClusterIssuer backed by a cert-manager private CA — cheaper, no
-rate limits, and it is how mTLS gets bootstrapped if a mesh ever arrives.
-
-## Open items
-
-- **Replace the `.sops.yaml` placeholder recipients** before the first encrypt.
-- **Set the KMS key ID** in `cluster/vault/values.yaml`.
-- Once Vault is live, the only secrets left in GitHub should be the age key and
-  the GitHub App key. Audit that this is true.
