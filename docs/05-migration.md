@@ -42,7 +42,7 @@ Fits the rebuild timeline's Phases 2–3.
 |---|---|---|
 | 1 | Create the org, move repos, create this repo, GitHub App, ADRs 0001–0004 | Org-level runner page exists |
 | 2 | Cloud-init templates, image all four SSDs, run the §2.3 matrix | All four Pis reachable from VLAN 10 by key; VLAN 20 → VLAN 10 provably blocked |
-| 3 | `common`/`hardening`/`docker` roles, `ansible-runner` image, `build-images.yml` | Image in GHCR, built without touching a Pi |
+| 3 | `common`/`hardening`/`docker` roles, `ansible-runner` image, `image-ansible-runner-build.yml` | Image in GHCR, built without touching a Pi |
 | 4 | Compose runner stack on console, `deploy-nodes.yml` | Push to main reconfigures a Pi with no human SSH |
 | 5–6 | kubeadm + Cilium + join workers + default-deny + Kubescape baseline | Empty hardened cluster; before/after scan committed |
 | 7 | Argo CD, MetalLB, ingress-nginx, cert-manager, Longhorn | First HTTPS ingress with a real Let's Encrypt certificate |

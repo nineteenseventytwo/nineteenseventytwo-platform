@@ -18,6 +18,14 @@ suffix onto it — the tag has to keep meaning exactly one image.
 rather than two copies that drift. The Makefile then does `docker run
 ansible-runner ...` through the mounted socket.
 
+Publishing is tied to bumping `version.txt` — no manual trigger.
+`image-gha-runner-build.yml` builds and pushes `:latest` (most recently
+built, any branch) from a branch; `image-gha-runner-promote.yml` moves
+`:stable` (what deploys pin to) onto that same digest on `main` without
+rebuilding. See
+[ansible-runner's README](../ansible-runner/README.md#versioning) for the
+full two-workflow rationale, identical here.
+
 ## Why it holds no state
 
 Runners are cattle and run `--ephemeral`: one job, then the container exits and

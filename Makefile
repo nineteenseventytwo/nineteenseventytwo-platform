@@ -179,9 +179,10 @@ deploy-cicd: require-workstation ## Stand up the compose runner stack on 1972-co
 .PHONY: images
 images: image-ansible-runner image-gha-runner ## Build both container images locally (arm64)
 
-# build-images.yml is the real publisher (docker/build-push-action, native
-# arm64 hosted runner). These targets are for testing a Dockerfile change
-# without pushing, from whichever side is calling.
+# build-<name>.yml (via the reusable _build-image.yml) is the real publisher
+# (docker/build-push-action, native arm64 hosted runner), triggered by a
+# version.txt bump on a branch. These targets are for testing a Dockerfile
+# change locally without pushing, from whichever side is calling.
 .PHONY: image-ansible-runner
 image-ansible-runner: ## Build the ansible-runner image locally
 ifeq ($(ENGINE),docker)

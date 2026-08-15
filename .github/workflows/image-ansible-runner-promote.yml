@@ -1,0 +1,21 @@
+---
+name: image-ansible-runner-promote
+
+# Merging to main never rebuilds — it only moves :stable onto the digest
+# image-ansible-runner-build.yml already built, scanned and smoke-tested
+# from the branch. See _promote-image.yml and images/ansible-runner/README.md
+# §Versioning.
+on:
+  push:
+    branches: [main]
+    paths: ["images/ansible-runner/version.txt"]
+
+concurrency:
+  group: image-ansible-runner-promote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    uses: ./.github/workflows/_promote-image.yml
+    with:
+      image: ansible-runner
