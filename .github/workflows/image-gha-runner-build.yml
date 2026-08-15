@@ -16,6 +16,9 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_build-image.yml
     with:
       image: gha-runner
