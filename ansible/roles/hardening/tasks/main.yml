@@ -86,7 +86,7 @@
         src: "172.16.0.0/12"
         port: "{{ hardening_ssh_port }}"
         proto: tcp
-        comment: "ansible hairpin from console's own runner containers"
+        comment: "ansible hairpin from consoles runner containers"
       when: hardening_ufw_allow_docker_bridge_ssh | default(false)
 
     # Intra-VLAN 20 traffic is switch-local — OPNsense never sees it. Node
