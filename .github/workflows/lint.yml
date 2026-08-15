@@ -6,14 +6,15 @@ on:
   push:
     branches: [main]
 
-# Runs on GitHub-hosted runners only. Lint needs no LAN reachability, so
-# putting it on a Pi buys nothing and costs the Pi.
 permissions:
   contents: read
 
 concurrency:
   group: lint-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  RUNNER_LOCAL: "1"
 
 jobs:
   yaml:
@@ -23,7 +24,7 @@ jobs:
       - uses: actions/setup-python@v7
         with: {python-version: "3.14"}
       - run: pip install yamllint
-      - run: yamllint -c .yamllint --strict .
+      - run: make lint-yaml
 
   ansible:
     runs-on: ubuntu-24.04
@@ -33,11 +34,9 @@ jobs:
         with: {python-version: "3.14"}
       - run: pip install "ansible-core==2.21.3" ansible-lint
       - run: ansible-galaxy collection install -r ansible/requirements.yml
-      - run: ansible-lint -c .ansible-lint
+      - run: make lint-ansible
       - name: Inventory parses and every host resolves
-        run: ansible-inventory -i ansible/inventory/lab --list --yaml > /dev/null
-        env:
-          ANSIBLE_CONFIG: ansible/ansible.cfg
+        run: make lint-inventory
 
   shell:
     runs-on: ubuntu-24.04
@@ -46,7 +45,7 @@ jobs:
       - name: shellcheck
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          find bootstrap tests -name '*.sh' -print0 | xargs -0 -r shellcheck
+          make lint-shell
 
   helm:
     runs-on: ubuntu-24.04
@@ -54,41 +53,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
       - name: Values files are valid YAML and charts template cleanly
-        run: |
-          set -euo pipefail
-          # Each values.yaml carries a `# chart:` comment; the same string is in
-          # the Argo Application. Rendering here catches a values key that the
-          # pinned chart version does not have — which otherwise surfaces as a
-          # silently ignored setting.
-          add() { helm repo add "$1" "$2" >/dev/null; }
-          add cilium https://helm.cilium.io/
-          add metallb https://metallb.github.io/metallb
-          add ingress-nginx https://kubernetes.github.io/ingress-nginx
-          add jetstack https://charts.jetstack.io
-          add longhorn https://charts.longhorn.io
-          add external-secrets https://charts.external-secrets.io
-          add hashicorp https://helm.releases.hashicorp.com
-          add prometheus-community https://prometheus-community.github.io/helm-charts
-          add argo https://argoproj.github.io/argo-helm
-          helm repo update >/dev/null
-
-          fail=0
-          check() { # chart, values path
-            local chart="$1" values="$2" version
-            version=$(grep -m1 '^# chart:' "$values" | awk '{print $3}')
-            echo "--- $chart @ $version ($values)"
-            helm template test "$chart" --version "$version" -f "$values" >/dev/null || fail=1
-          }
-          check cilium/cilium                                cluster/cilium/values.yaml
-          check metallb/metallb                              cluster/metallb/values.yaml
-          check ingress-nginx/ingress-nginx                  cluster/ingress-nginx/values.yaml
-          check jetstack/cert-manager                        cluster/cert-manager/values.yaml
-          check longhorn/longhorn                            cluster/longhorn/values.yaml
-          check external-secrets/external-secrets            cluster/external-secrets/values.yaml
-          check hashicorp/vault                              cluster/vault/values.yaml
-          check prometheus-community/kube-prometheus-stack   cluster/monitoring/values.yaml
-          check argo/argo-cd                                 cluster/argocd/values.yaml
-          exit $fail
+        run: make lint-helm
 
   security:
     runs-on: ubuntu-24.04

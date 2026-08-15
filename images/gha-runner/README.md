@@ -2,11 +2,21 @@
 
 `ghcr.io/nineteenseventytwo/gha-runner`
 
-Upstream `actions/actions-runner` plus the docker CLI and git. Nothing else —
-it should track upstream closely and change rarely.
+Upstream `actions/actions-runner` plus the docker CLI, git and make. Nothing
+else — it should track upstream closely and change rarely.
 
-`version.txt` tracks the **upstream runner version**, not an independent
-release number, so a bump here means a bump of the base image.
+`version.txt` is this image's **own** semver, the same as `ansible-runner`'s.
+The upstream runner version is pinned separately in the Dockerfile's
+`RUNNER_VERSION` arg. They move independently: adding a package here is a
+`version.txt` bump with `RUNNER_VERSION` unchanged, and a base image bump is
+the reverse. Tying the tag to the upstream version instead would mean either
+republishing an existing tag with different contents or bolting a revision
+suffix onto it — the tag has to keep meaning exactly one image.
+
+`make` is in here because every workflow drives the platform through
+`make <target>`, so CI and a workstation run the same definition of the work
+rather than two copies that drift. The Makefile then does `docker run
+ansible-runner ...` through the mounted socket.
 
 ## Why it holds no state
 

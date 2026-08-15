@@ -4,17 +4,16 @@
 
 kubelet_node: true
 
-# kubelet will not start with swap on. The `common` role masks swap.target;
-# this flag is what makes it do so.
-disable_swap: true
+# kubelet will not start with swap on. The `common` role masks swap.target.
+common_disable_swap: true
 
 # Modules and sysctls the kubelet and Cilium both need. Kept here rather than in
 # the role defaults because they are a property of "this is a cluster node".
-kube_required_modules:
+kube_prereqs_required_modules:
   - overlay
   - br_netfilter
 
-kube_required_sysctls:
+kube_prereqs_required_sysctls:
   net.bridge.bridge-nf-call-iptables: 1
   net.bridge.bridge-nf-call-ip6tables: 1
   net.ipv4.ip_forward: 1
@@ -24,9 +23,9 @@ kube_required_sysctls:
 
 # 2 GB nodes. Reserve enough that a runaway pod evicts itself before it evicts
 # the kubelet, and set eviction thresholds that leave room to SSH in and fix it.
-kubelet_system_reserved_memory: "256Mi"
-kubelet_kube_reserved_memory: "256Mi"
-kubelet_eviction_hard_memory: "150Mi"
+kube_prereqs_kubelet_system_reserved_memory: "256Mi"
+kube_prereqs_kubelet_kube_reserved_memory: "256Mi"
+kube_prereqs_kubelet_eviction_hard_memory: "150Mi"
 
 # Longhorn needs open-iscsi and nfs-common on every node that hosts a replica.
 longhorn_node: true

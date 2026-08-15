@@ -43,51 +43,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Two credentials, both short-lived on disk: the age key that decrypts
+      # group_vars, and the kubeconfig. The SSH key is ansible-console, which
+      # lives on this host and never enters GitHub; known_hosts is public and
+      # committed at ansible/files/known_hosts.
       - name: Stage credentials
         run: |
-          mkdir -p "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh" "$RUNNER_TEMP/kube"
-          printf '%s' "${{ secrets.SOPS_AGE_KEY }}"      > "$RUNNER_TEMP/age/keys.txt"
-          printf '%s' "${{ secrets.ANSIBLE_SSH_KEY }}"   > "$RUNNER_TEMP/ssh/id_ed25519"
-          printf '%s' "${{ secrets.ANSIBLE_KNOWN_HOSTS }}" > "$RUNNER_TEMP/ssh/known_hosts"
-          printf '%s' "${{ secrets.KUBECONFIG }}"        > "$RUNNER_TEMP/kube/config"
-          chmod 700 "$RUNNER_TEMP"/{age,ssh,kube}
-          chmod 600 "$RUNNER_TEMP"/age/keys.txt "$RUNNER_TEMP"/ssh/* "$RUNNER_TEMP"/kube/config
+          install -d -m 700 "$RUNNER_TEMP/age" "$RUNNER_TEMP/kube"
+          printf '%s' "${{ secrets.SOPS_AGE_KEY }}" > "$RUNNER_TEMP/age/keys.txt"
+          printf '%s' "${{ secrets.KUBECONFIG }}"   > "$RUNNER_TEMP/kube/config"
+          chmod 600 "$RUNNER_TEMP/age/keys.txt" "$RUNNER_TEMP/kube/config"
 
       - name: Rebuild the cluster
         if: inputs.rebuild
-        run: |
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            -v "$RUNNER_TEMP/ssh:/root/.ssh:ro" \
-            -v "$RUNNER_TEMP/age:/root/.config/sops/age:ro" \
-            -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
-            "ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}" \
-            ansible-playbook -i ansible/inventory/lab ansible/playbooks/30-cluster.yml
+        env:
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+          SSH_KEY: /home/mchellmer/.ssh/ansible-console
+        run: make deploy-cluster
 
-      # Argo CD polls every 3 minutes. Nudging it turns "the deploy finished"
-      # into something you can actually gate on, rather than a green tick that
-      # means "a commit landed somewhere".
       - name: Nudge Argo CD and wait for sync
-        run: |
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            -v "$RUNNER_TEMP/kube:/root/.kube:ro" \
-            "ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}" \
-            sh -eux -c '
-              kubectl -n argocd patch application platform --type merge \
-                -p "{\"operation\":{\"sync\":{\"revision\":\"HEAD\"}}}"
-              for i in $(seq 1 60); do
-                status=$(kubectl -n argocd get application platform \
-                  -o jsonpath="{.status.sync.status}/{.status.health.status}")
-                echo "platform: $status"
-                [ "$status" = "Synced/Healthy" ] && exit 0
-                sleep 15
-              done
-              echo "argocd did not reach Synced/Healthy within 15m" >&2
-              kubectl -n argocd get applications -o wide >&2
-              exit 1
-            '
+        env:
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+        run: make argocd-sync-wait
 
       - name: Shred the staged credentials
         if: always()
-        run: rm -rf "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh" "$RUNNER_TEMP/kube"
+        run: rm -rf "$RUNNER_TEMP/age" "$RUNNER_TEMP/kube"

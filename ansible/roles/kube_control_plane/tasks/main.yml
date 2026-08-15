@@ -17,14 +17,14 @@
 # every Secret, so it goes in now.
 - name: Generate an etcd encryption key
   ansible.builtin.set_fact:
-    kube_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
-  when: kube_etcd_encryption_key is not defined
+    kube_control_plane_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
+  when: kube_control_plane_etcd_encryption_key is not defined
   no_log: true
 
 - name: Check whether etcd encryption is already configured
   ansible.builtin.stat:
     path: "{{ kube_control_plane_encryption_key_path }}"
-  register: kube_encryption_stat
+  register: kube_control_plane_encryption_stat
   become: true
 
 - name: Write the etcd encryption config
@@ -35,7 +35,7 @@
     group: root
     mode: "0600"
   become: true
-  when: not kube_encryption_stat.stat.exists
+  when: not kube_control_plane_encryption_stat.stat.exists
   no_log: true
 
 - name: Write the PSS admission config
@@ -59,16 +59,16 @@
 - name: Check whether the control plane is already initialised
   ansible.builtin.stat:
     path: /etc/kubernetes/admin.conf
-  register: kube_admin_conf
+  register: kube_control_plane_admin_conf_stat
   become: true
 
 - name: Run kubeadm init
   ansible.builtin.command:
     cmd: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
   become: true
-  when: not kube_admin_conf.stat.exists
-  register: kubeadm_init
-  changed_when: kubeadm_init.rc == 0
+  when: not kube_control_plane_admin_conf_stat.stat.exists
+  register: kube_control_plane_kubeadm_init
+  changed_when: kube_control_plane_kubeadm_init.rc == 0
 
 - name: Install kubeconfig for the admin user
   become: true
@@ -104,11 +104,11 @@
   ansible.builtin.command:
     cmd: kubeadm token create --print-join-command
   become: true
-  register: kubeadm_join
+  register: kube_control_plane_kubeadm_join
   changed_when: false
   no_log: true
 
 - name: Publish the join command to the workers
   ansible.builtin.set_fact:
-    kube_join_command: "{{ kubeadm_join.stdout }}"
+    kube_control_plane_kube_join_command: "{{ kube_control_plane_kubeadm_join.stdout }}"
   no_log: true

@@ -53,7 +53,7 @@
       tags: [ssh]
 
 - name: Authorise the console key on every node
-  hosts: cluster
+  hosts: cicd:cluster
   gather_facts: false
   tags: [ssh]
   tasks:

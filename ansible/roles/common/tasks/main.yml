@@ -80,7 +80,7 @@
 # a reboot brings it back.
 # --------------------------------------------------------------------------
 - name: Disable swap
-  when: disable_swap | bool
+  when: common_disable_swap | bool
   become: true
   block:
     - name: Report currently active swap devices

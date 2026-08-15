@@ -98,7 +98,9 @@ fi
 # problem, and it will resurface later as "some HTTPS sites hang" — which is a
 # much worse way to discover it.
 if want 5; then
-  if ping -M do -s 1472 -c3 -W2 1.1.1.1 >/dev/null 2>&1; then
+  # "do" is quoted only to stop shellcheck reading it as a loop keyword
+  # (SC1010); it is the argument to -M, the don't-fragment flag.
+  if ping -M "do" -s 1472 -c3 -W2 1.1.1.1 >/dev/null 2>&1; then
     report 5 "path MTU 1500 without fragmentation" pass
   else
     report 5 "path MTU 1500 without fragmentation" fail \

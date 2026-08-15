@@ -45,7 +45,7 @@ cache-to:   type=registry,ref=ghcr.io/nineteenseventytwo/ansible-runner:buildcac
 | Image | Contents | Why separate |
 |---|---|---|
 | [`ansible-runner`](../images/ansible-runner/) | `ansible-core`, pinned collections, `kubectl`, `helm`, `sops`, `age` | The artefact with real reuse value — run from CI, from console, from a laptop. Versioned independently of anything GitHub does. |
-| [`gha-runner`](../images/gha-runner/) | Upstream runner + docker CLI + git | Tracks upstream, changes rarely. Baking Ansible in means a collection bump forces a runner rebuild and a runner CVE forces an Ansible revalidation. |
+| [`gha-runner`](../images/gha-runner/) | Upstream runner + docker CLI + git + make | Tracks upstream, changes rarely. Baking Ansible in means a collection bump forces a runner rebuild and a runner CVE forces an Ansible revalidation. Carries `make` because workflows drive the platform through `make <target>`. Its `version.txt` is its own semver; the upstream pin is the Dockerfile's `RUNNER_VERSION`. |
 
 The workflow composes them:
 

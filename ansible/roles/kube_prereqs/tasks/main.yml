@@ -27,7 +27,7 @@
   community.general.modprobe:
     name: "{{ item }}"
     state: present
-  loop: "{{ kube_required_modules }}"
+  loop: "{{ kube_prereqs_required_modules }}"
   become: true
 
 - name: Persist required kernel modules
@@ -47,7 +47,7 @@
     sysctl_set: true
     state: present
     reload: true
-  loop: "{{ kube_required_sysctls | dict2items }}"
+  loop: "{{ kube_prereqs_required_sysctls | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
   become: true

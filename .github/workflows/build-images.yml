@@ -9,9 +9,6 @@ on:
     paths: ["images/**", ".github/workflows/build-images.yml"]
   workflow_dispatch:
 
-# Native arm64 on a GitHub-hosted runner: no QEMU emulation, and no load on a
-# Pi. Self-hosted runners exist because of network position, not compute
-# (§3.3) — nothing about an image build needs to be inside VLAN 20.
 permissions:
   contents: read
   packages: write
@@ -71,10 +68,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@v0.36.0
         env:
-          # The action's container runs under amd64 emulation on arm64-hosted
-          # runners, so trivy's platform auto-detection picks amd64 — and this
-          # repo only ever pushes arm64. Without this it 404s against the
-          # image index looking for a child that was never built.
           TRIVY_PLATFORM: linux/arm64
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.version.outputs.value }}
@@ -90,3 +83,11 @@ jobs:
           docker run --rm "$IMAGE" kubectl version --client
           docker run --rm "$IMAGE" helm version --short
           docker run --rm "$IMAGE" sops --version
+
+      - name: Smoke test the runner image
+        if: matrix.image == 'gha-runner' && github.event_name != 'pull_request'
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/gha-runner:${{ steps.version.outputs.value }}
+          docker run --rm --entrypoint make "$IMAGE" --version
+          docker run --rm --entrypoint docker "$IMAGE" --version
+          docker run --rm --entrypoint git "$IMAGE" --version

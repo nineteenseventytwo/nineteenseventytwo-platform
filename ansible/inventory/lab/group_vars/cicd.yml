@@ -1,33 +1,17 @@
 ---
-# 1972-console-1: bootstrap node and break-glass runner host. RPi 5 / 2 GB / SSD
-# — the same hardware as the cluster nodes. Kept out of the cluster for
-# architectural reasons (ADR-0007: it is what builds the cluster, so joining
-# it creates a circular dependency), not because it lacks the resources.
-
 kubelet_node: false
 longhorn_node: false
 
-# Runners are cattle. One job each, then the container exits and is replaced —
-# all repo state comes from actions/checkout in the job itself (§3.1). The
-# caching you lose is bought back with a registry-backed buildx cache, not with
-# a long-lived _work directory.
-runner_ephemeral: true
-runner_replicas: 2
-runner_scope: "org"                 # org-scoped: serves every repo. ADR-0001.
-runner_labels:
+runner_host_ephemeral: true
+runner_host_replicas: 2
+runner_host_scope: "org"
+runner_host_labels:
   - self-hosted
   - linux
   - arm64
   - lab-network
 
-# Mounting the docker socket is approximately root on the host. Mitigations:
-# an unprivileged runner user, and moving to ARC dind once the cluster exists.
-# Stated plainly here and in ADR-0006 rather than buried.
-runner_mount_docker_socket: true
-runner_user: "github-runner"
+runner_host_mount_docker_socket: true
+runner_host_user: "github-runner"
 
-# 2 GB of RAM. Real headroom over the previous 1 GB board, but still not
-# enough to add a kubelet on top of the runner containers and dockerd — that
-# is an architectural decision (ADR-0007) now, not a resource one, but the
-# guard stays as a sanity check either way.
 console_memory_guard_mb: 2048

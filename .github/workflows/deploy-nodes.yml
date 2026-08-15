@@ -44,30 +44,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The age key decrypts group_vars/all/secrets.sops.yml. It is one of only
-      # two secrets that stay in GitHub after Vault lands (the other is the
-      # GitHub App key) — see docs/04-secrets.md.
-      - name: Stage the age key and SSH key
+      # The age key decrypts group_vars/all/secrets.sops.yml. It is the only
+      # credential this workflow stages: the SSH key is ansible-console, which
+      # lives on this host and never enters GitHub, and known_hosts is public
+      # and committed at ansible/files/known_hosts. See docs/04-secrets.md.
+      - name: Stage the age key
         run: |
-          mkdir -p "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"
+          install -d -m 700 "$RUNNER_TEMP/age"
           printf '%s' "${{ secrets.SOPS_AGE_KEY }}" > "$RUNNER_TEMP/age/keys.txt"
-          printf '%s' "${{ secrets.ANSIBLE_SSH_KEY }}" > "$RUNNER_TEMP/ssh/id_ed25519"
-          printf '%s' "${{ secrets.ANSIBLE_KNOWN_HOSTS }}" > "$RUNNER_TEMP/ssh/known_hosts"
-          chmod 700 "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"
-          chmod 600 "$RUNNER_TEMP"/age/keys.txt "$RUNNER_TEMP"/ssh/*
+          chmod 600 "$RUNNER_TEMP/age/keys.txt"
 
+      # The work itself is a make target, identical to what runs on a
+      # workstation. Everything above this line is orchestration.
       - name: Converge the nodes
-        run: |
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            -v "$RUNNER_TEMP/ssh:/root/.ssh:ro" \
-            -v "$RUNNER_TEMP/age:/root/.config/sops/age:ro" \
-            -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
-            "ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}" \
-            ansible-playbook -i ansible/inventory/lab \
-              ansible/playbooks/10-bootstrap-nodes.yml \
-              ${{ inputs.check_mode && '--check --diff' || '' }}
+        env:
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+          SSH_KEY: /home/mchellmer/.ssh/ansible-console
+          CHECK: ${{ inputs.check_mode && '1' || '' }}
+        run: make deploy-nodes
 
       - name: Shred the staged credentials
         if: always()
-        run: rm -rf "$RUNNER_TEMP/age" "$RUNNER_TEMP/ssh"
+        run: rm -rf "$RUNNER_TEMP/age"

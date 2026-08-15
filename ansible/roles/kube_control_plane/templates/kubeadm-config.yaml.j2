@@ -69,9 +69,9 @@ kind: KubeletConfiguration
 cgroupDriver: systemd
 # 2 GB nodes. Matches the systemd drop-in written by kube_prereqs.
 systemReserved:
-  memory: "{{ kubelet_system_reserved_memory }}"
+  memory: "{{ kube_prereqs_kubelet_system_reserved_memory }}"
 kubeReserved:
-  memory: "{{ kubelet_kube_reserved_memory }}"
+  memory: "{{ kube_prereqs_kubelet_kube_reserved_memory }}"
 evictionHard:
-  memory.available: "{{ kubelet_eviction_hard_memory }}"
+  memory.available: "{{ kube_prereqs_kubelet_eviction_hard_memory }}"
 serverTLSBootstrap: true

@@ -1,10 +1,10 @@
 ---
 - name: Create the unprivileged runner user
   ansible.builtin.user:
-    name: "{{ runner_user }}"
+    name: "{{ runner_host_user }}"
     system: true
     shell: /usr/sbin/nologin
-    home: "{{ runner_home }}"
+    home: "{{ runner_host_home }}"
     create_home: true
   become: true
 
@@ -13,22 +13,22 @@
 # can do through the socket. ADR-0006 says so plainly, and ARC dind is the exit.
 - name: Add the runner user to the docker group
   ansible.builtin.user:
-    name: "{{ runner_user }}"
+    name: "{{ runner_host_user }}"
     groups: docker
     append: true
   become: true
-  when: runner_mount_docker_socket | bool
+  when: runner_host_mount_docker_socket | bool
 
 - name: Create the runner directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0750"
   loop:
-    - "{{ runner_home }}"
-    - "{{ runner_workdir }}"
+    - "{{ runner_host_home }}"
+    - "{{ runner_host_workdir }}"
   become: true
 
 # The GitHub App private key replaces hand-pasted registration tokens, which
@@ -37,9 +37,9 @@
 - name: Install the GitHub App private key
   ansible.builtin.copy:
     content: "{{ github_app_private_key }}"
-    dest: "{{ runner_home }}/github-app.pem"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    dest: "{{ runner_host_home }}/github-app.pem"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0400"
   become: true
   no_log: true
@@ -48,9 +48,9 @@
 - name: Render the runner compose stack
   ansible.builtin.template:
     src: compose.yml.j2
-    dest: "{{ runner_home }}/compose.yml"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    dest: "{{ runner_host_home }}/compose.yml"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0640"
   become: true
   notify: Restart runner stack
@@ -58,9 +58,9 @@
 - name: Render the runner environment file
   ansible.builtin.template:
     src: runner.env.j2
-    dest: "{{ runner_home }}/runner.env"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    dest: "{{ runner_host_home }}/runner.env"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0640"
   become: true
   no_log: true

@@ -8,7 +8,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=true
-WorkingDirectory={{ runner_home }}
+WorkingDirectory={{ runner_host_home }}
 ExecStart=/usr/bin/docker compose -f compose.yml up -d --remove-orphans
 ExecStop=/usr/bin/docker compose -f compose.yml down
 TimeoutStartSec=0

@@ -4,41 +4,33 @@
 # Target is ARC scale sets in-cluster — but this stack stays afterwards as the
 # break-glass path, because it is how you rebuild the cluster that hosts ARC.
 #
-# Org-scoped, so "a runner for whichever repo is queueing" is a non-problem.
-# That is the whole point of the org (ADR-0001).
 services:
   runner:
-    image: {{ runner_image }}
+    image: {{ runner_host_image }}
     env_file: [runner.env]
     environment:
-{% if runner_scope == 'org' %}
+{% if runner_host_scope == 'org' %}
       ORG_NAME: "{{ github_org }}"
 {% else %}
       REPO_URL: "https://github.com/{{ github_org }}/{{ runner_repo }}"
 {% endif %}
-      RUNNER_SCOPE: "{{ runner_scope }}"
-      EPHEMERAL: "{{ 'true' if runner_ephemeral else 'false' }}"
-      LABELS: "{{ runner_labels | join(',') }}"
-      RUNNER_WORKDIR: "{{ runner_workdir }}"
+      RUNNER_SCOPE: "{{ runner_host_scope }}"
+      EPHEMERAL: "{{ 'true' if runner_host_ephemeral else 'false' }}"
+      LABELS: "{{ runner_host_labels | join(',') }}"
+      RUNNER_WORKDIR: "{{ runner_host_workdir }}"
       DISABLE_AUTO_UPDATE: "true"
     volumes:
-{% if runner_mount_docker_socket %}
-      # ~= root on the host. Mitigated by the unprivileged runner user; removed
-      # entirely when jobs move to ARC dind.
+{% if runner_host_mount_docker_socket %}
       - /var/run/docker.sock:/var/run/docker.sock
 {% endif %}
-      - {{ runner_workdir }}:{{ runner_workdir }}
-      # The App private key is what lets the container mint its own
-      # registration token at start. Read-only, and never in the image.
-      - {{ runner_home }}/github-app.pem:/github-app.pem:ro
+      - {{ runner_host_workdir }}:{{ runner_host_workdir }}
+      - {{ runner_host_home }}/github-app.pem:/github-app.pem:ro
     restart: always
     deploy:
-      replicas: {{ runner_replicas }}
+      replicas: {{ runner_host_replicas }}
       resources:
         limits:
-          # 2 GB host. Two runners at this ceiling plus dockerd leaves ~700M
-          # for the OS — comfortable, not maxed out. The limit's job is the
-          # same as before: turning "console fell over" into "one job failed".
+          # 2 GB host. Two runners at this ceiling plus dockerd leaves ~700M.
           # There's room for a third replica now if concurrency is worth more
           # than the extra headroom; not enabled by default.
           memory: 640M
