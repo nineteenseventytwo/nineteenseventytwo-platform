@@ -71,6 +71,24 @@
         proto: tcp
         comment: "ansible from 1972-console-1"
 
+    # Ansible runs inside a container on console's own docker bridge here, so
+    # a play against console is a hairpin connection back to the same host.
+    # Docker's hairpin NAT does not reliably rewrite the source to console's
+    # LAN address for that case, so sshd sees the container's bridge IP
+    # instead — which matches neither allow rule above. 172.16.0.0/12 covers
+    # Docker's whole classic bridge range rather than one exact subnet, so
+    # this does not quietly break again if the configured address pool
+    # (docker role, default-address-pools) ever actually takes effect and the
+    # live subnet shifts.
+    - name: Allow SSH from the docker bridge range
+      community.general.ufw:
+        rule: allow
+        src: "172.16.0.0/12"
+        port: "{{ hardening_ssh_port }}"
+        proto: tcp
+        comment: "ansible hairpin from console's own runner containers"
+      when: hardening_ufw_allow_docker_bridge_ssh | default(false)
+
     # Intra-VLAN 20 traffic is switch-local — OPNsense never sees it. Node
     # isolation here and NetworkPolicy in-cluster are the only controls that do.
     - name: Allow cluster ports between lab nodes

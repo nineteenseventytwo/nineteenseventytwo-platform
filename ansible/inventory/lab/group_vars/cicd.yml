@@ -14,4 +14,8 @@ runner_host_labels:
 runner_host_mount_docker_socket: true
 runner_host_user: "github-runner"
 
+# Ansible runs against this host from inside its own runner containers —
+# see the hardening role's task comment for why that needs a dedicated rule.
+hardening_ufw_allow_docker_bridge_ssh: true
+
 console_memory_guard_mb: 2048

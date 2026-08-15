@@ -16,6 +16,10 @@ hardening_ufw_enabled: true
 hardening_ufw_default_incoming: deny
 hardening_ufw_default_outgoing: allow
 
+# Only true where ansible itself runs from a container on the target host
+# (console, via the runner_host compose stack) — see the task comment.
+hardening_ufw_allow_docker_bridge_ssh: false
+
 # Kubernetes control plane and node ports, per the upstream port requirements.
 hardening_ufw_cluster_rules:
   - { port: "6443", proto: tcp, comment: "kube-apiserver" }
