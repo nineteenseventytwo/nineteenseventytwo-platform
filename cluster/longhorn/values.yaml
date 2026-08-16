@@ -2,8 +2,7 @@
 # chart: 1.12.1
 # repo:  https://charts.longhorn.io
 #
-# Worker SSDs only. Two replicas across two workers: one node can go down
-# without data loss, which is the most three nodes can honestly offer.
+# Worker SSDs only. Two replicas across two workers.
 persistence:
   defaultClass: true
   defaultClassReplicaCount: 2
@@ -11,9 +10,6 @@ persistence:
 
 defaultSettings:
   defaultReplicaCount: 2
-  # The control plane is a 2 GB RPi 5 also running etcd and the API server.
-  # Keeping replicas off it is the difference between a slow cluster and an
-  # unresponsive one.
   systemManagedComponentsNodeSelector: "node-role.kubernetes.io/worker:true"
   createDefaultDiskLabeledNodes: true
   defaultDataPath: /var/lib/longhorn
