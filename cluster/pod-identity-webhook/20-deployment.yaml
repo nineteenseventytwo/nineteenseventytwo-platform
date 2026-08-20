@@ -16,6 +16,12 @@ metadata:
   namespace: pod-identity-webhook
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+    # Checkov's Kubernetes scanner reads its inline skips from an annotation,
+    # not a comment near the field — a plain `# checkov:skip=` comment inside
+    # this resource is silently ignored (confirmed empirically). This pod's
+    # own controller loop calls the API server (watches ServiceAccounts via
+    # its ClusterRole in 10-rbac.yaml) and needs its own token to do so.
+    checkov.io/skip1: "CKV_K8S_38=this pod calls the API server itself (watches ServiceAccounts) and needs its own token"
   labels:
     app.kubernetes.io/name: pod-identity-webhook
 spec:
@@ -28,6 +34,12 @@ spec:
       labels:
         app.kubernetes.io/name: pod-identity-webhook
     spec:
+      # The webhook's own controller loop needs this token: its ClusterRole
+      # (10-rbac.yaml) grants `serviceaccounts: get/list/watch`, and it uses
+      # its own projected token to authenticate those calls to the API
+      # server. Unlike a workload that only consumes AWS credentials, this
+      # one is a K8s controller first — the token is load-bearing, not an
+      # oversight. See the checkov.io/skip1 annotation above.
       serviceAccountName: pod-identity-webhook
       securityContext:
         runAsNonRoot: true
@@ -39,7 +51,10 @@ spec:
       containers:
         - name: pod-identity-webhook
           image: public.ecr.aws/eks/amazon-eks-pod-identity-webhook:v0.6.17
-          imagePullPolicy: IfNotPresent
+          # Always, not IfNotPresent: a mutating admission webhook is worth
+          # the extra pull on every restart, in exchange for never silently
+          # running whatever this node happened to cache under this tag.
+          imagePullPolicy: Always
           command:
             - /webhook
             # Port 8443, not the upstream default of 443. The image carries no
@@ -72,6 +87,21 @@ spec:
           resources:
             requests: {cpu: 25m, memory: 48Mi}
             limits: {memory: 128Mi}
+          # The webhook's own /healthz, over HTTPS on the same port it serves
+          # /mutate on — kubelet doesn't validate the cert-manager-issued cert
+          # for probes, so no extra TLS config is needed. Worth having
+          # precisely because failurePolicy is Ignore on the webhook config: a
+          # wedged pod that never restarts would silently strip AWS
+          # credentials from every pod it admits, with nothing in the
+          # deployment itself to say so. This is what actually catches that.
+          livenessProbe:
+            httpGet: {path: /healthz, port: https, scheme: HTTPS}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /healthz, port: https, scheme: HTTPS}
+            initialDelaySeconds: 3
+            periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
