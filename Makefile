@@ -252,6 +252,24 @@ argocd-sync-wait: ## Nudge Argo CD and block until the platform app is Synced/He
 	  kubectl -n argocd get applications -o wide >&2; \
 	  exit 1'
 
+# Runs on the workstation, not through the ansible-runner image: it needs an
+# `aws sso login` session from ~/.aws, and mounting that into a container to
+# avoid writing three lines of Makefile would be the wrong trade. Same reasoning
+# as bootstrap/ssh/scan-known-hosts.sh.
+.PHONY: publish-oidc
+publish-oidc: ## Publish the cluster's OIDC discovery documents to the public JWKS bucket
+	@command -v aws >/dev/null || { echo "aws cli not found — this target runs on the workstation" >&2; exit 1; }
+	@command -v kubectl >/dev/null || { echo "kubectl not found — this target runs on the workstation" >&2; exit 1; }
+	KUBECONFIG=$(KUBECONFIG) bootstrap/oidc/publish-discovery.sh
+
+# Proves the whole chain end to end: a pod gets a projected token, exchanges it
+# at STS, and comes back with an assumed-role identity. Run it after the roles
+# exist — a green result here is the only real evidence IRSA works, as opposed
+# to each half looking correct on its own.
+.PHONY: verify-irsa
+verify-irsa: ## Assume an AWS role from inside the cluster and print the identity
+	$(KUBE_SH) ' 	  kubectl -n vault get sa vault 	    -o jsonpath="{.metadata.annotations.eks\.amazonaws\.com/role-arn}" 	    | grep -q . || { echo "vault ServiceAccount carries no role-arn annotation" >&2; exit 1; }; 	  echo "annotation present"; 	  kubectl -n vault get pod -l app.kubernetes.io/name=vault 	    -o jsonpath="{.items[0].spec.containers[0].env[?(@.name=="AWS_ROLE_ARN")].value}" 	    | grep -q . || { echo "AWS_ROLE_ARN not injected — check the pod-identity-webhook pod" >&2; exit 1; }; 	  echo "webhook injection present"; 	  kubectl -n vault exec deploy/vault -- sh -c 	    "vault status 2>&1 | grep -E "Sealed|Seal Type"" '
+
 .PHONY: apply-policy
 apply-policy: ## Apply baseline policy and tenant namespaces (Argo owns these after bootstrap)
 	$(KUBECTL) apply -f policy/

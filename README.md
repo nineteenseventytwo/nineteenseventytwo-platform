@@ -57,7 +57,13 @@ make deploy-nodes
 make deploy-cicd
 
 # 5. Build the cluster
+#    The AWS JWKS bucket must exist first, and kubeadm bakes the OIDC issuer
+#    in permanently — docs/06-aws-federation.md steps 0-1.
 make deploy-cluster           # kubeadm + Cilium + join workers + default-deny
+
+# 5a. Publish the cluster's OIDC discovery documents, then wire up the
+#     Cloudflare Worker so AWS can reach them (docs/06-aws-federation.md 3-5)
+make publish-oidc
 
 # 6. Hand the cluster to Argo CD; everything in cluster/ reconciles from git
 make bootstrap-argocd
@@ -119,5 +125,6 @@ what it can reach, rotation cadence, blast radius — is
 | [02-cicd.md](docs/02-cicd.md) | Runners, images, workflows |
 | [03-cluster.md](docs/03-cluster.md) | kubeadm, Cilium, addons, Argo CD |
 | [04-secrets.md](docs/04-secrets.md) | Secret inventory and rotation |
+| [06-aws-federation.md](docs/06-aws-federation.md) | IRSA on kubeadm: the OIDC issuer, the JWKS bucket, Cloudflare, and the rollout order |
 | [decisions/](docs/decisions/) | ADRs |
 | [plan/](docs/plan/) | The originating plan this repo was built from |

@@ -44,6 +44,40 @@ ansible_runner_image: "{{ registry }}/ansible-runner"
 gha_runner_image: "{{ registry }}/gha-runner"
 
 # ---------------------------------------------------------------------------
+# AWS federation. Mirrors nineteenseventytwo-cloud/config/aws.json, which is
+# the source of truth — if these disagree, every AssumeRoleWithWebIdentity call
+# fails with a message that does not mention URLs. No credential appears here
+# or anywhere else in this repo: pods present a projected service-account token
+# and STS hands back an hour of access. docs/06-aws-federation.md.
+#
+# cluster_oidc_issuer is a ONE-WAY DOOR. It is baked into the API server at
+# `kubeadm init` and into every IAM role trust policy. Changing it means
+# rebuilding the control plane. No trailing slash — the issuer field in the
+# discovery document must match this character for character.
+# ---------------------------------------------------------------------------
+cluster_oidc_issuer: "https://oidc.{{ lab_domain }}"
+cluster_oidc_audience: "sts.amazonaws.com"
+
+aws_region: "eu-west-2"
+aws_account_platform_prod: "972034964468"
+
+# Roles created by live/aws/platform-prod once publish_cluster_oidc is on.
+# These are ARNs, not secrets — they go on ServiceAccount annotations in
+# cluster/*/values.yaml, and the trust policy on the far side is what decides.
+aws_cluster_role_arns:
+  argocd_sops: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-argocd-sops"
+  vault_unseal: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-vault-unseal"
+  longhorn_backup: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-longhorn-backup"
+  prowler: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-prowler"
+
+# S3 bucket the cluster publishes its OIDC discovery documents into, and the
+# bucket Longhorn writes volume backups to. Names are derived in the cloud repo
+# as <org>-<purpose>-<account id>; kept literal here so `make publish-oidc`
+# does not need Terraform on the workstation.
+aws_jwks_bucket: "nineteenseventytwo-oidc-{{ aws_account_platform_prod }}"
+aws_longhorn_bucket: "nineteenseventytwo-longhorn-backups-{{ aws_account_platform_prod }}"
+
+# ---------------------------------------------------------------------------
 # Versions. Pinned so replaying an old commit does what it did then.
 # ---------------------------------------------------------------------------
 # Matches what eightbitsaxlounge/server runs today; bump deliberately.

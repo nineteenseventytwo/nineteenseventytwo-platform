@@ -10,8 +10,9 @@ protecting the Vault that holds the credentials.
 |---|---|---|---|---|
 | 0 | Config secrets before anything exists | **SOPS + age** | age private key: password manager, a GitHub Actions secret, and `/root/.config/sops/age/keys.txt` on console | Phase A/B |
 | 1 | CI → AWS | **GitHub OIDC → IAM role** | Nothing stored. Trust policy pins the org and repo. | Phase C |
+| 1 | Cluster pods → AWS | **Cluster OIDC issuer → IAM role** | Nothing stored. Trust policy pins the service account. [06-aws-federation.md](06-aws-federation.md) | Phase C |
 | 1b | CI → GitHub (runner registration) | **GitHub App private key** | SOPS-encrypted + org secret | Phase B — [02-cicd.md](02-cicd.md) |
-| 2 | Cluster workload secrets | **Vault OSS** + **External Secrets Operator** | Vault, auto-unsealed by AWS KMS | Phase C/D |
+| 2 | Cluster workload secrets | **Vault OSS** + **External Secrets Operator** | Vault, auto-unsealed by AWS KMS over IRSA — no key in the cluster | Phase C/D |
 | 3 | SSH access | **Vault SSH secrets engine (CA)** | Vault | Phase D |
 | 4 | TLS | **cert-manager** + Let's Encrypt DNS-01 | Cloudflare API token, held in Vault | Phase C/D |
 
@@ -135,7 +136,7 @@ minutes to maintain.
 
 | Secret | Lives | Reaches | Rotation | Blast radius if leaked |
 |---|---|---|---|---|
-| `age` private key | Password manager; `SOPS_AGE_KEY` org secret; console `/root/.config/sops/age/keys.txt` | Every Tier-0 value in this repo | Annual, or immediately on suspicion | **Total for Tier 0** — GitHub App key, Cloudflare token, KMS creds. Rotate by re-encrypting with a new recipient and revoking the old. |
+| `age` private key | Password manager; `SOPS_AGE_KEY` org secret; console `/root/.config/sops/age/keys.txt` | Every Tier-0 value in this repo | Annual, or immediately on suspicion | **Total for Tier 0** — GitHub App key, Cloudflare token. No longer AWS credentials: those are federated. Rotate by re-encrypting with a new recipient and revoking the old. |
 | GitHub App private key | SOPS + org Actions secret | Org runner registration | Annual | Attacker can register runners into the org and receive jobs. Revoke in App settings; regeneration is instant. |
 | `ansible-console` SSH key | `1972-console-1` only — generated there by `20-cicd-host.yml`, never in GitHub or git | All four Pis as `mchellmer` | Annual → **retired at Phase D** | Root-equivalent on every node (NOPASSWD sudo). The reason Tier 3 exists. Not an Actions secret: CI runs *on* the console, so it reads the key from the host rather than being handed a copy. |
 | `ansible-workstation` SSH key | Workstations only, alongside `mark-workstation`; never in GitHub or git | All four Pis as `mchellmer` | Annual → **retired at Phase D** | As above. No passphrase, because the consumer is a container with no TTY; the compensating control is that it never leaves the machine that made it. |
@@ -143,7 +144,7 @@ minutes to maintain.
 | `KUBECONFIG` | Org Actions secret | `deploy-cluster.yml`'s Argo CD nudge-and-wait | On cluster rebuild | Whatever RBAC the embedded credential carries — scope it, don't hand it cluster-admin. Retire once ESO/in-cluster auth makes a static kubeconfig unnecessary. |
 | etcd encryption key | `/etc/kubernetes/enc/` on `1972-master-1`, mode 0600 | Every Secret in the cluster at rest | Manual rekey (rewrites every Secret) | Reads every cluster Secret from an etcd snapshot or a stolen SSD. **Back it up with the etcd snapshot, not instead of it — losing it makes every Secret unreadable.** |
 | Vault recovery keys | Password manager, split across two entries | `generate-root`, rekey | On personnel change | Full Vault takeover via root token generation. Not unseal keys — auto-unseal is KMS. |
-| AWS KMS key / IAM principal | AWS; creds in `vault-kms` Secret | Vault's seal | Quarterly (IAM keys); KMS key never | Vault cannot unseal if revoked; cannot be decrypted without it if stolen alone. |
+| AWS KMS keys (`sops`, `vault-unseal`) | AWS only. **No credential in the cluster** — pods assume a role via the cluster OIDC issuer ([06-aws-federation.md](06-aws-federation.md)) | Vault's seal; Argo CD's SOPS decryption | Key never; nothing else to rotate | Vault cannot unseal if the role is revoked. There is no long-lived key to leak — that is the point, and `DenyIAMUsersAndKeys` makes creating one impossible. |
 | Cloudflare API token | Vault `kv/platform/cloudflare` | `Zone:DNS:Edit` on one zone | Semi-annual | DNS records for one zone — enough to mis-issue certificates for it. Scope to the single zone, never account-wide. |
 | App secrets (env vars, API keys) | Vault `kv/tenants/<name>/*` | One namespace each, via `ExternalSecret` | Per-app | Whatever that app's config holds. No app repo can read another's — see [ADR-0012](decisions/ADR-0012-platform-owns-app-workloads.md); there is no tenant kubeconfig anymore, only this. |
 | Grafana admin password | Vault `kv/platform/grafana` | Grafana | Annual | Dashboards and datasource credentials. |

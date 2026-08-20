@@ -90,6 +90,18 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: pod-identity-webhook
+  labels:
+    # Fully restricted-compliant: non-root on an unprivileged port, no
+    # privilege escalation, all capabilities dropped, read-only root.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: arc-systems
   labels:
     pod-security.kubernetes.io/enforce: baseline

@@ -1,0 +1,54 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pod-identity-webhook
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    # cainjector copies the CA from the Certificate above into caBundle below
+    # and keeps it current across renewals. Without this the API server has no
+    # way to trust the webhook's serving cert and every call fails.
+    cert-manager.io/inject-ca-from: pod-identity-webhook/pod-identity-webhook
+webhooks:
+  - name: pod-identity-webhook.amazonaws.com
+    # Ignore, not Fail, and this is a deliberate trade in both directions.
+    #
+    # Fail would mean a broken or unreachable webhook blocks pod creation in
+    # every selected namespace — on a three-node lab that turns one crashlooping
+    # pod into an outage you cannot deploy your way out of.
+    #
+    # Ignore means the opposite failure: pods start cleanly with no AWS
+    # credentials injected, and the symptom is Vault refusing to unseal or
+    # Longhorn backups quietly failing, with nothing in the pod's own events to
+    # explain it. If AWS access breaks for no visible reason, check this
+    # webhook's pod before anything else.
+    failurePolicy: Ignore
+    clientConfig:
+      service:
+        name: pod-identity-webhook
+        namespace: pod-identity-webhook
+        path: /mutate
+        port: 443
+    # Scoped to the namespaces that actually federate to AWS. Every other pod
+    # in the cluster skips this admission hop entirely, which on 2 GB nodes is
+    # worth having, and it bounds what a compromised webhook could rewrite.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["argocd", "vault", "longhorn-system", "security"]
+    objectSelector:
+      matchExpressions:
+        - key: eks.amazonaws.com/skip-pod-identity-webhook
+          operator: DoesNotExist
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    # v1, not upstream's v1beta1. The v1beta1 AdmissionReview was removed in
+    # Kubernetes 1.22; leaving it as upstream ships it means the API server can
+    # negotiate no common version and every call fails — silently, because
+    # failurePolicy is Ignore.
+    admissionReviewVersions: ["v1"]

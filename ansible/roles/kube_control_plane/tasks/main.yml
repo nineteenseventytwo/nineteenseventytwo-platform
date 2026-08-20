@@ -1,4 +1,28 @@
 ---
+# ---------------------------------------------------------------------------
+# The service-account issuer is fixed at `kubeadm init` and cannot be changed
+# afterwards without rebuilding the control plane and invalidating every
+# projected token in the cluster. Both checks below exist because that mistake
+# is silent: the cluster comes up perfectly and IRSA simply never works, and by
+# the time you notice, the fix is a rebuild.
+# ---------------------------------------------------------------------------
+- name: Assert the OIDC issuer is well formed before it becomes permanent
+  ansible.builtin.assert:
+    that:
+      - cluster_oidc_issuer is defined
+      - cluster_oidc_issuer is string
+      - cluster_oidc_issuer.startswith('https://')
+      - not cluster_oidc_issuer.endswith('/')
+      - cluster_oidc_audience is defined
+    fail_msg: >-
+      cluster_oidc_issuer must be a plain https:// URL with no trailing slash
+      (got: {{ cluster_oidc_issuer | default('undefined') }}). AWS compares the
+      issuer character for character against the discovery document, and a
+      trailing slash produces an invalid-token error that says nothing about
+      URLs. This is baked in permanently at kubeadm init — fix it now, not
+      after. See docs/06-aws-federation.md.
+    quiet: true
+
 - name: Create the control plane config directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -57,6 +81,36 @@
     path: /etc/kubernetes/admin.conf
   register: kube_control_plane_admin_conf_stat
   become: true
+
+# If the control plane already exists, kubeadm init is skipped and the
+# rendered config above is inert — so a changed issuer would sit in git looking
+# applied while the running cluster still trusts the old one. Catch that here
+# rather than in an AccessDenied six months later.
+- name: Read the issuer of the running control plane
+  ansible.builtin.shell:
+    cmd: >-
+      grep -oP '(?<=--service-account-issuer=)\S+'
+      /etc/kubernetes/manifests/kube-apiserver.yaml || true
+  register: kube_control_plane_running_issuer
+  changed_when: false
+  become: true
+  when: kube_control_plane_admin_conf_stat.stat.exists
+
+- name: Assert the running issuer still matches the configured one
+  ansible.builtin.assert:
+    that:
+      - kube_control_plane_running_issuer.stdout | trim == cluster_oidc_issuer
+    fail_msg: >-
+      This control plane was initialised with service-account-issuer
+      '{{ kube_control_plane_running_issuer.stdout | trim | default("<unset>", true) }}'
+      but the inventory now asks for '{{ cluster_oidc_issuer }}'. Ansible will
+      NOT change this — the issuer is fixed at kubeadm init. Reconcile the two
+      deliberately: either restore the inventory value, or accept that changing
+      it means tearing down and rebuilding the control plane, which invalidates
+      every projected service-account token and every IAM role trust policy
+      built on the old issuer. See docs/06-aws-federation.md.
+    quiet: true
+  when: kube_control_plane_admin_conf_stat.stat.exists
 
 - name: Run kubeadm init
   ansible.builtin.command:

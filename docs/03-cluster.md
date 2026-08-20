@@ -11,6 +11,18 @@ NetworkPolicy, and Argo CD reconciling everything else from git.
   to the org — [02-cicd.md](02-cicd.md)
 - All four Pis converged to the hardened baseline (`make deploy-nodes`), so
   `kube_prereqs` (cgroups, swap masked) is already satisfied
+- **The JWKS bucket exists in AWS** (`create_jwks_bucket = true` in
+  `nineteenseventytwo-cloud`) — [06-aws-federation.md](06-aws-federation.md)
+  step 1
+
+> **One-way door.** `kubeadm init` fixes the API server's
+> `--service-account-issuer` permanently. Building the cluster without it means
+> pods can never federate to AWS, and the only fix is rebuilding the control
+> plane. `kube_control_plane` asserts the issuer is set and well formed before
+> it will run, and refuses to proceed if a running control plane disagrees with
+> the inventory — but understand what it is protecting before you run step 1.
+> The full sequence, including what to do in Cloudflare and when to enable the
+> remaining AWS resources, is [06-aws-federation.md](06-aws-federation.md).
 
 ## 1. Build the cluster
 
@@ -35,6 +47,19 @@ Store its contents as the org secret `KUBECONFIG`
 reconcile job needs it to nudge Argo CD after this point. Scope it; don't hand
 out cluster-admin if you can avoid it — see the
 [secret inventory](04-secrets.md#secret-inventory).
+
+## 2a. Publish the OIDC discovery documents
+
+```bash
+make publish-oidc
+```
+
+Uploads the cluster's `openid-configuration` and `jwks` to the public bucket,
+which is what lets AWS verify tokens the cluster's pods present. It checks the
+issuer inside the document matches, then verifies the public URL — which fails
+until the Cloudflare Worker is deployed. Both halves are step 3 and 4 of
+[06-aws-federation.md](06-aws-federation.md); do them now, before Argo CD
+brings up Vault and Longhorn.
 
 ## 3. Bootstrap Argo CD
 
@@ -69,6 +94,7 @@ default-deny work is worth more than either scan alone.
 
 ## Verify
 
+- `make verify-irsa` — a pod can assume an AWS role with no credential
 - `kubectl get nodes` — control plane + both workers `Ready`
 - `kubectl -n argocd get applications` — everything `Synced`/`Healthy`
 - `kubectl get networkpolicy -A` — default-deny present in every namespace
@@ -116,7 +142,9 @@ later — it's a supported migration.
 | Wave | What |
 |---|---|
 | −20 | Cilium (adopted; installed pre-Argo by the playbook) |
-| 0–30 | MetalLB → ingress-nginx → cert-manager → Longhorn |
+| 0–20 | MetalLB → ingress-nginx → cert-manager |
+| 25 | pod-identity-webhook — before anything that federates to AWS |
+| 30 | Longhorn |
 | 40–50 | External Secrets → Vault |
 | 60–80 | monitoring → ARC controller → scale sets |
 | 90–95 | CRs that need the operators above, then `policy/` |

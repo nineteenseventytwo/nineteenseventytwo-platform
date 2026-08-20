@@ -11,9 +11,25 @@ and every one of those becomes a manual unseal at whatever hour it happens.
 AWS KMS auto-unseal removes the human from that loop for a few pence a month.
 
 The tradeoff, stated honestly: the cluster's secrets are now unavailable if AWS
-KMS is unavailable or the IAM principal is revoked. That is a real dependency
+KMS is unavailable or the IAM role is revoked. That is a real dependency
 on a cloud provider inside an on-prem lab. It is the right trade here because
 the alternative is not "no dependency", it is "a dependency on you being awake".
+
+## No AWS credential
+
+Vault holds no access key. The `eks.amazonaws.com/role-arn` annotation on its
+ServiceAccount is the entire AWS configuration: the pod-identity-webhook turns
+it into a projected token and `AWS_ROLE_ARN` at admission, and Vault's own SDK
+exchanges that at STS for an hour of access to exactly the unseal CMK.
+
+This used to be an `AWS_ACCESS_KEY_ID` pair in a `vault-kms` Secret. That Secret
+no longer exists and must not come back — `DenyIAMUsersAndKeys` at the
+organisation root makes creating the key it wanted impossible anyway. See
+[docs/06-aws-federation.md](../../docs/06-aws-federation.md).
+
+If Vault will not unseal, check `kubectl -n pod-identity-webhook get pods`
+before anything else: the webhook fails open, so a pod that missed injection
+looks completely normal until it tries to reach AWS.
 
 ## Post-install, once
 

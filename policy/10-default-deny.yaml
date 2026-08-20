@@ -112,3 +112,72 @@ spec:
               - 172.16.0.0/12
       ports:
         - {protocol: TCP, port: 443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: pod-identity-webhook
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# The API server calls this webhook on every pod CREATE in the federated
+# namespaces, and it does so from a node's host IP rather than a pod IP — so a
+# namespaceSelector cannot express it and the VLAN 20 range is the honest way
+# to write it. Without this rule the default-deny above silently blackholes
+# every admission call, and because the webhook's failurePolicy is Ignore the
+# only symptom is pods starting with no AWS credentials.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apiserver-to-webhook
+  namespace: pod-identity-webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pod-identity-webhook
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 192.168.20.0/24
+      ports:
+        - {protocol: TCP, port: 8443}
+    # Prometheus scrapes the metrics port from the monitoring namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 9999}
+---
+# The webhook watches ServiceAccounts, so it needs DNS and the API server.
+# It never talks to AWS itself — it only writes env vars and a volume into a
+# pod spec; the pod's own SDK is what calls STS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-webhook-egress
+  namespace: pod-identity-webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pod-identity-webhook
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock:
+            cidr: 192.168.20.202/32
+      ports:
+        - {protocol: TCP, port: 6443}

@@ -50,12 +50,22 @@ server:
         path = "/vault/data"
       }
 
-      # Auto-unseal. Credentials come from the vault-kms Secret, projected by
-      # ESO from... nowhere, on day one. Bootstrap it from SOPS once; see
-      # docs/04-secrets.md for why that ordering is not circular.
+      # Auto-unseal, with no credential anywhere.
+      #
+      # The pod-identity-webhook injects AWS_ROLE_ARN and a projected token at
+      # admission, from the annotation on the ServiceAccount below. Vault's AWS
+      # SDK finds them, calls AssumeRoleWithWebIdentity, and gets an hour of
+      # access to exactly this one key. There is no vault-kms Secret any more
+      # and there is nothing to rotate — which is just as well, because the
+      # DenyIAMUsersAndKeys SCP on the organisation root makes creating the
+      # access key this used to want impossible.
+      #
+      # The alias, not the key ID: a key replacement in Terraform then is not
+      # an edit here. Region and alias track nineteenseventytwo-cloud —
+      # live/aws/platform-prod/kms.tf.
       seal "awskms" {
-        region     = "us-east-2"
-        kms_key_id = "REPLACE_WITH_KMS_KEY_ID"
+        region     = "eu-west-2"
+        kms_key_id = "alias/nineteenseventytwo-vault-unseal"
       }
 
       # Audit device is enabled post-init (it cannot be set in config), see
@@ -65,13 +75,16 @@ server:
         disable_hostname = true
       }
 
-  extraSecretEnvironmentVars:
-    - envName: AWS_ACCESS_KEY_ID
-      secretName: vault-kms
-      secretKey: aws_access_key_id
-    - envName: AWS_SECRET_ACCESS_KEY
-      secretName: vault-kms
-      secretKey: aws_secret_access_key
+  # IRSA. This annotation is the entire AWS configuration for this pod: the
+  # webhook turns it into AWS_ROLE_ARN, AWS_WEB_IDENTITY_TOKEN_FILE and a
+  # projected token with audience sts.amazonaws.com. The role's trust policy on
+  # the AWS side pins `system:serviceaccount:vault:vault`, so this annotation
+  # on any other ServiceAccount buys nothing.
+  serviceAccount:
+    create: true
+    name: vault
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-vault-unseal"
 
   ingress:
     enabled: true
