@@ -1,6 +1,7 @@
 ---
 name: deploy-nodes
 
+# checkov:skip=CKV_GHA_7: check_mode toggles fixed, committed playbooks, not what runs or from where. The real boundary is `environment: lab` below.
 on:
   push:
     branches: [main]

@@ -1,6 +1,7 @@
 ---
 name: deploy-cluster
 
+# checkov:skip=CKV_GHA_7: rebuild toggles a fixed, committed playbook, not what runs or from where. The real boundary is `environment: lab` below.
 on:
   push:
     branches: [main]

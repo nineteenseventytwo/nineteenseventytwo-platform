@@ -69,3 +69,8 @@ ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
 WORKDIR /work
 ENTRYPOINT []
 CMD ["ansible-playbook", "--version"]
+
+# A one-shot CLI invocation (`docker run --rm ansible-runner ansible-playbook
+# ...`), not a long-running service — there is no ongoing process for Docker
+# to poll. NONE is the honest declaration of that, not an omission.
+HEALTHCHECK NONE

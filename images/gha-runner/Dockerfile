@@ -41,3 +41,12 @@ RUN chmod +x /entrypoint.sh
 USER runner
 WORKDIR /home/runner
 ENTRYPOINT ["/entrypoint.sh"]
+
+# Runs long-lived under compose (restart: always), unlike ansible-runner, so a
+# real check is worth having. Runner.Listener is the process entrypoint.sh's
+# ./run.sh eventually execs once GitHub App registration (config.sh) succeeds
+# — pgrep, already on the Ubuntu base, needs nothing extra installed.
+# start-period covers that registration phase: JWT mint, two token exchanges,
+# then config.sh's own call to GitHub, all before run.sh even starts.
+HEALTHCHECK --interval=60s --timeout=5s --start-period=60s --retries=3 \
+  CMD pgrep -f Runner.Listener || exit 1
