@@ -10,6 +10,12 @@ on:
     branches-ignore: [main]
     paths: ["images/ansible-runner/version.txt"]
 
+# The floor every job in this file gets by default; each job below already
+# overrides with exactly what it needs (packages: write to build, packages:
+# read to smoke-test), same pattern as lint.yml and deploy-cluster.yml.
+permissions:
+  contents: read
+
 concurrency:
   group: image-ansible-runner-build-${{ github.ref }}
   cancel-in-progress: true

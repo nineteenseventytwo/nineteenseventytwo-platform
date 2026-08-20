@@ -10,6 +10,12 @@ on:
     branches: [main]
     paths: ["images/gha-runner/version.txt"]
 
+# The floor every job in this file gets by default; the promote job below
+# already overrides with exactly what it needs, same pattern as lint.yml
+# and deploy-cluster.yml.
+permissions:
+  contents: read
+
 concurrency:
   group: image-gha-runner-promote-${{ github.ref }}
   cancel-in-progress: true
