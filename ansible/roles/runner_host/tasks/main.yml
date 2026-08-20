@@ -1,10 +1,10 @@
 ---
 - name: Create the unprivileged runner user
   ansible.builtin.user:
-    name: "{{ runner_user }}"
+    name: "{{ runner_host_user }}"
     system: true
     shell: /usr/sbin/nologin
-    home: "{{ runner_home }}"
+    home: "{{ runner_host_home }}"
     create_home: true
   become: true
 
@@ -13,34 +13,62 @@
 # can do through the socket. ADR-0006 says so plainly, and ARC dind is the exit.
 - name: Add the runner user to the docker group
   ansible.builtin.user:
-    name: "{{ runner_user }}"
+    name: "{{ runner_host_user }}"
     groups: docker
     append: true
   become: true
-  when: runner_mount_docker_socket | bool
+  when: runner_host_mount_docker_socket | bool
 
-- name: Create the runner directories
+# Looked up rather than hardcoded: the container's own "docker" group (baked
+# into the base image) has a different GID than the host's, so being a member
+# of "docker" inside the container does not grant access to the bind-mounted
+# host socket. group_add on the compose service needs the host's actual GID.
+- name: Look up the host docker group GID
+  ansible.builtin.getent:
+    database: group
+    key: docker
+  become: true
+  when: runner_host_mount_docker_socket | bool
+
+- name: Create the runner home directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ runner_host_home }}"
     state: directory
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0750"
-  loop:
-    - "{{ runner_home }}"
-    - "{{ runner_workdir }}"
+  become: true
+
+# 0777, not 0750: this one is bind-mounted read-write into the container
+# (compose.yml.j2), and the container's non-root "runner" user (uid 1001,
+# set by the actions-runner base image) needs to create and write job
+# checkouts under it. Same uid mismatch as the App private key above — the
+# host's github-runner system user doesn't line up with the container's uid.
+- name: Create the runner work directory
+  ansible.builtin.file:
+    path: "{{ runner_host_workdir }}"
+    state: directory
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
+    mode: "0777"
   become: true
 
 # The GitHub App private key replaces hand-pasted registration tokens, which
 # expire after an hour and are why the old script took two of them as arguments.
 # The container mints its own token at start; no human in the loop.
+#
+# Mode 0444, not 0400: the runner container's non-root "runner" user (uid
+# 1001, set by the actions-runner base image) has to read this file through
+# the :ro bind mount, and its uid doesn't line up with the host's
+# github-runner system user. The key's real confidentiality boundary is
+# sops in git, not host file perms on a single-tenant box.
 - name: Install the GitHub App private key
   ansible.builtin.copy:
     content: "{{ github_app_private_key }}"
-    dest: "{{ runner_home }}/github-app.pem"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
-    mode: "0400"
+    dest: "{{ runner_host_home }}/github-app.pem"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
+    mode: "0444"
   become: true
   no_log: true
   notify: Restart runner stack
@@ -48,9 +76,9 @@
 - name: Render the runner compose stack
   ansible.builtin.template:
     src: compose.yml.j2
-    dest: "{{ runner_home }}/compose.yml"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    dest: "{{ runner_host_home }}/compose.yml"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0640"
   become: true
   notify: Restart runner stack
@@ -58,9 +86,9 @@
 - name: Render the runner environment file
   ansible.builtin.template:
     src: runner.env.j2
-    dest: "{{ runner_home }}/runner.env"
-    owner: "{{ runner_user }}"
-    group: "{{ runner_user }}"
+    dest: "{{ runner_host_home }}/runner.env"
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
     mode: "0640"
   become: true
   no_log: true

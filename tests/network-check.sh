@@ -81,8 +81,11 @@ if want 3; then
 fi
 
 # 4 ------------------------------------------------------------------------
+# GET, not HEAD/-I: ghcr.io's root path answers HEAD with 405, which looks
+# like a broken egress path but actually proves the opposite — DNS, TCP and
+# TLS all completed and the server responded.
 if want 4; then
-  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -I https://ghcr.io 2>/dev/null)
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://ghcr.io 2>/dev/null)
   if [[ "$code" =~ ^(200|301|302)$ ]]; then
     report 4 "egress TCP to ghcr.io" pass
   else
@@ -95,7 +98,9 @@ fi
 # problem, and it will resurface later as "some HTTPS sites hang" — which is a
 # much worse way to discover it.
 if want 5; then
-  if ping -M do -s 1472 -c3 -W2 1.1.1.1 >/dev/null 2>&1; then
+  # "do" is quoted only to stop shellcheck reading it as a loop keyword
+  # (SC1010); it is the argument to -M, the don't-fragment flag.
+  if ping -M "do" -s 1472 -c3 -W2 1.1.1.1 >/dev/null 2>&1; then
     report 5 "path MTU 1500 without fragmentation" pass
   else
     report 5 "path MTU 1500 without fragmentation" fail \

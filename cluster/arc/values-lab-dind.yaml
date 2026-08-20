@@ -1,5 +1,5 @@
 ---
-# chart: 0.14.0  (gha-runner-scale-set)
+# chart: 0.14.2  (gha-runner-scale-set)
 #
 # lab-dind: for jobs that genuinely must build a container locally. Almost
 # nothing should — image builds belong on GitHub-hosted ubuntu-24.04-arm

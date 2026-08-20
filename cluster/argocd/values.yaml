@@ -1,12 +1,12 @@
 ---
-# chart: 7.8.2
+# chart: 10.3.3
 # repo:  https://argoproj.github.io/argo-helm
 #
 # Argo CD on 2 GB nodes. The defaults assume a cluster with room to spare, so
 # most of what follows is turning things down rather than on.
 
 global:
-  domain: "argocd.lab.example.invalid"   # TODO: track lab_domain
+  domain: "argocd.eightbitsaxlounge.com"   # tracks lab_domain in ansible group_vars
 
 crds:
   install: true
@@ -22,8 +22,9 @@ configs:
     # DNS-01. `make argocd-sync` forces a reconcile when you cannot wait.
     timeout.reconciliation: 180s
   cm:
-    # Argo CD manages the platform repo only. Tenant repos deploy through their
-    # own scoped kubeconfig; they do not get an Argo project here.
+    # Argo CD manages this repo only, including application workloads under
+    # apps/ (ADR-0012). App repos publish images to GHCR; they hold no cluster
+    # credential and get no Argo project of their own.
     application.resourceTrackingMethod: annotation
     resource.exclusions: |
       - apiGroups: ["cilium.io"]
@@ -41,6 +42,19 @@ repoServer:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 384Mi}
+  # IRSA, so the repo-server can decrypt SOPS-with-KMS values during
+  # reconciliation without holding a key. The role grants kms:Decrypt on the
+  # sops CMK and nothing else.
+  #
+  # NOTE: this annotation is necessary but not sufficient. Argo CD has no SOPS
+  # decryption plugin configured yet, so nothing in cluster/ is encrypted for
+  # it to decrypt today — see docs/06-aws-federation.md, "Still outstanding".
+  # The annotation is here now because Argo CD is installed by hand before the
+  # webhook exists, and adding it later means another restart.
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-argocd-sops"
 
 server:
   replicas: 1
@@ -50,7 +64,7 @@ server:
   ingress:
     enabled: true
     ingressClassName: nginx
-    hostname: "argocd.lab.example.invalid"   # TODO: track lab_domain
+    hostname: "argocd.eightbitsaxlounge.com"   # tracks lab_domain
     tls: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod

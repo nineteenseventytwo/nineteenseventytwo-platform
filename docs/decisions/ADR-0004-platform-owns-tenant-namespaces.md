@@ -1,7 +1,15 @@
 # ADR-0004: Platform owns tenant namespaces, quotas and RBAC
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](ADR-0012-platform-owns-app-workloads.md)
 **Date:** 2026-08-07
+
+> Kept for the historical record: this was the boundary for about a day. The
+> "consuming the kubeconfig they are handed" column below stopped being true
+> once ADR-0012 moved application workloads into this repo too — there is no
+> tenant kubeconfig anymore, and the per-tenant ServiceAccount/Role/RoleBinding
+> this ADR introduced were removed from `policy/tenants/`. The ResourceQuota,
+> LimitRange, PSS labels and namespace-creation argument below are all still
+> current; only the RBAC-handoff mechanism changed.
 
 ## Context
 

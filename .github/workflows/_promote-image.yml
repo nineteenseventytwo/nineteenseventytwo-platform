@@ -1,0 +1,52 @@
+---
+name: _promote-image
+
+# Reusable — not meant to be triggered directly. Called by each
+# image-<name>-promote.yml on push to main. Deliberately does no build: main
+# only ever promotes (moves :stable onto) a digest that _build-image.yml
+# already built, scanned and smoke-tested from the branch that bumped the
+# version. Rebuilding on merge would risk producing different bytes under
+# the same tag (a base image patch landing between the two builds), which
+# defeats the point of a version tag meaning exactly one image.
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the pinned version
+        id: version
+        run: echo "value=$(cat images/${{ inputs.image }}/version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # imagetools create with a single source aliases the existing manifest
+      # under the new tag rather than constructing anything new — :stable and
+      # :<version> end up pointing at the identical digest, not just
+      # equivalent content. If :<version> was never published (version.txt
+      # bumped on main directly, skipping the branch build), this fails with
+      # buildx's own "no such manifest" error, which is the correct outcome.
+      - name: Move :stable onto the published version tag
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}"
+          VERSION="${{ steps.version.outputs.value }}"
+          docker buildx imagetools create --tag "$IMAGE:stable" "$IMAGE:$VERSION"

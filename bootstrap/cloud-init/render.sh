@@ -5,8 +5,12 @@
 #
 # The inventory (ansible/inventory/lab/hosts.yml) is the single source of truth
 # for hostnames, addresses and roles, so this shells out to ansible rather than
-# re-implementing the lookup. Uses the ansible-runner image unless
-# RUNNER_LOCAL=1 or ansible-playbook is already on PATH.
+# re-implementing the lookup. Uses the ansible-runner image via podman unless
+# RUNNER_LOCAL=1 or ansible-playbook is already on PATH. Always podman, not
+# ENGINE-conditional like the Makefile's CONTAINER_RUN: this step never
+# touches a live node — pure local templating, run by hand before a node
+# exists to image an SD card — so CI never calls it and the workstation's
+# podman-only rule always applies.
 set -euo pipefail
 
 HOST="${1:?usage: render.sh <hostname> [output-dir]}"
@@ -15,8 +19,22 @@ OUT="${2:-build/${HOST}}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-KEY_NAME="${ADMIN_SSH_KEY_NAME:-mark-workstation}"
-if [[ ! -f "bootstrap/ssh/${KEY_NAME}.pub" ]]; then
+# Both keys go into every node's authorized_keys: mark-workstation for humans
+# (passphrase-protected), ansible-workstation for the containerised Ansible you
+# run from here during Phase A/B (no passphrase — a container has no TTY to
+# prompt at). See bootstrap/ssh/README.md for the full three-key model.
+KEY_NAMES="${ADMIN_SSH_KEY_NAMES:-mark-workstation,ansible-workstation}"
+
+for KEY_NAME in ${KEY_NAMES//,/ }; do
+  [[ -f "bootstrap/ssh/${KEY_NAME}.pub" ]] && continue
+
+  # Automation keys must have no passphrase; human keys must have one.
+  if [[ "$KEY_NAME" == ansible-* ]]; then
+    KEYGEN="ssh-keygen -t ed25519 -C \"${KEY_NAME}\" -f ~/.ssh/${KEY_NAME} -N \"\""
+  else
+    KEYGEN="ssh-keygen -t ed25519 -C \"${KEY_NAME}\" -f ~/.ssh/${KEY_NAME}"
+  fi
+
   cat >&2 <<MSG
 error: bootstrap/ssh/${KEY_NAME}.pub not found.
 
@@ -24,20 +42,20 @@ The rendered user-data is the only thing that grants access to a freshly imaged
 node, so refusing to render without a key is deliberate — a host booted with an
 empty authorized_keys needs a monitor and a keyboard to recover.
 
-  ssh-keygen -t ed25519 -C "${KEY_NAME}" -f ~/.ssh/${KEY_NAME}
+  ${KEYGEN}
   cp ~/.ssh/${KEY_NAME}.pub bootstrap/ssh/
 
 (On Windows/PuTTY: generate in PuTTYgen and export the OpenSSH public key.)
 MSG
   exit 1
-fi
+done
 
 ARGS=(
   bootstrap/cloud-init/render.yml
   -i ansible/inventory/lab
   -e "target_host=${HOST}"
   -e "output_dir=${OUT}"
-  -e "admin_ssh_key_name=${KEY_NAME}"
+  -e "admin_ssh_key_names=${KEY_NAMES}"
 )
 
 if [[ "${RUNNER_LOCAL:-0}" == "1" ]] || command -v ansible-playbook >/dev/null 2>&1; then
@@ -45,8 +63,13 @@ if [[ "${RUNNER_LOCAL:-0}" == "1" ]] || command -v ansible-playbook >/dev/null 2
 else
   ORG="${ORG:-nineteenseventytwo}"
   IMAGE="${ANSIBLE_RUNNER:-ghcr.io/${ORG}/ansible-runner:$(cat images/ansible-runner/version.txt)}"
-  docker run --rm -i \
+  # The age key is needed even though this play never leaves localhost: loading
+  # the lab inventory pulls in group_vars/all/secrets.sops.yml, and the
+  # community.sops vars plugin decrypts it at inventory-load time.
+  SOPS_AGE_DIR="${SOPS_AGE_DIR:-$HOME/.config/sops/age}"
+  podman run --rm -i \
     -v "$PWD:/work" -w /work \
+    -v "$SOPS_AGE_DIR:/root/.config/sops/age:ro" \
     -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
     "$IMAGE" ansible-playbook "${ARGS[@]}"
 fi

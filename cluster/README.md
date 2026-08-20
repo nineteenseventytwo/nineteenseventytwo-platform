@@ -13,20 +13,27 @@ cluster reproducible rather than merely documented.
 ```
 cluster/argocd/bootstrap/app-of-apps.yaml
   └── watches cluster/argocd/applications/*.yaml
-        ├── cilium            (installed pre-Argo by 30-cluster.yml, adopted here)
-        ├── metallb
-        ├── ingress-nginx
-        ├── cert-manager
-        ├── longhorn
-        ├── external-secrets
-        ├── vault
-        ├── monitoring
-        └── arc
+        ├── cilium               wave -20  (installed pre-Argo by 30-cluster.yml, adopted here)
+        ├── metallb               wave 0
+        ├── ingress-nginx        wave 10
+        ├── cert-manager         wave 20
+        ├── longhorn             wave 30
+        ├── external-secrets     wave 40
+        ├── vault                wave 50
+        ├── monitoring           wave 60
+        ├── arc (controller + scale sets)  wave 70-80
+        ├── platform-manifests   wave 90   (MetalLB pool, Issuers, ClusterSecretStore — CRs that need the charts above)
+        ├── platform-policy      wave 95   (../policy/ — namespaces, quota, default-deny)
+        └── apps (ApplicationSet) wave 100 (../apps/*/* — one Application per app/env, auto-discovered)
 ```
 
 Sync waves order the dependencies — cert-manager's CRDs must exist before an
-Issuer, ESO's before a ClusterSecretStore, and Longhorn wants MetalLB up so its
-UI is reachable when you go looking for it.
+Issuer, ESO's before a ClusterSecretStore, Longhorn wants MetalLB up so its UI
+is reachable when you go looking for it, and no application workload
+reconciles until its namespace's quota and default-deny policy are in place.
+`apps/` and its ApplicationSet are documented in [`apps/README.md`](../apps/README.md) —
+see [ADR-0012](../docs/decisions/ADR-0012-platform-owns-app-workloads.md) for
+why application workloads live in this repo at all.
 
 ## Version pinning
 

@@ -5,6 +5,12 @@ ignore: |
   build/
   charts/
   docs/plan/
+  # SOPS owns the formatting of these: it rewrites the whole file on every
+  # encrypt, with its own indentation and with comments turned into #ENC[...]
+  # lines. Nothing here is hand-edited, so there is nothing for a linter to
+  # keep honest.
+  *.sops.yml
+  *.sops.yaml
 
 rules:
   # Helm values and k8s manifests routinely exceed 80 columns.

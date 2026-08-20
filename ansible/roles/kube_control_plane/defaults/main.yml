@@ -7,10 +7,10 @@ kube_control_plane_admission_config_path: /etc/kubernetes/admission/admission-co
 # not opt out with labels. `baseline` cluster-wide with `restricted` warnings
 # is the setting that catches problems without breaking Longhorn and Cilium,
 # both of which legitimately need privileged pods.
-pss_default_enforce: baseline
-pss_default_audit: restricted
-pss_default_warn: restricted
-pss_exempt_namespaces:
+kube_control_plane_pss_default_enforce: baseline
+kube_control_plane_pss_default_audit: restricted
+kube_control_plane_pss_default_warn: restricted
+kube_control_plane_pss_exempt_namespaces:
   - kube-system
   - cilium-secure
   - longhorn-system

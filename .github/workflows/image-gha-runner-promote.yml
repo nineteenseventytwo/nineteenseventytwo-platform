@@ -1,0 +1,30 @@
+---
+name: image-gha-runner-promote
+
+# Merging to main never rebuilds — it only moves :stable onto the digest
+# image-gha-runner-build.yml already built, scanned and smoke-tested from
+# the branch. See _promote-image.yml and images/gha-runner/README.md
+# §Versioning.
+on:
+  push:
+    branches: [main]
+    paths: ["images/gha-runner/version.txt"]
+
+# The floor every job in this file gets by default; the promote job below
+# already overrides with exactly what it needs, same pattern as lint.yml
+# and deploy-cluster.yml.
+permissions:
+  contents: read
+
+concurrency:
+  group: image-gha-runner-promote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_promote-image.yml
+    with:
+      image: gha-runner

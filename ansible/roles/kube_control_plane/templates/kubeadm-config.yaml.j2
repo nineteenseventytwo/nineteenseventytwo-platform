@@ -27,6 +27,28 @@ apiServer:
 {% endfor %}
     - "{{ hostvars['1972-master-1'].ansible_host }}"
   extraArgs:
+    # ---------------------------------------------------------------------
+    # IRSA. This is a ONE-WAY DOOR: the service account issuer is fixed at
+    # `kubeadm init`. Changing it later means restarting the control plane and
+    # invalidating every projected service-account token in the cluster.
+    #
+    # The issuer must be a public HTTPS URL that AWS can resolve, because STS
+    # fetches the JWKS from it to verify tokens pods present. It is served by a
+    # Cloudflare Worker in front of an S3 bucket that the cluster itself
+    # publishes into — see docs/06-aws-federation.md.
+    #
+    # api-audiences keeps `https://kubernetes.default.svc` FIRST so ordinary
+    # in-cluster tokens and TokenReview (Vault's kubernetes auth, which ESO
+    # depends on) keep working exactly as before; `sts.amazonaws.com` is
+    # additive, and only tokens explicitly projected with that audience carry
+    # it.
+    # ---------------------------------------------------------------------
+    - name: service-account-issuer
+      value: {{ cluster_oidc_issuer }}
+    - name: service-account-jwks-uri
+      value: {{ cluster_oidc_issuer }}/openid/v1/jwks
+    - name: api-audiences
+      value: https://kubernetes.default.svc,{{ cluster_oidc_audience }}
     - name: encryption-provider-config
       value: {{ kube_control_plane_encryption_key_path }}
     - name: admission-control-config-file
@@ -69,9 +91,9 @@ kind: KubeletConfiguration
 cgroupDriver: systemd
 # 2 GB nodes. Matches the systemd drop-in written by kube_prereqs.
 systemReserved:
-  memory: "{{ kubelet_system_reserved_memory }}"
+  memory: "{{ kube_prereqs_kubelet_system_reserved_memory }}"
 kubeReserved:
-  memory: "{{ kubelet_kube_reserved_memory }}"
+  memory: "{{ kube_prereqs_kubelet_kube_reserved_memory }}"
 evictionHard:
-  memory.available: "{{ kubelet_eviction_hard_memory }}"
+  memory.available: "{{ kube_prereqs_kubelet_eviction_hard_memory }}"
 serverTLSBootstrap: true

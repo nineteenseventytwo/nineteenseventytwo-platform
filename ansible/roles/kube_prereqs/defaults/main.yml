@@ -10,15 +10,15 @@ kube_prereqs_packages:
   - open-iscsi     # Longhorn
   - nfs-common     # Longhorn RWX
 
-kube_required_modules:
+kube_prereqs_required_modules:
   - overlay
   - br_netfilter
 
-kube_required_sysctls:
+kube_prereqs_required_sysctls:
   net.bridge.bridge-nf-call-iptables: 1
   net.bridge.bridge-nf-call-ip6tables: 1
   net.ipv4.ip_forward: 1
 
-kubelet_system_reserved_memory: "256Mi"
-kubelet_kube_reserved_memory: "256Mi"
-kubelet_eviction_hard_memory: "150Mi"
+kube_prereqs_kubelet_system_reserved_memory: "256Mi"
+kube_prereqs_kubelet_kube_reserved_memory: "256Mi"
+kube_prereqs_kubelet_eviction_hard_memory: "150Mi"

@@ -1,14 +1,11 @@
 ---
-# chart: 1.17.5
+# chart: 1.20.0
 # repo:  https://helm.cilium.io/
 #
-# Cilium is the CNI and, for now, the only network layer. Istio is NOT an
-# alternative to this — a mesh sits on top of a CNI, it does not replace one.
-# ADR-0003 records why the mesh is deferred.
+# Cilium is the CNI and, for now, the only network layer.
 #
 # k8sServiceHost / k8sServicePort / ipam / kubeProxyReplacement are injected by
-# ansible/playbooks/30-cluster.yml from the inventory, so the API server address
-# lives in exactly one place.
+# ansible/playbooks/30-cluster.yml from the inventory.
 
 # 3 nodes, 2 GB each.
 operator:
@@ -16,6 +13,8 @@ operator:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
+  prometheus:
+    enabled: true
 
 resources:
   requests: {cpu: 100m, memory: 256Mi}
@@ -32,16 +31,13 @@ ipv4:
 ipv6:
   enabled: false
 
-# Node-to-node encryption without a service mesh. This is one of the three
-# reasons Cilium is enough for now (the others being NetworkPolicy enforcement,
-# which Flannel never had, and Hubble).
+# Node-to-node encryption.
 encryption:
   enabled: true
   type: wireguard
   nodeEncryption: true
 
-# NetworkPolicy is the whole point: intra-VLAN 20 traffic is switch-local and
-# the firewall never sees it, so pod isolation cannot be a firewall problem.
+# NetworkPolicy for intra-VLAN traffic.
 policyEnforcementMode: default
 
 hubble:
@@ -67,8 +63,6 @@ bpf:
   masquerade: true
 
 prometheus:
-  enabled: true
-operator.prometheus:
   enabled: true
 
 # Restarting every pod to pick up a config change is disruptive on 3 nodes.

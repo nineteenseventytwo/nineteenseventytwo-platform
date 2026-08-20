@@ -1,4 +1,28 @@
 ---
+# ---------------------------------------------------------------------------
+# The service-account issuer is fixed at `kubeadm init` and cannot be changed
+# afterwards without rebuilding the control plane and invalidating every
+# projected token in the cluster. Both checks below exist because that mistake
+# is silent: the cluster comes up perfectly and IRSA simply never works, and by
+# the time you notice, the fix is a rebuild.
+# ---------------------------------------------------------------------------
+- name: Assert the OIDC issuer is well formed before it becomes permanent
+  ansible.builtin.assert:
+    that:
+      - cluster_oidc_issuer is defined
+      - cluster_oidc_issuer is string
+      - cluster_oidc_issuer.startswith('https://')
+      - not cluster_oidc_issuer.endswith('/')
+      - cluster_oidc_audience is defined
+    fail_msg: >-
+      cluster_oidc_issuer must be a plain https:// URL with no trailing slash
+      (got: {{ cluster_oidc_issuer | default('undefined') }}). AWS compares the
+      issuer character for character against the discovery document, and a
+      trailing slash produces an invalid-token error that says nothing about
+      URLs. This is baked in permanently at kubeadm init — fix it now, not
+      after. See docs/06-aws-federation.md.
+    quiet: true
+
 - name: Create the control plane config directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -11,20 +35,16 @@
     - /etc/kubernetes/admission
   become: true
 
-# etcd stores Secrets base64-encoded, not encrypted. Anyone with the etcd data
-# directory — or a stolen SSD out of a Pi — reads every Secret in the cluster
-# unless this is configured at init time. Retrofitting it later means rewriting
-# every Secret, so it goes in now.
 - name: Generate an etcd encryption key
   ansible.builtin.set_fact:
-    kube_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
-  when: kube_etcd_encryption_key is not defined
+    kube_control_plane_etcd_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"
+  when: kube_control_plane_etcd_encryption_key is not defined
   no_log: true
 
 - name: Check whether etcd encryption is already configured
   ansible.builtin.stat:
     path: "{{ kube_control_plane_encryption_key_path }}"
-  register: kube_encryption_stat
+  register: kube_control_plane_encryption_stat
   become: true
 
 - name: Write the etcd encryption config
@@ -35,7 +55,7 @@
     group: root
     mode: "0600"
   become: true
-  when: not kube_encryption_stat.stat.exists
+  when: not kube_control_plane_encryption_stat.stat.exists
   no_log: true
 
 - name: Write the PSS admission config
@@ -59,16 +79,46 @@
 - name: Check whether the control plane is already initialised
   ansible.builtin.stat:
     path: /etc/kubernetes/admin.conf
-  register: kube_admin_conf
+  register: kube_control_plane_admin_conf_stat
   become: true
+
+# If the control plane already exists, kubeadm init is skipped and the
+# rendered config above is inert — so a changed issuer would sit in git looking
+# applied while the running cluster still trusts the old one. Catch that here
+# rather than in an AccessDenied six months later.
+- name: Read the issuer of the running control plane
+  ansible.builtin.shell:
+    cmd: >-
+      grep -oP '(?<=--service-account-issuer=)\S+'
+      /etc/kubernetes/manifests/kube-apiserver.yaml || true
+  register: kube_control_plane_running_issuer
+  changed_when: false
+  become: true
+  when: kube_control_plane_admin_conf_stat.stat.exists
+
+- name: Assert the running issuer still matches the configured one
+  ansible.builtin.assert:
+    that:
+      - kube_control_plane_running_issuer.stdout | trim == cluster_oidc_issuer
+    fail_msg: >-
+      This control plane was initialised with service-account-issuer
+      '{{ kube_control_plane_running_issuer.stdout | trim | default("<unset>", true) }}'
+      but the inventory now asks for '{{ cluster_oidc_issuer }}'. Ansible will
+      NOT change this — the issuer is fixed at kubeadm init. Reconcile the two
+      deliberately: either restore the inventory value, or accept that changing
+      it means tearing down and rebuilding the control plane, which invalidates
+      every projected service-account token and every IAM role trust policy
+      built on the old issuer. See docs/06-aws-federation.md.
+    quiet: true
+  when: kube_control_plane_admin_conf_stat.stat.exists
 
 - name: Run kubeadm init
   ansible.builtin.command:
     cmd: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
   become: true
-  when: not kube_admin_conf.stat.exists
-  register: kubeadm_init
-  changed_when: kubeadm_init.rc == 0
+  when: not kube_control_plane_admin_conf_stat.stat.exists
+  register: kube_control_plane_kubeadm_init
+  changed_when: kube_control_plane_kubeadm_init.rc == 0
 
 - name: Install kubeconfig for the admin user
   become: true
@@ -98,17 +148,15 @@
   become: true
   tags: [kubeconfig]
 
-# The join command carries a token that expires in 24h; regenerate rather than
-# persisting one, so a worker rebuild six months from now still works.
 - name: Generate a worker join command
   ansible.builtin.command:
     cmd: kubeadm token create --print-join-command
   become: true
-  register: kubeadm_join
+  register: kube_control_plane_kubeadm_join
   changed_when: false
   no_log: true
 
 - name: Publish the join command to the workers
   ansible.builtin.set_fact:
-    kube_join_command: "{{ kubeadm_join.stdout }}"
+    kube_control_plane_kube_join_command: "{{ kube_control_plane_kubeadm_join.stdout }}"
   no_log: true

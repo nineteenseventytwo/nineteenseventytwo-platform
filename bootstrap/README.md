@@ -25,14 +25,15 @@ inventory is the single source of truth for hostnames, addresses and roles.
 
 ### What the rendered `user-data` does
 
-- Creates the single admin user with your workstation public key. No others.
+- Creates the single admin user with both workstation public keys
+  (`mark-workstation`, `ansible-workstation`). No others.
 - `ssh_pwauth: false` and `lock_passwd: true` — password auth is off from first
   boot, not "off once Ansible runs".
 - Writes `/etc/ssh/sshd_config.d/10-hardening.conf` so the very first SSH
   connection is already hardened.
 - On the three **cluster** nodes only, appends
   `cgroup_enable=memory cgroup_memory=1` to `/boot/firmware/cmdline.txt` and
-  reboots once. kubelet will not start without it. `1972-console` skips this.
+  reboots once. kubelet will not start without it. `1972-console-1` skips this.
 - Installs a deliberately minimal package set. Ansible does the rest.
 
 ### Addressing
@@ -51,12 +52,21 @@ Phase A ships **keys**. Phase D swaps in a Vault SSH **certificate authority**
 and Ansible adds `TrustedUserCAKeys` to `sshd_config`; the helpers here cover
 both. See [docs/04-secrets.md](../docs/04-secrets.md) §Tier 3.
 
-| Key | Lives where | Used for |
-|---|---|---|
-| `mark-workstation` (ed25519) | Windows workstation agent; private key never leaves it | VLAN 10 → VLAN 20, interactive |
-| `ansible-console` (ed25519) | Generated *on* `1972-console`, never committed | console → all nodes, non-interactive |
-| GitHub App private key | SOPS-encrypted + org Actions secret | runner registration |
+| Key | Passphrase | Lives where | Used for |
+|---|---|---|---|
+| `mark-workstation` (ed25519) | **yes** | Mac + Windows workstation; private key never leaves them | humans typing `ssh`, break-glass. Never used by automation |
+| `ansible-workstation` (ed25519) | no | Same workstations, alongside the above | containerised Ansible launched from a workstation (Phase A/B, before CI exists) |
+| `ansible-console` (ed25519) | no | Generated *on* `1972-console-1`, never committed | containerised Ansible launched from CI, which runs on that host |
+| GitHub App private key | — | SOPS-encrypted + org Actions secret | runner registration |
 
-Put the **public** half of `mark-workstation` at `bootstrap/ssh/mark-workstation.pub`
-before rendering cloud-init. `.gitignore` allows `bootstrap/ssh/*.pub` and blocks
-everything else in the directory that looks like a private key.
+No private key is ever transported: each is generated where it is used and
+stays there. That is what lets the automation keys go without a passphrase
+safely — and they have to, because the thing using them is a container with no
+TTY to prompt at. The human key keeps its passphrase precisely because it is
+the one that lives on portable hardware.
+
+Put the **public** half of both workstation keys in `bootstrap/ssh/` before
+rendering cloud-init; `render.sh` writes all of them into every node's
+`authorized_keys` and refuses to render if one is missing. `.gitignore` allows
+`bootstrap/ssh/*.pub` and blocks everything else in the directory that looks
+like a private key.

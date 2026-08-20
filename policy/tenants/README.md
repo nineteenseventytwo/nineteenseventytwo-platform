@@ -1,56 +1,41 @@
 # Adding a tenant
 
-1. Copy `eightbitsaxlounge.yaml`, rename every occurrence, and adjust the quota
-   to what the app actually needs. Open a PR.
-2. Once merged and synced, mint the kubeconfig the app repo's pipeline will use:
+A "tenant" here is a namespace pair (`<name>-dev`, `<name>-prod`) with its
+guardrails: PSS labels, ResourceQuota, LimitRange, default-deny NetworkPolicy.
+This directory owns the guardrails only. The workloads that run inside them
+live in [`apps/<name>/`](../../apps/) — see [ADR-0012](../../docs/decisions/ADR-0012-platform-owns-app-workloads.md)
+for why both moved into this repo.
+
+## Steps
+
+1. Copy [`eightbitsaxlounge.yaml`](eightbitsaxlounge.yaml), rename every
+   occurrence, and size the quota to what the app actually needs. Open a PR.
+2. Once merged and synced (`make argocd-sync` to skip the poll wait), add the
+   workload manifests under `apps/<name>/dev/` and `apps/<name>/prod/` — see
+   [`apps/README.md`](../../apps/README.md). The namespace has to exist first,
+   which is why this is step 2 and not step 1.
+3. Verify the quota actually bites before calling it done:
 
 ```bash
-NS=eightbitsaxlounge-dev
-SA=deployer
-SERVER=https://192.168.20.202:6443
-
-# Short-lived by default; kubeadm no longer creates permanent SA token Secrets.
-# 8760h = 1 year, which is the rotation cadence recorded in docs/04-secrets.md.
-TOKEN=$(kubectl -n "$NS" create token "$SA" --duration=8760h)
-CA=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
-
-cat > "${NS}.kubeconfig" <<YAML
-apiVersion: v1
-kind: Config
-clusters:
-  - name: nineteenseventytwo
-    cluster: {server: ${SERVER}, certificate-authority-data: ${CA}}
-contexts:
-  - name: ${NS}
-    context: {cluster: nineteenseventytwo, namespace: ${NS}, user: ${SA}}
-current-context: ${NS}
-users:
-  - name: ${SA}
-    user: {token: ${TOKEN}}
-YAML
+kubectl get resourcequota -n <name>-dev
+kubectl describe resourcequota tenant-quota -n <name>-dev
 ```
 
-3. Put it in Vault, not in the app repo's GitHub secrets:
+4. Verify the default-deny boundary holds — a Pod in one tenant namespace
+   should not reach a Pod in another:
 
 ```bash
-vault kv put kv/tenants/eightbitsaxlounge dev_kubeconfig=@eightbitsaxlounge-dev.kubeconfig
-shred -u eightbitsaxlounge-dev.kubeconfig
+kubectl run -n <name>-dev probe --rm -it --image=nicolaka/netshoot -- \
+  curl -m3 http://<other-tenant-service>.<other-tenant>-dev.svc.cluster.local
+# expect a timeout
 ```
 
-4. Verify the boundary actually holds before handing it over. A tenant token
-   that can list namespaces is a tenant token that can read another tenant's
-   Secrets, and you want to find that out here:
+## Why namespace creation lives here and not in the workload
 
-```bash
-export KUBECONFIG=./eightbitsaxlounge-dev.kubeconfig
-kubectl auth can-i create deployments -n eightbitsaxlounge-dev   # yes
-kubectl auth can-i get secrets -n eightbitsaxlounge-prod         # no
-kubectl auth can-i list namespaces                               # no
-kubectl auth can-i edit resourcequota -n eightbitsaxlounge-dev   # no
-```
-
-## Why namespace creation lives here
-
-It is the only way the quota and RBAC are enforceable. If the app repo creates
-its own namespace, it creates it without a quota, and "please add a quota" is a
-request rather than a constraint.
+It is the only way the quota is enforceable rather than advisory. If a
+workload manifest under `apps/` could also declare its own namespace, quota
+sizing would live wherever the last person to touch it put it, and a namespace
+could exist with no quota at all until someone noticed. Splitting "guardrail"
+(here) from "what runs inside it" (`apps/`) keeps the constraint somewhere it
+cannot be quietly bypassed, while still applying both from the same repo,
+reconciled by the same Argo CD instance.

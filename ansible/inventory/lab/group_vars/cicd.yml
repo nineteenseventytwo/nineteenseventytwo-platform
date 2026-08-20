@@ -1,28 +1,21 @@
 ---
-# 1972-console: bootstrap node and break-glass runner host.
-
 kubelet_node: false
 longhorn_node: false
 
-# Runners are cattle. One job each, then the container exits and is replaced —
-# all repo state comes from actions/checkout in the job itself (§3.1). The
-# caching you lose is bought back with a registry-backed buildx cache, not with
-# a long-lived _work directory.
-runner_ephemeral: true
-runner_replicas: 2
-runner_scope: "org"                 # org-scoped: serves every repo. ADR-0001.
-runner_labels:
+runner_host_ephemeral: true
+runner_host_replicas: 2
+runner_host_scope: "org"
+runner_host_labels:
   - self-hosted
   - linux
   - arm64
   - lab-network
 
-# Mounting the docker socket is approximately root on the host. Mitigations:
-# an unprivileged runner user, and moving to ARC dind once the cluster exists.
-# Stated plainly here and in ADR-0006 rather than buried.
-runner_mount_docker_socket: true
-runner_user: "github-runner"
+runner_host_mount_docker_socket: true
+runner_host_user: "github-runner"
 
-# 1 GB of RAM. Two ephemeral runner containers plus dockerd is already the
-# ceiling; do not add a kubelet.
-console_memory_guard_mb: 1024
+# Ansible runs against this host from inside its own runner containers —
+# see the hardening role's task comment for why that needs a dedicated rule.
+hardening_ufw_allow_docker_bridge_ssh: true
+
+console_memory_guard_mb: 2048

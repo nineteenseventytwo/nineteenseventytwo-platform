@@ -1,5 +1,5 @@
 ---
-# Stand up the runner stack on 1972-console.
+# Stand up the runner stack on 1972-console-1.
 #
 #   make deploy-cicd
 #
@@ -13,10 +13,12 @@
     - name: Fail early if the GitHub App credentials are missing
       ansible.builtin.assert:
         that:
-          - github_app_id is defined
+          - github_app_client_id is defined
+          - github_app_installation_id is defined
           - github_app_private_key is defined
         fail_msg: >-
-          github_app_id / github_app_private_key are not set. They live in
+          github_app_client_id / github_app_installation_id /
+          github_app_private_key are not all set. They live in
           ansible/inventory/lab/group_vars/all/secrets.sops.yml — copy the
           .example, fill it in, and `sops --encrypt --in-place` it.
           See docs/02-cicd.md.
@@ -51,14 +53,14 @@
       tags: [ssh]
 
 - name: Authorise the console key on every node
-  hosts: cluster
+  hosts: cicd:cluster
   gather_facts: false
   tags: [ssh]
   tasks:
     - name: Install the console public key
       ansible.posix.authorized_key:
         user: "{{ admin_user }}"
-        key: "{{ hostvars['1972-console'].console_pubkey.content | b64decode }}"
+        key: "{{ hostvars['1972-console-1'].console_pubkey.content | b64decode }}"
         state: present
         comment: "ansible-console"
       become: true

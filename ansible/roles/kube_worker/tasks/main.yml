@@ -16,7 +16,7 @@
 
 - name: Join the cluster
   ansible.builtin.command:
-    cmd: "{{ hostvars['1972-master-1'].kube_join_command }} --cri-socket unix:///run/containerd/containerd.sock"
+    cmd: "{{ hostvars['1972-master-1'].kube_control_plane_kube_join_command }} --cri-socket unix:///run/containerd/containerd.sock"
   become: true
   when: not kube_worker_joined.stat.exists or kube_worker_reset_before_join | bool
   register: kube_worker_join

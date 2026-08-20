@@ -3,7 +3,7 @@
 # than the kubelet, and leave headroom to SSH in and fix it.
 [Service]
 Environment="KUBELET_EXTRA_ARGS=\
---system-reserved=memory={{ kubelet_system_reserved_memory }} \
---kube-reserved=memory={{ kubelet_kube_reserved_memory }} \
---eviction-hard=memory.available<{{ kubelet_eviction_hard_memory }} \
+--system-reserved=memory={{ kube_prereqs_kubelet_system_reserved_memory }} \
+--kube-reserved=memory={{ kube_prereqs_kubelet_kube_reserved_memory }} \
+--eviction-hard=memory.available<{{ kube_prereqs_kubelet_eviction_hard_memory }} \
 --node-ip={{ ansible_host }}"

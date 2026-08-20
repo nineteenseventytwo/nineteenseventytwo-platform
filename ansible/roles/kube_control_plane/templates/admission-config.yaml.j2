@@ -9,11 +9,11 @@ plugins:
       apiVersion: pod-security.admission.config.k8s.io/v1
       kind: PodSecurityConfiguration
       defaults:
-        enforce: "{{ pss_default_enforce }}"
+        enforce: "{{ kube_control_plane_pss_default_enforce }}"
         enforce-version: latest
-        audit: "{{ pss_default_audit }}"
+        audit: "{{ kube_control_plane_pss_default_audit }}"
         audit-version: latest
-        warn: "{{ pss_default_warn }}"
+        warn: "{{ kube_control_plane_pss_default_warn }}"
         warn-version: latest
       exemptions:
         usernames: []
@@ -22,6 +22,6 @@ plugins:
         # namespace is honest; weakening the cluster default to accommodate
         # them is not.
         namespaces:
-{% for ns in pss_exempt_namespaces %}
+{% for ns in kube_control_plane_pss_exempt_namespaces %}
           - "{{ ns }}"
 {% endfor %}

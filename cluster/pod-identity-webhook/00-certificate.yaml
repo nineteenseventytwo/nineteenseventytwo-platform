@@ -1,0 +1,47 @@
+---
+# Serving certificate for the mutating webhook.
+#
+# Self-signed and scoped to this namespace rather than issued by the shared
+# `internal-ca` ClusterIssuer: that ClusterIssuer is applied by the
+# platform-manifests Application at sync wave 90, and this webhook has to be
+# running by wave 25 so that Longhorn and Vault pods are mutated when they
+# first start. A webhook's serving cert has exactly one consumer — the API
+# server, which is told the CA out of band by cainjector — so nothing is lost
+# by it having its own trust root.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: pod-identity-webhook-selfsigned
+  namespace: pod-identity-webhook
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  selfSigned: {}
+---
+# isCA so cainjector can publish this certificate's own CA into the
+# MutatingWebhookConfiguration's caBundle via the inject-ca-from annotation.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pod-identity-webhook
+  namespace: pod-identity-webhook
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  secretName: pod-identity-webhook-cert
+  commonName: "pod-identity-webhook.pod-identity-webhook.svc"
+  dnsNames:
+    - "pod-identity-webhook"
+    - "pod-identity-webhook.pod-identity-webhook"
+    - "pod-identity-webhook.pod-identity-webhook.svc"
+    - "pod-identity-webhook.pod-identity-webhook.svc.cluster.local"
+  isCA: true
+  duration: 2160h    # 90d
+  renewBefore: 360h  # 15d
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: pod-identity-webhook-selfsigned
+    kind: Issuer
+    group: cert-manager.io

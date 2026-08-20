@@ -2,12 +2,21 @@
 # Renders cloud-init for a single host using the lab inventory as the data
 # source. Invoked by bootstrap/cloud-init/render.sh — not run directly.
 - name: Render cloud-init for one host
-  hosts: "{{ target_host }}"
+  hosts: "{{ target_host }}"  # noqa: syntax-check[specific] — only ever supplied via render.sh's -e
   gather_facts: false
   connection: local
   vars:
-    admin_ssh_public_key: >-
-      {{ lookup('file', playbook_dir + '/../ssh/' + admin_ssh_key_name + '.pub') }}
+    # ansible.cfg pins interpreter_python to /usr/bin/python3 for the real
+    # Pis; this play never touches one. It runs inside the ansible-runner
+    # container against itself, where Python lives under /usr/local instead
+    # (python:*-slim-bookworm), so use whatever interpreter is actually
+    # running ansible-playbook rather than the Pi-targeted global path.
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    # admin_ssh_key_names arrives from render.sh as a comma-separated string
+    # because -e only carries scalars; split it back into the list the
+    # template loops over to read each .pub.
+    admin_ssh_key_list: >-
+      {{ admin_ssh_key_names.split(',') | map('trim') | select | list }}
   tasks:
     - name: Ensure the output directory exists
       ansible.builtin.file:

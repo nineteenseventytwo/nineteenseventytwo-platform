@@ -1,5 +1,5 @@
 ---
-# chart: 0.15.3
+# chart: 0.16.1
 # repo:  https://metallb.github.io/metallb
 #
 # L2 mode. The pool is carved out of VLAN 20 and MUST stay clear of the Kea

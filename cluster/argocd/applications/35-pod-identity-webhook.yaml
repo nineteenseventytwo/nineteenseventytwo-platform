@@ -1,0 +1,40 @@
+---
+# Sync wave 25: after cert-manager (20), which issues its serving cert, and
+# before Longhorn (30) and Vault (50), whose pods must be mutated the first
+# time they start rather than on a later restart.
+#
+# Argo CD itself is installed by `make bootstrap-argocd` before this exists, so
+# argocd-repo-server does not get mutated on the first pass. Restart it once
+# after this app goes Healthy — docs/06-aws-federation.md covers it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pod-identity-webhook
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pod-identity-webhook
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/pod-identity-webhook
+    directory:
+      recurse: false
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      # policy/00-namespaces.yaml owns this namespace and its PSS labels, and
+      # 30-cluster.yml applies policy/ before Argo CD ever runs. This is the
+      # same belt-and-braces every other Application here uses, for the case
+      # where it did not.
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}

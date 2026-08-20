@@ -22,4 +22,4 @@ common_ntp_servers:
   - "time.cloudflare.com"
 
 common_unattended_reboot: false
-disable_swap: false
+common_disable_swap: false

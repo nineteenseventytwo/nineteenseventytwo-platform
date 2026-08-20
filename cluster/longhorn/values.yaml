@@ -1,9 +1,8 @@
 ---
-# chart: 1.8.1
+# chart: 1.12.1
 # repo:  https://charts.longhorn.io
 #
-# Worker SSDs only. Two replicas across two workers: one node can go down
-# without data loss, which is the most three nodes can honestly offer.
+# Worker SSDs only. Two replicas across two workers.
 persistence:
   defaultClass: true
   defaultClassReplicaCount: 2
@@ -11,9 +10,6 @@ persistence:
 
 defaultSettings:
   defaultReplicaCount: 2
-  # The control plane is a 2 GB RPi 5 also running etcd and the API server.
-  # Keeping replicas off it is the difference between a slow cluster and an
-  # unresponsive one.
   systemManagedComponentsNodeSelector: "node-role.kubernetes.io/worker:true"
   createDefaultDiskLabeledNodes: true
   defaultDataPath: /var/lib/longhorn
@@ -24,7 +20,23 @@ defaultSettings:
   concurrentReplicaRebuildPerNodeLimit: 1
   concurrentAutomaticEngineUpgradePerNodeLimit: 1
   guaranteedInstanceManagerCPU: 10
-  backupstorePollInterval: 0          # no backup target configured yet
+
+# Volume backups to S3, with no credential.
+#
+# Longhorn's usual S3 path wants a Secret holding AWS_ACCESS_KEY_ID and
+# AWS_SECRET_ACCESS_KEY. There is deliberately no such Secret here:
+# backupTargetCredentialSecret stays empty, the pod-identity-webhook injects a
+# role and a projected token from the serviceAccount annotation below, and the
+# AWS SDK inside longhorn-manager picks them up on its own.
+#
+# The bucket, its lifecycle rules and the role are in nineteenseventytwo-cloud
+# (live/aws/platform-prod). Backups are the one line item in the cost model
+# with no natural ceiling — the bucket expires them at 90 days, but a schedule
+# left on hourly will still find that out for you.
+defaultBackupStore:
+  backupTarget: "s3://nineteenseventytwo-longhorn-backups-972034964468@eu-west-2/"
+  backupTargetCredentialSecret: ""
+  pollInterval: 300
 
 longhornManager:
   resources:
@@ -32,9 +44,14 @@ longhornManager:
     limits: {memory: 256Mi}
 longhornUI:
   replicas: 1
-  resources:
-    requests: {cpu: 25m, memory: 64Mi}
-    limits: {memory: 128Mi}
+
+# IRSA. The chart puts this on longhorn-service-account, which is exactly the
+# subject the cluster-longhorn-backup role's trust policy pins. It also lands on
+# longhorn-ui-service-account, which is harmless — the annotation is a request,
+# and the trust policy on the AWS side is what decides.
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-longhorn-backup"
 
 ingress:
   enabled: false   # reach it through port-forward until an auth story exists

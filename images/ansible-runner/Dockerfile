@@ -1,17 +1,17 @@
 # ansible-runner — the artefact with real reuse value.
 #
-# Run from CI, from 1972-console, and from a laptop. Versioned and pinned
+# Run from CI, from 1972-console-1, and from a laptop. Versioned and pinned
 # independently of anything GitHub does, which is exactly why it is separate
 # from the gha-runner image: a collection bump should not force a runner
 # rebuild, and a runner CVE should not force an Ansible revalidation.
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
-ARG ANSIBLE_CORE_VERSION=2.18.1
-ARG KUBECTL_VERSION=v1.32.0
-ARG HELM_VERSION=v3.16.3
-ARG SOPS_VERSION=v3.9.2
-ARG AGE_VERSION=v1.2.1
+ARG ANSIBLE_CORE_VERSION=2.21.3
+ARG KUBECTL_VERSION=v1.36.0
+ARG HELM_VERSION=v4.2.3
+ARG SOPS_VERSION=v3.13.3
+ARG AGE_VERSION=v1.3.1
 ARG TARGETARCH=arm64
 
 LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nineteenseventytwo-platform" \
@@ -69,3 +69,8 @@ ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
 WORKDIR /work
 ENTRYPOINT []
 CMD ["ansible-playbook", "--version"]
+
+# A one-shot CLI invocation (`docker run --rm ansible-runner ansible-playbook
+# ...`), not a long-running service — there is no ongoing process for Docker
+# to poll. NONE is the honest declaration of that, not an omission.
+HEALTHCHECK NONE

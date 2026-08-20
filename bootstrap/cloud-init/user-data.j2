@@ -16,8 +16,14 @@ users:
     shell: /bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     lock_passwd: true
+    # Two keys, two jobs. mark-workstation is passphrase-protected and is for
+    # humans typing `ssh` — nothing automated ever uses it. ansible-workstation
+    # has no passphrase and is used only by the containerised Ansible you run
+    # from the workstation.
     ssh_authorized_keys:
-      - "{{ admin_ssh_public_key }}"
+{% for key_name in admin_ssh_key_list %}
+      - "{{ lookup('file', playbook_dir + '/../ssh/' + key_name + '.pub') }}"
+{% endfor %}
 
 ssh_pwauth: false
 disable_root: true

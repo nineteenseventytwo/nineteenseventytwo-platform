@@ -98,8 +98,8 @@ Two Pi-specific gotchas that bit you last time and will again:
 
 | Item | Action |
 |---|---|
-| cgroups for kubelet | Append `cgroup_enable=memory cgroup_memory=1` to `/boot/firmware/cmdline.txt` (one line, no wrapping) on the **three cluster nodes**. Not needed on `1972-console`. |
-| SSD boot | RPi 4 needs its EEPROM `BOOT_ORDER` set to try USB before SD (`rpi-eeprom-config`). Check this on `1972-console` *before* you retire its SD card, not after. |
+| cgroups for kubelet | Append `cgroup_enable=memory cgroup_memory=1` to `/boot/firmware/cmdline.txt` (one line, no wrapping) on the **three cluster nodes**. Not needed on `1972-console-1`. |
+| SSD boot | RPi 4 needs its EEPROM `BOOT_ORDER` set to try USB before SD (`rpi-eeprom-config`). Check this on `1972-console-1` *before* you retire its SD card, not after. |
 | Swap | Confirm `swapon --show` is empty; mask `swap.target` in the `common` role. kubelet refuses to start otherwise. |
 
 ### 2.2 SSH key strategy — three keys, not one
@@ -107,7 +107,7 @@ Two Pi-specific gotchas that bit you last time and will again:
 | Key | Lives where | Used for |
 |---|---|---|
 | `mark-workstation` (ed25519) | Windows workstation, in Pageant/agent; **private key never leaves the machine** | VLAN 10 → VLAN 20, interactive |
-| `ansible-console` (ed25519) | Generated *on* `1972-console`, never checked in | console → all nodes, non-interactive |
+| `ansible-console` (ed25519) | Generated *on* `1972-console-1`, never checked in | console → all nodes, non-interactive |
 | GitHub App private key | sops-encrypted in repo + GitHub Actions secret | runner registration (§3.4) |
 
 You use PuTTY, so generate with `ssh-keygen -t ed25519` and convert with PuTTYgen, or generate in PuTTYgen directly and export the OpenSSH public key. Either is fine; just make sure the *private* key lands in exactly one place.
@@ -161,7 +161,7 @@ Practical consequence: your caching gets worse (no warm `_work` dir, no Docker l
 
 | Image | Contents | Why separate |
 |---|---|---|
-| `ghcr.io/…/ansible-runner` | `ansible-core`, your `requirements.yml` collections, `kubectl`, `helm`, `sops`, `age` | This is the artefact with real reuse value. You'll run it from CI, from `1972-console`, and from your laptop. It should be versioned and pinned independently of anything GitHub does. |
+| `ghcr.io/…/ansible-runner` | `ansible-core`, your `requirements.yml` collections, `kubectl`, `helm`, `sops`, `age` | This is the artefact with real reuse value. You'll run it from CI, from `1972-console-1`, and from your laptop. It should be versioned and pinned independently of anything GitHub does. |
 | `ghcr.io/…/gha-runner` | Upstream runner + `docker` CLI + `git` | Should track upstream closely and change rarely. Baking Ansible in means a collection bump forces a runner rebuild, and a runner CVE forces an Ansible revalidation. |
 
 The workflow then reads:
@@ -180,7 +180,7 @@ The runner container mounts `/var/run/docker.sock` so it can start sibling conta
 
 ### 3.3 Where things build vs where things deploy
 
-This split matters more than anything else in this section, because `1972-console` has 1 GB of RAM.
+This split matters more than anything else in this section, because `1972-console-1` has 1 GB of RAM.
 
 | Job type | Runs on | Rationale |
 |---|---|---|
@@ -199,7 +199,7 @@ Repo registration tokens expire in an hour, which is why your current script tak
 
 ### 3.5 Two runner topologies — interim, then target
 
-**Interim (Weeks 1–3, before the cluster exists):** docker-compose on `1972-console`, one service per repo scope, rendered from a template in this repo.
+**Interim (Weeks 1–3, before the cluster exists):** docker-compose on `1972-console-1`, one service per repo scope, rendered from a template in this repo.
 
 ```yaml
 # ansible/roles/runner_host/templates/compose.yml.j2
@@ -226,7 +226,7 @@ Because it's org-scoped, "a runner for whichever repo is queueing" becomes a non
 | `lab-deploy` | `self-hosted, lab-network` | Ansible + kubectl |
 | `lab-dind` | `self-hosted, dind` | jobs that must build locally |
 
-Keep the compose runner on `1972-console` as the break-glass path — it's how you rebuild the cluster that hosts the other runners.
+Keep the compose runner on `1972-console-1` as the break-glass path — it's how you rebuild the cluster that hosts the other runners.
 
 **Security note you should act on this week:** `eightbitsaxlounge` is public and has self-hosted runners attached. A fork PR is a code-execution path onto a machine in your lab VLAN. Either set Actions → "Require approval for all external contributors", or route `pull_request` jobs to GitHub-hosted runners only, or make the repo private. Write this up as a decision record — it's a good threat-model artefact.
 
@@ -276,7 +276,7 @@ containerd + kube_prereqs (all 3 nodes)
 
 Everything after `kubeadm init` is a Helm release with a values file in `cluster/`, applied by the pipeline. No `kubectl apply` from your laptop; that's the discipline that makes it reproducible.
 
-`1972-console` (RPi 4, 1 GB) **stays out of the cluster**. It's the bootstrap node that builds the cluster; putting it in creates a circular dependency and 1 GB won't take a kubelet plus a runner.
+`1972-console-1` (RPi 4, 1 GB) **stays out of the cluster**. It's the bootstrap node that builds the cluster; putting it in creates a circular dependency and 1 GB won't take a kubelet plus a runner.
 
 ### 4.3 kube-proxy replacement — optional, one gotcha
 
@@ -338,7 +338,7 @@ Once Vault is up:
 
 What this buys: no `authorized_keys` files to manage or drift, revocation that actually works, an audit log of who requested access to what and when, and credentials that expire before you've finished making tea. It's the on-prem mirror of the short-lived-credential pattern you're already planning with `aws configure sso`.
 
-Keep one break-glass static key on `1972-console`, offline, for when Vault is the thing that's down.
+Keep one break-glass static key on `1972-console-1`, offline, for when Vault is the thing that's down.
 
 ### 5.5 Tier 4: TLS
 
@@ -387,7 +387,7 @@ Cut over in this order; don't delete anything until the replacement rebuilds a n
 ## 8. Open questions
 
 1. Are you willing to make `eightbitsaxlounge` private, or do you want the public showcase value? If public, the fork-PR mitigation in §3.5 needs deciding this week, not later.
-2. `1972-console` — confirm the RPi 4's EEPROM boot order supports USB SSD before you retire the SD card.
+2. `1972-console-1` — confirm the RPi 4's EEPROM boot order supports USB SSD before you retire the SD card.
 3. Do you want GitOps (Argo CD / Flux) reconciling `cluster/`, or is pipeline-driven `helm upgrade` enough? Pipeline-driven is simpler and fine at this size; Argo is a better interview story. Either way the directory layout above supports both.
 4. Does the PC's Linux side join the cluster in this phase or later? It's the only x86 node and the only GPU, so it changes scheduling and image architecture assumptions (multi-arch builds become mandatory the day it joins).
 5. Is AWS available for KMS auto-unseal by the time Vault lands? If not, plan a manual-unseal interim and don't let it become permanent.

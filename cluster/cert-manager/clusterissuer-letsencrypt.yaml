@@ -37,9 +37,10 @@ spec:
             apiTokenSecretRef:
               name: cloudflare-api-token
               key: api-token
-        # TODO: set to the real zone once lab_domain is decided. Until then the
-        # staging issuer is the one to exercise — prod has rate limits that a
-        # misconfigured selector will burn through in an afternoon.
+        # The Cloudflare zone, not a lab_domain hostname — internal tool names
+        # like vault.eightbitsaxlounge.com are still within this zone. Exercise
+        # the staging issuer first: prod has rate limits that a misconfigured
+        # selector will burn through in an afternoon, with a week-long lockout.
         selector:
           dnsZones:
-            - "lab.example.invalid"
+            - "eightbitsaxlounge.com"

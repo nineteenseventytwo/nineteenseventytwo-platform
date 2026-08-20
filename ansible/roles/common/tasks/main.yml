@@ -55,6 +55,15 @@
     state: started
   become: true
 
+- name: Ensure the journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
 - name: Cap journald disk usage
   ansible.builtin.template:
     src: journald.conf.j2
@@ -65,22 +74,13 @@
   become: true
   notify: Restart journald
 
-- name: Ensure the journald drop-in directory exists
-  ansible.builtin.file:
-    path: /etc/systemd/journald.conf.d
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  become: true
-
 # --------------------------------------------------------------------------
 # Swap. kubelet refuses to start with swap enabled, and the failure message
 # does not say so clearly. Mask the target rather than just swapoff, otherwise
 # a reboot brings it back.
 # --------------------------------------------------------------------------
 - name: Disable swap
-  when: disable_swap | bool
+  when: common_disable_swap | bool
   become: true
   block:
     - name: Report currently active swap devices
@@ -113,6 +113,8 @@
 - name: Report EEPROM boot order reminder
   ansible.builtin.debug:
     msg: >-
-      {{ inventory_hostname }} is an RPi 4. Confirm `rpi-eeprom-config` has
-      BOOT_ORDER trying USB before SD *before* you retire its SD card.
+      {{ inventory_hostname }} is flagged requires_eeprom_boot_order. Confirm
+      `rpi-eeprom-config` has BOOT_ORDER trying USB before SD *before* you
+      retire its SD card. (No current host sets this flag — it exists for
+      whichever board needs it next, e.g. an RPi 4 added back to the fleet.)
   when: requires_eeprom_boot_order | default(false)

@@ -19,14 +19,16 @@ lab_mtu: 1500
 lab_dhcp_pool: "192.168.20.100-192.168.20.199"
 lab_metallb_pool: "192.168.20.240-192.168.20.250"
 
-# TODO: replace with the real Cloudflare-hosted zone before cert-manager's
-# DNS-01 issuer can work. Everything that needs a name references this one var,
-# so it is a single edit. Until then internal names resolve but Let's Encrypt
-# issuance will fail with an NXDOMAIN on the _acme-challenge record.
+# Cloudflare-hosted zone used for both node names and internal-only lab
+# service hostnames (Argo CD, Vault, Grafana — none of these have an inbound
+# internet path; DNS-01 only needs the zone to be resolvable, not reachable).
+# Node fqdn is `{{ inventory_hostname }}.lab_domain`; internal tool hostnames
+# in cluster/*/values.yaml are hand-written as `<tool>.lab_domain` and are not
+# templated from this var, so a change here means updating both places.
 lab_domain: "eightbitsaxlounge.com"
 
-lab_timezone: "America/Chicago"
-lab_locale: "en_US.UTF-8"
+lab_timezone: "Europe/London"
+lab_locale: "en_GB.UTF-8"
 
 # VLAN 10 — your workstation side. Referenced by the hardening role's ufw rules
 # so SSH is reachable from the workstation and nowhere else.
@@ -42,12 +44,46 @@ ansible_runner_image: "{{ registry }}/ansible-runner"
 gha_runner_image: "{{ registry }}/gha-runner"
 
 # ---------------------------------------------------------------------------
+# AWS federation. Mirrors nineteenseventytwo-cloud/config/aws.json, which is
+# the source of truth — if these disagree, every AssumeRoleWithWebIdentity call
+# fails with a message that does not mention URLs. No credential appears here
+# or anywhere else in this repo: pods present a projected service-account token
+# and STS hands back an hour of access. docs/06-aws-federation.md.
+#
+# cluster_oidc_issuer is a ONE-WAY DOOR. It is baked into the API server at
+# `kubeadm init` and into every IAM role trust policy. Changing it means
+# rebuilding the control plane. No trailing slash — the issuer field in the
+# discovery document must match this character for character.
+# ---------------------------------------------------------------------------
+cluster_oidc_issuer: "https://oidc.{{ lab_domain }}"
+cluster_oidc_audience: "sts.amazonaws.com"
+
+aws_region: "eu-west-2"
+aws_account_platform_prod: "972034964468"
+
+# Roles created by live/aws/platform-prod once publish_cluster_oidc is on.
+# These are ARNs, not secrets — they go on ServiceAccount annotations in
+# cluster/*/values.yaml, and the trust policy on the far side is what decides.
+aws_cluster_role_arns:
+  argocd_sops: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-argocd-sops"
+  vault_unseal: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-vault-unseal"
+  longhorn_backup: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-longhorn-backup"
+  prowler: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-prowler"
+
+# S3 bucket the cluster publishes its OIDC discovery documents into, and the
+# bucket Longhorn writes volume backups to. Names are derived in the cloud repo
+# as <org>-<purpose>-<account id>; kept literal here so `make publish-oidc`
+# does not need Terraform on the workstation.
+aws_jwks_bucket: "nineteenseventytwo-oidc-{{ aws_account_platform_prod }}"
+aws_longhorn_bucket: "nineteenseventytwo-longhorn-backups-{{ aws_account_platform_prod }}"
+
+# ---------------------------------------------------------------------------
 # Versions. Pinned so replaying an old commit does what it did then.
 # ---------------------------------------------------------------------------
 # Matches what eightbitsaxlounge/server runs today; bump deliberately.
-kubernetes_version: "1.35"
+kubernetes_version: "1.36"
 containerd_version: "latest"
-cilium_version: "1.17.5"
+cilium_version: "1.20.0"
 
 # Cilium replaces Flannel, so pick a pod CIDR that does not collide with the
 # lab subnet or with Cilium's default cluster-pool.
