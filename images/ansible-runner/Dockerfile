@@ -66,6 +66,26 @@ RUN ansible-galaxy collection install -r /tmp/requirements.yml -p /usr/share/ans
 
 ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
 
+# Non-root default. The Makefile's CONTAINER_RUN macros pass
+# --user "$(id -u):$(id -g)" at `docker run` time, which overrides this UID
+# with whoever actually invoked make — on the workstation that's you, on
+# 1972-console-1 (deploy-cluster.yml, deploy-nodes.yml, both self-hosted) it's
+# the runner service account. Either way the container ends up owned by
+# exactly whoever owns the bind-mounted /work and the credential files under
+# $HOME, so there's no UID mismatch to fight on a real Linux bind mount.
+#
+# HOME stays set and world-writable regardless of which UID lands here via
+# --user, since an arbitrary numeric UID has no /etc/passwd entry and would
+# otherwise get no $HOME at all — Ansible wants one writable, for
+# ~/.ansible/tmp and retry files. This container is ephemeral (--rm) and never
+# holds a credential beyond one invocation, so a permissive HOME costs nothing
+# a read-only key mount doesn't already cost.
+RUN useradd --create-home --shell /usr/sbin/nologin ansible \
+ && mkdir -p /home/ansible/.ssh /home/ansible/.config/sops /home/ansible/.kube \
+ && chmod -R 0777 /home/ansible
+ENV HOME=/home/ansible
+USER ansible
+
 WORKDIR /work
 ENTRYPOINT []
 CMD ["ansible-playbook", "--version"]

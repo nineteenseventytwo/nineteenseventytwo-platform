@@ -11,18 +11,27 @@ compute (§3.3), so nothing about this image is built in the lab.
 
 ## Use
 
+Runs as a non-root `ansible` user, not root — `--user` below matches it to
+whoever is actually invoking `docker run`, so the container reads your key
+with your own UID rather than a baked-in one, and anything it writes back to
+`/work` comes out owned by you, not root.
+
 ```bash
-docker run --rm \
+docker run --rm --user "$(id -u):$(id -g)" \
   -v $PWD:/work -w /work \
-  -v ~/.ssh:/root/.ssh:ro \
-  -v ~/.config/sops/age:/root/.config/sops/age:ro \
+  -v ~/.ssh/ansible-workstation:/home/ansible/.ssh/id_ed25519:ro \
+  -v ~/.config/sops/age:/home/ansible/.config/sops/age:ro \
+  -e ANSIBLE_PRIVATE_KEY_FILE=/home/ansible/.ssh/id_ed25519 \
   -e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
   ghcr.io/nineteenseventytwo/ansible-runner:1.0.0 \
   ansible-playbook -i ansible/inventory/lab ansible/playbooks/10-bootstrap-nodes.yml
 ```
 
 The `Makefile` wraps exactly this, so `make deploy-nodes` and the
-`deploy-nodes.yml` workflow run the same command.
+`deploy-nodes.yml` workflow run the same command. It mounts the one SSH key
+needed, not all of `~/.ssh` as the snippet above shows for brevity — that
+directory holds `mark-workstation` and every other private key on the
+machine, none of which a converge has any business being able to read.
 
 ## Versioning
 

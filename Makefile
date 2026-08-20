@@ -49,25 +49,38 @@ KUBECONFIG       ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/kube/config,$(HOME)/.k
 # Mount the one SSH key we need, not all of ~/.ssh — that directory holds
 # mark-workstation and every other private key on the machine, none of which
 # a converge has any business being able to read.
-CONTAINER_RUN = $(ENGINE) run --rm -i \
+#
+# --user matches the image's default (ansible-runner runs as a non-root
+# `ansible` user, not root), against whoever is actually invoking make: you,
+# on the workstation, or the self-hosted runner's own service account on
+# 1972-console-1 (deploy-cluster.yml, deploy-nodes.yml). Either way it's the
+# same UID that owns /work and everything under $HOME being mounted in, so
+# there's no bind-mount ownership mismatch to fight — a real concern on
+# 1972-console-1's native Linux bind mounts, unlike Docker Desktop's more
+# forgiving ones. The image's HOME is world-writable for exactly this: an
+# arbitrary UID with no /etc/passwd entry still needs somewhere to put
+# ~/.ansible/tmp.
+DOCKER_USER = --user "$(shell id -u):$(shell id -g)"
+
+CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
-	-v $(SSH_KEY):/root/.ssh/id_ed25519:ro \
-	-v $(KNOWN_HOSTS):/root/.ssh/known_hosts:ro \
-	-v $(SOPS_AGE_DIR):/root/.config/sops/age:ro \
-	-e ANSIBLE_PRIVATE_KEY_FILE=/root/.ssh/id_ed25519 \
+	-v $(SSH_KEY):/home/ansible/.ssh/id_ed25519:ro \
+	-v $(KNOWN_HOSTS):/home/ansible/.ssh/known_hosts:ro \
+	-v $(SOPS_AGE_DIR):/home/ansible/.config/sops/age:ro \
+	-e ANSIBLE_PRIVATE_KEY_FILE=/home/ansible/.ssh/id_ed25519 \
 	-e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
 	$(ANSIBLE_RUNNER)
 
-CONTAINER_RUN_KUBE = $(ENGINE) run --rm -i \
+CONTAINER_RUN_KUBE = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
-	-v $(KUBECONFIG):/root/.kube/config:ro \
+	-v $(KUBECONFIG):/home/ansible/.kube/config:ro \
 	$(ANSIBLE_RUNNER)
 
 # Linting reads files and nothing else — no key, no kubeconfig, no network.
 # ANSIBLE_CONFIG is still required even here: ansible-lint resolves
 # roles_path relative to it, and without it every role import 404s as
 # "role not found" rather than anything resembling a lint finding.
-CONTAINER_RUN_PLAIN = $(ENGINE) run --rm -i \
+CONTAINER_RUN_PLAIN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
 	-e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
 	$(ANSIBLE_RUNNER)
@@ -90,7 +103,7 @@ else
   KUBECTL   = $(CONTAINER_RUN_KUBE) kubectl
   HELM      = $(CONTAINER_RUN_KUBE) helm
   LINT          = $(CONTAINER_RUN_PLAIN)
-  LINT_NO_SOPS  = $(ENGINE) run --rm -i \
+  LINT_NO_SOPS  = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
 	-e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
 	-e ANSIBLE_VARS_ENABLED=host_group_vars \
