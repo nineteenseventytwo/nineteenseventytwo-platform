@@ -203,6 +203,38 @@
           /tmp/linux-{{ 'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}
         state: absent
 
+# Without this, kubernetes.core.helm falls back to a cruder idempotency check
+# and reports every Cilium release as changed whether or not it actually is.
+- name: Check the installed helm-diff plugin version
+  ansible.builtin.command:
+    cmd: helm plugin list
+  register: kube_control_plane_helm_diff_check
+  changed_when: false
+  failed_when: false
+  become: true
+  tags: [cni]
+
+- name: Install the helm-diff plugin
+  when: kube_control_plane_helm_diff_version.lstrip('v') not in (kube_control_plane_helm_diff_check.stdout | default(''))
+  become: true
+  tags: [cni]
+  block:
+    - name: Remove any existing helm-diff plugin
+      ansible.builtin.command:
+        cmd: helm plugin uninstall diff
+      failed_when: false
+      changed_when: true
+
+    # helm-diff's GitHub releases carry no provenance file, and helm 4
+    # verifies plugin sources by default — without --verify=false this fails
+    # with "plugin source does not support verification".
+    - name: Install the pinned helm-diff plugin
+      ansible.builtin.command:
+        cmd: >-
+          helm plugin install https://github.com/databus23/helm-diff
+          --version {{ kube_control_plane_helm_diff_version }} --verify=false
+      changed_when: true
+
 - name: Generate a worker join command
   ansible.builtin.command:
     cmd: kubeadm token create --print-join-command

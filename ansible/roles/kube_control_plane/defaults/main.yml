@@ -9,6 +9,11 @@ kube_control_plane_admission_config_path: /etc/kubernetes/admission/admission-co
 # pins, so the CLI driving these tasks and the CLI actually running them agree.
 kube_control_plane_helm_version: v4.2.3
 
+# Lets kubernetes.core.helm diff against the live release instead of falling
+# back to its own cruder idempotency check (the source of the "install helm
+# diff >= 3.4.1 for better results" warning on every Cilium run).
+kube_control_plane_helm_diff_version: v3.15.11
+
 # Pod Security Standards, enforced at admission for every namespace that does
 # not opt out with labels. `baseline` cluster-wide with `restricted` warnings
 # is the setting that catches problems without breaking Longhorn and Cilium,
