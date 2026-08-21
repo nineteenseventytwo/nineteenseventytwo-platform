@@ -148,6 +148,49 @@
   become: true
   tags: [kubeconfig]
 
+# 30-cluster.yml's "Container network interface" play runs
+# kubernetes.core.helm_repository/helm against this same host right after this
+# role finishes — those modules are thin wrappers around a real `helm` binary
+# on the target, not something the ansible-runner container's own helm
+# satisfies. kube_prereqs_packages never included it (helm isn't in Debian's
+# or Kubernetes' apt repos under that name), so nothing has ever put one here.
+- name: Check the installed helm version
+  ansible.builtin.command:
+    cmd: helm version --short
+  register: kube_control_plane_helm_check
+  changed_when: false
+  failed_when: false
+  tags: [cni]
+
+- name: Install helm
+  when: kube_control_plane_helm_version not in (kube_control_plane_helm_check.stdout | default(''))
+  become: true
+  tags: [cni]
+  block:
+    - name: Download and extract helm
+      ansible.builtin.unarchive:
+        src: >-
+          https://get.helm.sh/helm-{{ kube_control_plane_helm_version }}-linux-{{
+          'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install the helm binary
+      ansible.builtin.copy:
+        src: >-
+          /tmp/linux-{{ 'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}/helm
+        dest: /usr/local/bin/helm
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Clean up the extracted archive
+      ansible.builtin.file:
+        path: >-
+          /tmp/linux-{{ 'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}
+        state: absent
+
 - name: Generate a worker join command
   ansible.builtin.command:
     cmd: kubeadm token create --print-join-command
