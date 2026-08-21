@@ -28,6 +28,7 @@ hardening_ufw_cluster_rules:
   - { port: "10256", proto: tcp, comment: "kube-proxy health" }
   - { port: "30000:32767", proto: tcp, comment: "NodePort range" }
   - { port: "4240", proto: tcp, comment: "cilium health" }
+  - { port: "4244", proto: tcp, comment: "hubble peer service" }
   - { port: "8472", proto: udp, comment: "cilium vxlan" }
   - { port: "51871", proto: udp, comment: "cilium wireguard" }
   - { port: "7946", proto: tcp, comment: "metallb memberlist" }

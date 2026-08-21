@@ -31,11 +31,20 @@ ipv4:
 ipv6:
   enabled: false
 
-# Node-to-node encryption.
+# Node-to-node encryption. nodeEncryption additionally covers host-to-host
+# traffic (not just pod-to-pod) - the control-plane node is opted out of it
+# automatically (Cilium's own bootstrap safeguard: you cannot WireGuard your
+# way to the apiserver before reaching the apiserver to exchange keys), which
+# conflicts with Cilium's separate, always-on special-cased tunnel routing for
+# apiserver reachability and silently blackholes pod-to-ClusterIP apiserver
+# traffic. Confirmed live via cilium monitor: SYNs to the apiserver ClusterIP
+# get correctly DNAT'd (identity resolves to kube-apiserver) but are then
+# routed onto cilium_vxlan and never re-emerge - no drop event, just gone.
+# Pod-to-pod encryption is unaffected and stays on.
 encryption:
   enabled: true
   type: wireguard
-  nodeEncryption: true
+  nodeEncryption: false
 
 # NetworkPolicy for intra-VLAN traffic.
 policyEnforcementMode: default
