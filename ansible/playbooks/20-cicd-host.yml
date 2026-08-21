@@ -33,14 +33,24 @@
     # console -> nodes, non-interactive. Generated on the console and never
     # checked in; that is the whole reason it is generated here and not
     # rendered from a template.
+    #
+    # group: docker, mode: 0640, not owner-only. deploy-nodes.yml /
+    # deploy-cluster.yml mount this key by host path into the ansible-runner
+    # container from *inside* the containerized self-hosted runner — a sibling
+    # container spawned over the shared docker socket, not a process running
+    # as admin_user. That sibling gets --group-add <docker gid> (Makefile), so
+    # group-readable is what actually lets CI use this key at all. Docker-group
+    # membership already means root-equivalent host control on its own
+    # (trivial via `docker run --privileged`), so this doesn't hand out
+    # meaningfully more than that group already implies.
     - name: Generate the ansible-console SSH key
       community.crypto.openssh_keypair:
         path: "/home/{{ admin_user }}/.ssh/ansible-console"
         type: ed25519
         comment: "ansible-console"
         owner: "{{ admin_user }}"
-        group: "{{ admin_user }}"
-        mode: "0600"
+        group: docker
+        mode: "0640"
       become: true
       register: console_key
       tags: [ssh]
