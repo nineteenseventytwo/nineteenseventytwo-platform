@@ -1,5 +1,13 @@
-# Managed by ansible/roles/kube_control_plane. Do not edit on the host.
 ---
+# Managed by ansible/roles/kube_control_plane. Do not edit on the host.
+#
+# kubeadm's own config parser (SplitConfigDocuments) splits this file on
+# every `---` line and requires each resulting chunk to carry apiVersion and
+# kind — a comment-only chunk before the first `---` fails with "invalid
+# configuration for GroupVersionKind /, Kind=: kind and apiVersion is
+# mandatory", which is why this comment lives after the first `---` and not
+# before it. Confirmed against the real kubeadm binary (v1.36.4), not just
+# read from the error message.
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
 localAPIEndpoint:
