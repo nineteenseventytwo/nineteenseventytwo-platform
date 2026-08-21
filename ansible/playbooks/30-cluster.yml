@@ -35,6 +35,21 @@
         repo_url: https://helm.cilium.io/
       become: true
 
+    # kubernetes.core.helm runs the real `helm` binary on the target host
+    # (1972-master-1), not on the control node running ansible-playbook — a
+    # playbook_dir-based path resolves correctly as a *string* wherever the
+    # Jinja templating happens, but the file it points at only exists inside
+    # the ansible-runner container, never on the remote host. helm's own
+    # --values flag has no concept of "fetch this from the controller" the
+    # way values_files might suggest; the file has to already be sitting on
+    # the machine helm actually runs on.
+    - name: Copy the Cilium values file to the control plane
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../cluster/cilium/values.yaml"
+        dest: /tmp/cilium-values.yaml
+        mode: "0644"
+      become: true
+
     - name: Install Cilium
       kubernetes.core.helm:
         name: cilium
@@ -42,7 +57,7 @@
         chart_version: "{{ cilium_version }}"
         release_namespace: kube-system
         values_files:
-          - "{{ playbook_dir }}/../../cluster/cilium/values.yaml"
+          - /tmp/cilium-values.yaml
         # kube-proxy replacement needs the API server address explicitly,
         # because it cannot be reached through a Service that does not exist
         # yet. Standard mode first is a supported migration path (§4.3).
