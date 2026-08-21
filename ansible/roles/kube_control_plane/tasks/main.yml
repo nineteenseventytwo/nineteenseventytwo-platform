@@ -154,6 +154,18 @@
 # on the target, not something the ansible-runner container's own helm
 # satisfies. kube_prereqs_packages never included it (helm isn't in Debian's
 # or Kubernetes' apt repos under that name), so nothing has ever put one here.
+#
+# Same story one level down: kubernetes.core.k8s_info/k8s (used later in
+# 30-cluster.yml — waiting for Cilium, waiting for nodes, applying baseline
+# policy) are Python modules that execute *on this host*, and need the
+# `kubernetes` Python library present here to even import, independent of
+# whatever's inside the ansible-runner container running the playbook itself.
+- name: Install python3-kubernetes, required by kubernetes.core modules
+  ansible.builtin.apt:
+    name: python3-kubernetes
+    state: present
+  become: true
+
 - name: Check the installed helm version
   ansible.builtin.command:
     cmd: helm version --short

@@ -70,8 +70,43 @@
               'ipam': {'operator': {'clusterPoolIPv4PodCIDRList': [kubernetes_pod_cidr]}},
             }
           }}
-        wait: true
-        wait_timeout: 10m
+        wait: false
+      become: true
+
+    # Not helm's own `wait: true` — that waits for every resource the release
+    # creates, including hubble-relay, which has no toleration for the
+    # control-plane's NoSchedule taint and cannot schedule anywhere until a
+    # worker joins. Workers join in the very next play, but "so they come up
+    # with a working datapath" (the reason Cilium goes on first at all) only
+    # actually depends on the CNI agent and the operator — hubble-relay is
+    # observability, not datapath, and gating worker-join on it means a
+    # guaranteed wait_timeout failure on every single bootstrap.
+    - name: Wait for the Cilium DaemonSet to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        name: cilium
+        namespace: kube-system
+      register: kube_control_plane_cilium_ds
+      until: >-
+        kube_control_plane_cilium_ds.resources | length > 0 and
+        (kube_control_plane_cilium_ds.resources[0].status.numberReady | default(0)) ==
+        (kube_control_plane_cilium_ds.resources[0].status.desiredNumberScheduled | default(-1))
+      retries: 30
+      delay: 10
+      become: true
+
+    - name: Wait for the Cilium operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: cilium-operator
+        namespace: kube-system
+      register: kube_control_plane_cilium_operator
+      until: >-
+        kube_control_plane_cilium_operator.resources | length > 0 and
+        (kube_control_plane_cilium_operator.resources[0].status.readyReplicas | default(0)) ==
+        (kube_control_plane_cilium_operator.resources[0].status.replicas | default(-1))
+      retries: 30
+      delay: 10
       become: true
 
 - name: Join the workers
