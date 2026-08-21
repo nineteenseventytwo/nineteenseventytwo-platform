@@ -72,7 +72,16 @@ KUBECONFIG       ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/kube/config,$(HOME)/.k
 # forgiving ones. The image's HOME is world-writable for exactly this: an
 # arbitrary UID with no /etc/passwd entry still needs somewhere to put
 # ~/.ansible/tmp.
-DOCKER_USER = --user "$(shell id -u):$(shell id -g)"
+# DOCKER_GID is unset (no-op) on the workstation, where whoever invokes make
+# already owns the SSH key/age key files being mounted in. On the self-hosted
+# runner it's the numeric gid of the host's docker group, set by
+# deploy-nodes.yml/deploy-cluster.yml: the container that actually reads
+# ansible-console is a sibling spawned over the shared docker socket from
+# *inside* the containerized runner, not a process running as admin_user, so
+# --user alone can't match ansible-console's owning uid — only group
+# membership can. ansible-console is group:docker mode:0640 for exactly this
+# (ansible/playbooks/20-cicd-host.yml).
+DOCKER_USER = --user "$(shell id -u):$(shell id -g)" $(if $(DOCKER_GID),--group-add $(DOCKER_GID))
 
 CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \

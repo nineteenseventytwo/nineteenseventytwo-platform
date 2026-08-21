@@ -32,9 +32,9 @@ jobs:
     runs-on: [self-hosted, linux, arm64, lab-network]
     environment: lab
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -51,11 +51,26 @@ jobs:
           printf '%s' "${{ secrets.KUBECONFIG }}"   > "$RUNNER_TEMP/kube/config"
           chmod 600 "$RUNNER_TEMP/age/keys.txt" "$RUNNER_TEMP/kube/config"
 
+      # This job runs inside the containerized self-hosted runner, as that
+      # image's own baked-in user — not as mchellmer, who owns
+      # ansible-console. The ansible-runner container the Makefile spawns to
+      # rebuild the cluster is a *sibling* container over the shared docker
+      # socket, so --user alone can't bridge that identity gap; group
+      # membership does instead (ansible-console is group:docker mode:0640 —
+      # 20-cicd-host.yml). Only "Rebuild the cluster" needs it: "Nudge Argo CD"
+      # mounts a kubeconfig staged by this same job, no cross-identity gap
+      # there.
+      - name: Read the docker group gid
+        id: dockergid
+        run: |
+          echo "value=$(getent group docker | cut -d: -f3)" >> "$GITHUB_OUTPUT"
+
       - name: Rebuild the cluster
         if: inputs.rebuild
         env:
           ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
           SSH_KEY: /home/mchellmer/.ssh/ansible-console
+          DOCKER_GID: ${{ steps.dockergid.outputs.value }}
         run: make deploy-cluster
 
       - name: Nudge Argo CD and wait for sync
