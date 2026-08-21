@@ -4,8 +4,24 @@
 # Target is ARC scale sets in-cluster — but this stack stays afterwards as the
 # break-glass path, because it is how you rebuild the cluster that hosts ARC.
 #
+# One service per runner rather than one service with deploy.replicas, because
+# each runner needs its *own* work directory. Replicas share a single volume
+# spec, so every runner mounted the same _work: two concurrent jobs then shared
+# one repo checkout and one RUNNER_TEMP. That surfaced as a checkout failing
+# with "cannot lock ref 'refs/remotes/origin/main': is at X but expected Y"
+# while the other job fetched into the same clone, as "Missing file at path:
+# .../_runner_file_commands/set_output_*" when one job's cleanup removed the
+# other's, and — quietly — as one job's credential shred deleting the age key
+# the other was still using.
+#
+# The bind mount is deliberately host-path-identical on both sides: the
+# workflows spawn sibling containers over the shared docker socket, and the
+# host daemon resolves -v source paths, so a job's workspace has to exist at
+# the same path inside the runner and on the host.
 services:
-  runner:
+{% for i in range(1, runner_host_replicas + 1) %}
+  runner-{{ i }}:
+    container_name: github-runner-{{ i }}
     image: {{ runner_host_image }}
     env_file: [runner.env]
     environment:
@@ -17,13 +33,13 @@ services:
       RUNNER_SCOPE: "{{ runner_host_scope }}"
       EPHEMERAL: "{{ 'true' if runner_host_ephemeral else 'false' }}"
       LABELS: "{{ runner_host_labels | join(',') }}"
-      RUNNER_WORKDIR: "{{ runner_host_workdir }}"
+      RUNNER_WORKDIR: "{{ runner_host_workdir }}-{{ i }}"
       DISABLE_AUTO_UPDATE: "true"
     volumes:
 {% if runner_host_mount_docker_socket %}
       - /var/run/docker.sock:/var/run/docker.sock
 {% endif %}
-      - {{ runner_host_workdir }}:{{ runner_host_workdir }}
+      - {{ runner_host_workdir }}-{{ i }}:{{ runner_host_workdir }}-{{ i }}
       - {{ runner_host_home }}/github-app.pem:/github-app.pem:ro
 {% if runner_host_mount_docker_socket %}
     group_add:
@@ -33,15 +49,15 @@ services:
 {% endif %}
     restart: always
     deploy:
-      replicas: {{ runner_host_replicas }}
       resources:
         limits:
           # 2 GB host. Two runners at this ceiling plus dockerd leaves ~700M.
-          # There's room for a third replica now if concurrency is worth more
-          # than the extra headroom; not enabled by default.
+          # There's room for a third now if concurrency is worth more than the
+          # extra headroom; raise runner_host_replicas.
           memory: 640M
     logging:
       driver: json-file
       options:
         max-size: "20m"
         max-file: "3"
+{% endfor %}
