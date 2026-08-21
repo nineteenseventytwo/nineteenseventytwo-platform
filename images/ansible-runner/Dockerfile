@@ -84,10 +84,19 @@ RUN useradd --create-home --shell /usr/sbin/nologin ansible \
  && mkdir -p /home/ansible/.ssh /home/ansible/.config/sops /home/ansible/.kube \
  && chmod -R 0777 /home/ansible
 ENV HOME=/home/ansible
+
+# world-writable so an arbitrary UID (via --user, with no matching entry of
+# its own) can add itself — see entrypoint.sh for why this matters beyond
+# just HOME: ssh's own default-path resolution depends on it.
+RUN chmod 0666 /etc/passwd
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 USER ansible
 
 WORKDIR /work
-ENTRYPOINT []
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["ansible-playbook", "--version"]
 
 # A one-shot CLI invocation (`docker run --rm ansible-runner ansible-playbook
