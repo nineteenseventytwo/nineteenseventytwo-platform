@@ -34,10 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read the ansible-runner version
-        id: version
-        run: echo "value=$(cat images/ansible-runner/version.txt)" >> "$GITHUB_OUTPUT"
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -58,13 +54,13 @@ jobs:
       - name: Rebuild the cluster
         if: inputs.rebuild
         env:
-          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
           SSH_KEY: /home/mchellmer/.ssh/ansible-console
         run: make deploy-cluster
 
       - name: Nudge Argo CD and wait for sync
         env:
-          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
         run: make argocd-sync-wait
 
       - name: Shred the staged credentials

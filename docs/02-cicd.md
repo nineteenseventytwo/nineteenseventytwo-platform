@@ -101,8 +101,10 @@ longer share a push:
   smoke-tests that image; merging promotes `:stable` by re-tag, not rebuild
   (`image-<name>-build.yml` / `image-<name>-promote.yml`).
 - Pushing to `main` under `ansible/**` runs `deploy-nodes.yml`, which pulls
-  the `:<version>` that commit's `version.txt` names and converges all four
-  Pis.
+  `ansible-runner:stable` — the last promoted image, not necessarily
+  whatever that commit's own `version.txt` says — and converges all four
+  Pis. Same default the Makefile uses on a workstation; override
+  `ANSIBLE_RUNNER` on either to test a specific version or `:latest`.
 - No SSH from your laptop, either way.
 
 ---
@@ -147,15 +149,16 @@ The workflow composes them through the Makefile, same as a workstation run:
 ```yaml
 - name: Converge the nodes
   env:
-    ANSIBLE_RUNNER: ghcr.io/nineteenseventytwo/ansible-runner:${{ steps.version.outputs.value }}
+    ANSIBLE_RUNNER: ghcr.io/nineteenseventytwo/ansible-runner:stable
     SSH_KEY: /home/mchellmer/.ssh/ansible-console
   run: make deploy-nodes
 ```
 
-`steps.version.outputs.value` is that commit's
-`images/ansible-runner/version.txt` — always the exact `:<version>`, never
-`:latest`/`:stable`. `SSH_KEY` overrides the Makefile's workstation default
-to point at `ansible-console`, which never enters GitHub.
+`:stable` matches the Makefile's own default on a workstation — same tag
+either way, unless you override `ANSIBLE_RUNNER` explicitly to test a
+version bump or `:latest` on a branch. `SSH_KEY` overrides the Makefile's
+workstation default to point at `ansible-console`, which never enters
+GitHub.
 
 ### Publishing: build once, promote by re-tag
 
