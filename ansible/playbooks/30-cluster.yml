@@ -139,17 +139,33 @@
       delay: 10
       become: true
 
+    # kubernetes.core.k8s also runs on the remote host — same story as the
+    # Cilium values file two plays back. query('fileglob') is a lookup plugin
+    # and always evaluates on the control node (nothing makes a lookup run
+    # remotely), which is exactly why it correctly finds these files locally;
+    # they then need to exist somewhere the k8s module — running on
+    # 1972-master-1 — can actually read them from. One recursive copy handles
+    # both this loop and the tenants/ one below; mode: preserve keeps
+    # whatever permission bits the manifests already have rather than forcing
+    # one uniform mode across the whole tree.
+    - name: Copy the policy directory to the control plane
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../policy/"
+        dest: /tmp/policy/
+        mode: preserve
+      become: true
+
     # Default-deny in every namespace
     - name: Apply baseline policy
       kubernetes.core.k8s:
         state: present
-        src: "{{ item }}"
+        src: "/tmp/policy/{{ item | basename }}"
       loop: "{{ query('fileglob', playbook_dir + '/../../policy/*.yaml') | sort }}"
       become: true
 
     - name: Apply tenant namespaces, quotas and RBAC
       kubernetes.core.k8s:
         state: present
-        src: "{{ item }}"
+        src: "/tmp/policy/tenants/{{ item | basename }}"
       loop: "{{ query('fileglob', playbook_dir + '/../../policy/tenants/*.yaml') | sort }}"
       become: true
