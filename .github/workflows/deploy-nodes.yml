@@ -35,10 +35,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read the ansible-runner version
-        id: version
-        run: echo "value=$(cat images/ansible-runner/version.txt)" >> "$GITHUB_OUTPUT"
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -59,7 +55,7 @@ jobs:
       # workstation. Everything above this line is orchestration.
       - name: Converge the nodes
         env:
-          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:${{ steps.version.outputs.value }}
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
           SSH_KEY: /home/mchellmer/.ssh/ansible-console
           CHECK: ${{ inputs.check_mode && '1' || '' }}
         run: make deploy-nodes

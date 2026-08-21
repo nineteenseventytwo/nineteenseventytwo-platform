@@ -15,8 +15,20 @@ SHELL := /bin/bash
 
 ORG              ?= nineteenseventytwo
 REGISTRY         ?= ghcr.io/$(ORG)
-ANSIBLE_RUNNER   ?= $(REGISTRY)/ansible-runner:$(shell cat images/ansible-runner/version.txt)
+# :stable — the last version promoted from main, not necessarily what
+# version.txt says on whatever's checked out right now. Override explicitly
+# when testing a version bump on a branch:
+#   ANSIBLE_RUNNER=ghcr.io/nineteenseventytwo/ansible-runner:1.2.3 make ...
+#   ANSIBLE_RUNNER=ghcr.io/nineteenseventytwo/ansible-runner:latest make ...
+ANSIBLE_RUNNER   ?= $(REGISTRY)/ansible-runner:stable
 GHA_RUNNER       ?= $(REGISTRY)/gha-runner:$(shell cat images/gha-runner/version.txt)
+
+# For `make image-ansible-runner`'s own build tag specifically, not for
+# pulling-and-running — that stays pinned to version.txt regardless of what
+# ANSIBLE_RUNNER resolves to. Tagging a fresh, unpublished, untested local
+# build :stable would be a lie; GHA_RUNNER above already gets this right for
+# gha-runner because it never floats to :stable in the first place.
+ANSIBLE_RUNNER_BUILD_TAG ?= $(REGISTRY)/ansible-runner:$(shell cat images/ansible-runner/version.txt)
 
 INVENTORY        ?= ansible/inventory/lab
 BUILD_DIR        ?= build
@@ -200,10 +212,10 @@ images: image-ansible-runner image-gha-runner ## Build both container images loc
 image-ansible-runner: ## Build the ansible-runner image locally
 ifeq ($(ENGINE),docker)
 	docker buildx build --platform linux/arm64 \
-	  -t $(ANSIBLE_RUNNER) images/ansible-runner --load
+	  -t $(ANSIBLE_RUNNER_BUILD_TAG) images/ansible-runner --load
 else
 	podman build --platform linux/arm64 \
-	  -t $(ANSIBLE_RUNNER) images/ansible-runner
+	  -t $(ANSIBLE_RUNNER_BUILD_TAG) images/ansible-runner
 endif
 
 .PHONY: image-gha-runner
