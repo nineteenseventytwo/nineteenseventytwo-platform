@@ -31,7 +31,11 @@
     sysctl_set: true
     state: present
     reload: true
-  loop: "{{ hardening_sysctls | dict2items }}"
+  loop: >-
+    {{ (hardening_sysctls | combine(
+          hardening_sysctls_rp_filter_cluster
+          if (kubelet_node | default(false))
+          else hardening_sysctls_rp_filter)) | dict2items }}
   loop_control:
     label: "{{ item.key }}"
   become: true
@@ -44,6 +48,22 @@
       ansible.builtin.apt:
         name: ufw
         state: present
+
+    # ufw re-applies /etc/ufw/sysctl.conf every time it reloads, which lands
+    # after this role's own sysctl task and silently wins. Its file sets
+    # log_martians=0, so the log_martians: 1 above was never actually in
+    # effect — and because ansible re-set it on every run only for ufw to
+    # revert it again, `Apply sysctl hardening` reported changed forever,
+    # which is precisely the signal that would otherwise reveal drift.
+    # Emptying IPT_SYSCTL makes this role the single owner of sysctls; the
+    # settings ufw was contributing are folded into hardening_sysctls so
+    # nothing is lost.
+    - name: Stop ufw from managing sysctls
+      ansible.builtin.lineinfile:
+        path: /etc/default/ufw
+        regexp: '^IPT_SYSCTL='
+        line: "IPT_SYSCTL="
+        backrefs: false
 
     - name: Set default policies
       community.general.ufw:
@@ -94,13 +114,13 @@
     - name: Allow cluster ports between lab nodes
       community.general.ufw:
         rule: allow
-        src: "{{ lab_subnet }}"
-        port: "{{ item.port }}"
-        proto: "{{ item.proto }}"
-        comment: "{{ item.comment }}"
-      loop: "{{ hardening_ufw_cluster_rules }}"
+        src: "{{ item.0 }}"
+        port: "{{ item.1.port }}"
+        proto: "{{ item.1.proto }}"
+        comment: "{{ item.1.comment }}"
+      loop: "{{ hardening_ufw_cluster_sources | product(hardening_ufw_cluster_rules) | list }}"
       loop_control:
-        label: "{{ item.comment }} {{ item.port }}/{{ item.proto }}"
+        label: "{{ item.1.comment }} {{ item.1.port }}/{{ item.1.proto }} from {{ item.0 }}"
       when: kubelet_node | default(false)
 
     # Cilium programs its own eBPF datapath and pod traffic must not be

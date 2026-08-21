@@ -28,10 +28,36 @@ hardening_ufw_cluster_rules:
   - { port: "10256", proto: tcp, comment: "kube-proxy health" }
   - { port: "30000:32767", proto: tcp, comment: "NodePort range" }
   - { port: "4240", proto: tcp, comment: "cilium health" }
+  - { port: "4244", proto: tcp, comment: "hubble peer service" }
   - { port: "8472", proto: udp, comment: "cilium vxlan" }
   - { port: "51871", proto: udp, comment: "cilium wireguard" }
   - { port: "7946", proto: tcp, comment: "metallb memberlist" }
   - { port: "7946", proto: udp, comment: "metallb memberlist" }
+
+# Sources allowed to reach the ports above. lab_subnet covers node-to-node.
+#
+# The pod CIDR is here for the same-node hairpin: a pod reaching a
+# hostNetwork-backed Service whose chosen backend is its *own* node. That
+# packet never leaves the box, so nothing masquerades it, and it arrives on
+# the veth still carrying the pod source IP — which lab_subnet does not match,
+# so ufw's default-deny ate it. Silently: Cilium has already handed off to the
+# kernel stack by that point, so `cilium monitor` shows a clean `-> stack` and
+# no drop event anywhere in the CNI.
+#
+# hubble-peer is internalTrafficPolicy: Local, so it hits this path on every
+# single connection; the apiserver hits it for any pod scheduled onto the
+# control plane (which is what had coredns wedged on `waiting for Kubernetes
+# API` until a restart happened to reschedule it onto a worker).
+#
+# This grants pods no reach they did not already have: cross-node, pod traffic
+# is masqueraded to its node IP and so already matches lab_subnet. Verified on
+# the lab — a pod reaches 10250 and 2379 on any *other* node today and is
+# refused only on its own. This makes that consistent rather than
+# scheduling-dependent. Node isolation that actually matters (sshd) is a
+# separate rule and is unaffected.
+hardening_ufw_cluster_sources:
+  - "{{ lab_subnet }}"
+  - "{{ kubernetes_pod_cidr }}"
 
 hardening_sysctls:
   # Standard network hardening. Note ip_forward is deliberately absent here —
@@ -40,10 +66,45 @@ hardening_sysctls:
   net.ipv4.conf.all.send_redirects: 0
   net.ipv4.conf.all.accept_source_route: 0
   net.ipv4.conf.all.log_martians: 1
-  net.ipv4.conf.all.rp_filter: 1
   net.ipv6.conf.all.accept_redirects: 0
+  # Carried over from /etc/ufw/sysctl.conf, which this role now disables (see
+  # "Stop ufw from managing sysctls") so that log_martians actually sticks.
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  net.ipv4.icmp_echo_ignore_broadcasts: 1
+  net.ipv4.icmp_ignore_bogus_error_responses: 1
   net.ipv6.conf.all.accept_source_route: 0
   kernel.kptr_restrict: 2
   kernel.dmesg_restrict: 1
   fs.protected_hardlinks: 1
   fs.protected_symlinks: 1
+
+# rp_filter is split out of hardening_sysctls because the kernel uses
+# max(conf.all.rp_filter, conf.<iface>.rp_filter) rather than letting the more
+# specific value win. Cilium sets rp_filter=0 on the lxc veths and cilium_host
+# it manages, but a non-zero `all` silently promotes every one of them to
+# strict mode, and strict mode drops any packet whose route back to the source
+# does not leave via the interface it arrived on.
+#
+# Pod-to-node-IP traffic is exactly that shape: the packet lands on the pod's
+# veth, while the route back to the pod goes via cilium_host. The SYN is
+# discarded with no reply, no RST, and nothing logged in ufw or the CNI —
+# TcpExtIPReversePathFilter is the only counter that moves. Anything reaching
+# a hostNetwork-backed Service on its own node hits it: hubble-peer on every
+# connection (internalTrafficPolicy: Local), the apiserver for any pod
+# scheduled onto the control plane.
+#
+# Same conflict class as ip_forward above, and worse in one respect — it
+# regresses a running cluster, so `make deploy-nodes` against a healthy node
+# was enough to break pod networking on it.
+#
+# Cluster nodes get 0 on `all`, which removes the floor rather than disabling
+# the check: eth0 still inherits default=2 (loose mode), so the physical NIC
+# stays filtered while Cilium's own interfaces keep the 0 they require.
+hardening_sysctls_rp_filter:
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 2
+
+hardening_sysctls_rp_filter_cluster:
+  net.ipv4.conf.all.rp_filter: 0
+  net.ipv4.conf.default.rp_filter: 2
