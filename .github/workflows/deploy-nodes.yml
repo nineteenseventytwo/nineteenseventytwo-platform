@@ -60,10 +60,21 @@ jobs:
       # (ansible-console is group:docker mode:0640 — 20-cicd-host.yml). This
       # reads the real gid rather than hardcoding it, since it's a property
       # of this specific host, not a constant.
+      # The gid of the *host's* docker group, not this container's. These
+      # steps run inside the containerized runner, which has its own unrelated
+      # docker group (123 here) while the key ansible-runner must read is bind
+      # mounted from the host and keeps the host's numeric gid (988). Adding
+      # the container-local gid granted a group that owned nothing, so ssh
+      # could not read the key and reported "Load key ...: Permission denied"
+      # followed by a misleading "Permission denied (publickey)".
+      #
+      # The docker socket is itself bind mounted from the host, so its gid as
+      # seen in here *is* the host's docker gid — and 20-cicd-host.yml
+      # group-owns the key by docker for exactly this reason.
       - name: Read the docker group gid
         id: dockergid
         run: |
-          echo "value=$(getent group docker | cut -d: -f3)" >> "$GITHUB_OUTPUT"
+          echo "value=$(stat -c %g /var/run/docker.sock)" >> "$GITHUB_OUTPUT"
 
       # The work itself is a make target, identical to what runs on a
       # workstation. Everything above this line is orchestration.
