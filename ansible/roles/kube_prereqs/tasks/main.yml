@@ -79,6 +79,31 @@
     state: present
   become: true
 
+# containerd.io is a Docker-packaged build, not Debian's own `containerd` —
+# the pkgs.k8s.io repo above doesn't carry it either. The `docker` role adds
+# this same repo, but only on hosts: cicd (it installs the full docker-ce
+# daemon + CLI + buildx + compose, none of which a cluster node wants); this
+# role needs the repo on its own rather than depending on a sibling role
+# having already run on a different host group.
+- name: Install the Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Add the Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ 'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}
+      signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable
+    filename: docker
+    state: present
+  become: true
+
 - name: Install Kubernetes packages
   ansible.builtin.apt:
     name: "{{ kube_prereqs_packages }}"
