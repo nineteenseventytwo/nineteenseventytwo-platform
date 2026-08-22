@@ -119,6 +119,21 @@ CONTAINER_RUN_KUBE = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(CURDIR)/$(BUILD_DIR)/helm/cache:/home/ansible/.cache/helm \
 	$(ANSIBLE_RUNNER)
 
+# A bind-mount source that does not exist yet gets auto-created by the engine
+# daemon, typically root-owned, regardless of --user — bootstrap-argocd's own
+# `@mkdir -p` covered its own recipe, but every other target sharing
+# CONTAINER_RUN_KUBE (argocd-sync-wait, apply-policy, verify-irsa) had no such
+# line, so a fresh checkout could still auto-vivify these two directories as
+# root on its first $(KUBECTL)/$(KUBE_SH) call. The next actions/checkout on
+# the same self-hosted runner then fails trying to clean a workspace it does
+# not own: "EACCES: permission denied, rmdir '.../build/helm'" — confirmed
+# live on nineteenseventytwo-platform's own CI after argocd-sync-wait ran
+# once. $(shell ...) here is a bare top-level call, evaluated once when make
+# parses this file — before any target's recipe runs, regardless of which
+# target was invoked — so the directories always exist with the invoking
+# user's own ownership before the container engine ever gets a chance to.
+$(shell mkdir -p $(BUILD_DIR)/helm/config $(BUILD_DIR)/helm/cache)
+
 # Linting reads files and nothing else — no key, no kubeconfig, no network.
 # ANSIBLE_CONFIG is still required even here: ansible-lint resolves
 # roles_path relative to it, and without it every role import 404s as
@@ -274,7 +289,6 @@ kubeconfig: ## Fetch the admin kubeconfig from the control plane to ./build/kube
 
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
-	@mkdir -p $(BUILD_DIR)/helm/config $(BUILD_DIR)/helm/cache
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm
 	$(HELM) repo update argo
 	$(HELM) upgrade --install argocd argo/argo-cd \
