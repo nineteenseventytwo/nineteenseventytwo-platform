@@ -103,9 +103,20 @@ CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 # someone reasonably overrode it with the relative path the docs themselves
 # print. abspath is a no-op on an already-absolute path, so this is safe
 # either way.
+# $(BUILD_DIR)/helm/{config,cache} persist Helm's own state (repositories.yaml,
+# the downloaded index) across separate $(HELM) invocations. Each line of a
+# recipe is its own shell, so each one is a fresh `podman run --rm` — without
+# this, `helm repo add` writes into a container filesystem that is gone the
+# instant it exits, and the very next line's `helm repo update` finds no
+# repositories at all. Read-write, not :ro like the kubeconfig mount above:
+# these are the one thing in this macro that gets written to. Harmless as
+# unused mounts on the $(KUBECTL)/$(KUBE_SH) targets that share this macro —
+# neither reads nor writes Helm's state directories.
 CONTAINER_RUN_KUBE = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
 	-v $(abspath $(KUBECONFIG)):/home/ansible/.kube/config:ro \
+	-v $(CURDIR)/$(BUILD_DIR)/helm/config:/home/ansible/.config/helm \
+	-v $(CURDIR)/$(BUILD_DIR)/helm/cache:/home/ansible/.cache/helm \
 	$(ANSIBLE_RUNNER)
 
 # Linting reads files and nothing else — no key, no kubeconfig, no network.
@@ -263,6 +274,7 @@ kubeconfig: ## Fetch the admin kubeconfig from the control plane to ./build/kube
 
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
+	@mkdir -p $(BUILD_DIR)/helm/config $(BUILD_DIR)/helm/cache
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm
 	$(HELM) repo update argo
 	$(HELM) upgrade --install argocd argo/argo-cd \
