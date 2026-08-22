@@ -96,12 +96,9 @@ spec:
       ports:
         - {protocol: UDP, port: 53}
         - {protocol: TCP, port: 53}
-    # The API server, to reconcile anything at all.
-    - to:
-        - ipBlock:
-            cidr: 192.168.20.202/32
-      ports:
-        - {protocol: TCP, port: 6443}
+    # The API server: see allow-argocd-apiserver below (a CiliumNetworkPolicy,
+    # not a plain ipBlock here — that does not work for this destination,
+    # confirmed live, see the comment there for why).
     # github.com, to read the repo. Egress to the internet is otherwise denied.
     - to:
         - ipBlock:
@@ -112,6 +109,40 @@ spec:
               - 172.16.0.0/12
       ports:
         - {protocol: TCP, port: 443}
+---
+# Cilium resolves both the apiserver's real IP (192.168.20.202:6443) and its
+# ClusterIP (10.96.0.1:443, what every pod's own KUBERNETES_SERVICE_HOST/PORT
+# point at - the standard client-go in-cluster path, which is what Argo CD's
+# own components use) to a *reserved identity*, kube-apiserver, rather than a
+# generic CIDR/world/label-based identity. Neither a plain ipBlock rule naming
+# either address, nor a podSelector/namespaceSelector matching the apiserver
+# static pod's own component=kube-apiserver label, matches traffic Cilium has
+# already classified into a reserved identity - confirmed live with `cilium
+# monitor --type policy-verdict`: "remote ID kube-apiserver ... action deny
+# ... match none" against every one of those, despite each one's realized
+# policy (`cilium endpoint get <id>`) showing the intended selector correctly
+# present. toEntities is the documented, correct mechanism for a reserved
+# identity - except that combined with an explicit toPorts, it *also* denies
+# with match none. Confirmed by direct comparison on a live pod: toEntities
+# alone (no toPorts) - allowed; the identical rule with toPorts added -
+# denied. Reserved identities apparently do not compose with an L4 port
+# filter here, in this Cilium version, even though toEntities alone is
+# correct. Unscoped by port is what's actually verified working, and in
+# practice this is no broader than it looks: kube-apiserver is a fixed
+# reserved identity carrying no other port surface to accidentally allow.
+# Caught by argocd-redis-secret-init failing with "dial tcp 10.96.0.1:443:
+# i/o timeout" during the first live bootstrap-argocd run against this
+# ruleset - see the same rule's history for the full story if this is ever
+# revisited against a newer Cilium version.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-argocd-apiserver
+  namespace: argocd
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -176,8 +207,21 @@ spec:
       ports:
         - {protocol: UDP, port: 53}
         - {protocol: TCP, port: 53}
-    - to:
-        - ipBlock:
-            cidr: 192.168.20.202/32
-      ports:
-        - {protocol: TCP, port: 6443}
+        # The API server: see allow-webhook-apiserver below (a
+        # CiliumNetworkPolicy, not a plain ipBlock here) — same reasoning as
+        # allow-argocd-apiserver above, including the unscoped-by-port shape —
+        # this was never observed failing on its own, only inferred to have
+        # the identical latent bug: same shape, same reserved-identity
+        # mismatch.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-webhook-apiserver
+  namespace: pod-identity-webhook
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: pod-identity-webhook
+  egress:
+    - toEntities: [kube-apiserver]
