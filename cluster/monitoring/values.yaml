@@ -82,6 +82,13 @@ prometheusOperator:
 nodeExporter:
   enabled: true
 prometheus-node-exporter:
+  # hostNetwork/hostPID/hostPath/hostPort — genuinely privileged, and the rest
+  # of this namespace deliberately isn't (pod-security.kubernetes.io/enforce:
+  # baseline on monitoring). node-exporter-system carries the privileged
+  # label instead (policy/00-namespaces.yaml); Prometheus already reaches it
+  # fine since it's scraped by host IP, not namespace (see
+  # allow-prometheus-scrape-egress in policy/10-default-deny.yaml).
+  namespaceOverride: node-exporter-system
   resources:
     requests: {cpu: 25m, memory: 32Mi}
     limits: {memory: 64Mi}
