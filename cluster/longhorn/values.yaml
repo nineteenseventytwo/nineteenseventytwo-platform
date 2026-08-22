@@ -2,6 +2,21 @@
 # chart: 1.12.1
 # repo:  https://charts.longhorn.io
 #
+# preUpgradeChecker.jobEnabled: the chart's own values.yaml says to disable
+# this under Argo CD or any other GitOps tool, and means it - native Helm
+# skips a pre-upgrade hook on a genuine first install (nothing to upgrade
+# yet); Argo CD has no install-vs-upgrade distinction and runs every hook
+# unconditionally on the very first sync. The hook Job's own pod spec
+# references longhorn-service-account, a regular (non-hook) chart resource
+# that does not exist yet on a first sync, so it fails every single
+# attempt with "serviceaccount longhorn-service-account not found" - and
+# since Argo CD blocks the rest of the sync-wave on hook success, nothing
+# else in the chart, including that ServiceAccount, ever gets applied
+# either. Confirmed live: deleting the stuck Job just gets an identical
+# one recreated, failing identically, every time.
+preUpgradeChecker:
+  jobEnabled: false
+
 # Worker SSDs only. Two replicas across two workers.
 persistence:
   defaultClass: true
