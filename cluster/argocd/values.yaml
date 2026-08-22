@@ -33,9 +33,16 @@ configs:
 
 controller:
   replicas: 1
+  # 512Mi OOMKilled the controller on the very first live sync: comparing and
+  # rendering the whole app-of-apps (11+ child Applications' worth of Helm
+  # charts, cilium and kube-prometheus-stack among them) all at once is a
+  # real memory spike, well above what steady-state reconciliation of any one
+  # of them needs. 1Gi is sized for that one-time worst case, not steady
+  # state - Kubernetes limits are a ceiling, not a reservation, so headroom
+  # here does not cost anything once the initial sync settles.
   resources:
     requests: {cpu: 100m, memory: 256Mi}
-    limits: {memory: 512Mi}
+    limits: {memory: 1Gi}
 
 repoServer:
   replicas: 1
