@@ -44,13 +44,17 @@
 # set by the actions-runner base image) needs to create and write job
 # checkouts under it. Same uid mismatch as the App private key above — the
 # host's github-runner system user doesn't line up with the container's uid.
-- name: Create the runner work directory
+#
+# One per runner, not one shared: see the header of compose.yml.j2 for what
+# sharing it did to concurrent jobs.
+- name: Create the runner work directories
   ansible.builtin.file:
-    path: "{{ runner_host_workdir }}"
+    path: "{{ runner_host_workdir }}-{{ item }}"
     state: directory
     owner: "{{ runner_host_user }}"
     group: "{{ runner_host_user }}"
     mode: "0777"
+  loop: "{{ range(1, runner_host_replicas + 1) | list }}"
   become: true
 
 # The GitHub App private key replaces hand-pasted registration tokens, which
