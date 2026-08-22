@@ -43,7 +43,8 @@ kubectl -n vault exec -it vault-0 -- sh
 #    password manager, split across two entries, and never in this repo.
 vault operator init -recovery-shares=3 -recovery-threshold=2
 
-# 2. Audit device. Without it there is no record of who read what.
+# 2. Audit device. Without it there is no record of who read what. Token output from above
+vault login <initial-root-token>
 vault audit enable file file_path=/vault/audit/audit.log
 
 # 3. Kubernetes auth for ESO.
