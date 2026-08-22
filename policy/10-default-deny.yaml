@@ -193,10 +193,24 @@ spec:
 ---
 # The API server calls this webhook on every pod CREATE in the federated
 # namespaces, and it does so from a node's host IP rather than a pod IP — so a
-# namespaceSelector cannot express it and the VLAN 20 range is the honest way
-# to write it. Without this rule the default-deny above silently blackholes
-# every admission call, and because the webhook's failurePolicy is Ignore the
-# only symptom is pods starting with no AWS credentials.
+# namespaceSelector cannot express it. Without this rule the default-deny
+# above silently blackholes every admission call, and because the webhook's
+# failurePolicy is Ignore the only symptom is pods starting with no AWS
+# credentials.
+#
+# The port-8443 half is a CiliumNetworkPolicy below, not the ipBlock this
+# used to be. Cilium resolves the apiserver's own source address to a
+# reserved identity from the ingress side too - remote-node when the
+# webhook pod is on a different node than the apiserver, host if it were
+# ever on the same one - the same class of thing as
+# allow-argocd-apiserver's egress case, just the mirror direction.
+# ipBlock: 192.168.20.0/24 never matched it: confirmed live with `cilium
+# monitor --type policy-verdict`, "remote ID remote-node ... action deny
+# ... match none" against that exact rule. fromEntities is what actually
+# works, and - same shape as every toEntities case in this file - only
+# once unscoped by port; a toPorts restriction on fromEntities failed
+# identically to the egress toEntities+toPorts case, "match none" again,
+# confirmed the same way before removing it.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -208,11 +222,6 @@ spec:
       app.kubernetes.io/name: pod-identity-webhook
   policyTypes: [Ingress]
   ingress:
-    - from:
-        - ipBlock:
-            cidr: 192.168.20.0/24
-      ports:
-        - {protocol: TCP, port: 8443}
     # Prometheus scrapes the metrics port from the monitoring namespace.
     - from:
         - namespaceSelector:
@@ -220,6 +229,18 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - {protocol: TCP, port: 9999}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-webhook-apiserver-ingress
+  namespace: pod-identity-webhook
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: pod-identity-webhook
+  ingress:
+    - fromEntities: [remote-node, host]
 ---
 # The webhook watches ServiceAccounts, so it needs DNS and the API server.
 # It never talks to AWS itself — it only writes env vars and a volume into a
