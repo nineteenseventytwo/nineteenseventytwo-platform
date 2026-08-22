@@ -384,7 +384,43 @@ Cut over in this order; don't delete anything until the replacement rebuilds a n
 
 ---
 
-## 8. Open questions
+## 8. Security hardening backlog
+
+Found during a live security review (2026-08-22) against the real lab cluster,
+not a design read-through — each of these is a confirmed gap, not a
+hypothetical one. None are blocking; all are worth a PR before this stops
+being a lab.
+
+1. **Kubelet-serving CSR auto-approval.** kubeadm clusters don't auto-approve
+   `kubernetes.io/kubelet-serving` CSRs by default — only the client CSR used
+   for apiserver→kubelet auth gets that. A backlog of `Pending` ones was
+   cleared by hand this session to unblock `kubectl logs`/`exec`, but nothing
+   approves the *next* rotation. Recurs silently until something like
+   `postfinance/kubelet-csr-approver` is installed.
+2. **NetworkPolicy coverage gap.** `vault`, `cert-manager`, `external-secrets`,
+   `arc-systems`, `arc-runners` all carry a real PSS tier but no NetworkPolicy
+   — hardened at the pod-spec level, wide open at the network level.
+   `arc-runners` is the sharp edge: `privileged` PSS (dind, by necessity) *and*
+   unrestricted network reach.
+3. **No tenant-scoped RBAC.** §4.4 above already calls for a per-tenant
+   ServiceAccount + namespaced Role as something `platform` owns — it was
+   never built. The only custom RBAC in the cluster today is
+   `pod-identity-webhook`'s own permissions; a tenant's default ServiceAccount
+   and any CI-issued kubeconfig currently have no scoping below cluster-admin.
+4. **etcd encryption key never rotates.** Generated once at `kubeadm init`,
+   write-once by design (re-running the playbook won't touch it), no rotation
+   runbook wired into automation — just a comment saying it belongs on one.
+5. **No image scanning or signing** anywhere in the CI/deploy path. Nothing
+   verifies provenance before an image runs.
+6. **Kubescape and Prowler both still unrun.** Kubescape has been in the
+   build order (§4.2) since the plan was drafted; Prowler has a dormant
+   `enable_prowler_role` Terraform flag in `nineteenseventytwo-cloud`,
+   currently off. Neither has actually been pointed at this cluster/account.
+7. **No apiserver audit logging.** PSS's own `audit` mode logs *policy*
+   violations; there is no `--audit-log-path`/audit policy, so there's no
+   forensic trail of who did what against the API.
+
+## 9. Open questions
 
 1. Are you willing to make `eightbitsaxlounge` private, or do you want the public showcase value? If public, the fork-PR mitigation in §3.5 needs deciding this week, not later.
 2. `1972-console-1` — confirm the RPi 4's EEPROM boot order supports USB SSD before you retire the SD card.
