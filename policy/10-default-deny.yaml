@@ -87,6 +87,18 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
+    # Same-namespace traffic. Argo CD's own components talk to each other
+    # constantly (application-controller -> repo-server, -> redis, -> server)
+    # and none of that is cross-namespace, so it was never covered by the two
+    # selectors above. Missing since this policy was first written - confirmed
+    # live via `cilium monitor --type policy-verdict`: application-controller
+    # -> repo-server:8081 denied with match none the same way as every
+    # apiserver case this week, except this one is a completely ordinary
+    # same-namespace ClusterIP call with no reserved-identity involvement at
+    # all. It surfaced only now because nothing reached this far into Argo
+    # CD's own startup sequence until the apiserver egress fix landed.
+    - from:
+        - podSelector: {}
   egress:
     # DNS
     - to:
@@ -99,6 +111,9 @@ spec:
     # The API server: see allow-argocd-apiserver below (a CiliumNetworkPolicy,
     # not a plain ipBlock here — that does not work for this destination,
     # confirmed live, see the comment there for why).
+    # Same-namespace traffic - see the identical ingress rule above.
+    - to:
+        - podSelector: {}
     # github.com, to read the repo. Egress to the internet is otherwise denied.
     - to:
         - ipBlock:
