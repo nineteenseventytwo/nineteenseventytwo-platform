@@ -5,9 +5,10 @@ hardening_ssh_port: 22
 hardening_ssh_allow_users:
   - "{{ admin_user }}"
 hardening_ssh_ca_key_path: /etc/ssh/ca.pub
-# Flip to true once bootstrap/ssh/ca.pub exists (Phase D). Until then nodes
-# trust authorized_keys only.
-hardening_ssh_trust_ca: false
+# Phase D: nodes trust certificates signed by Vault's ssh-client-signer CA
+# (bootstrap/ssh/ca.pub), in addition to authorized_keys, which is never
+# disabled by this — see bootstrap/ssh/sign.sh and cluster/vault/README.md.
+hardening_ssh_trust_ca: true
 
 # ufw. The firewall between VLANs is OPNsense's job; this is defence in depth
 # on the node itself, and it is what stops a compromised pod from reaching a
