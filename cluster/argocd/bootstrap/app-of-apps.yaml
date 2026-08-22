@@ -30,6 +30,21 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
+      # Every other Application in this repo carries this; platform never
+      # did, and it's why it's the one that couldn't self-heal certain kinds
+      # of drift on its own children. Client-side apply (the default without
+      # this) relies on a 3-way merge against
+      # kubectl.kubernetes.io/last-applied-configuration — confirmed live
+      # that it was leaving a genuine structural difference in place run
+      # after run: pod-identity-webhook's Application missing its
+      # spec.source.directory.recurse: false field entirely, and both it and
+      # longhorn missing their argocd.argoproj.io/tracking-id annotation,
+      # despite the annotation's own embedded last-applied-configuration
+      # blob already showing the correct desired value. Repeated forced
+      # syncs bumped the resource's generation each time without ever
+      # actually closing the gap. Server-side apply doesn't have this
+      # failure mode.
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:
