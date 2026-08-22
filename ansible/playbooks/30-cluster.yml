@@ -151,6 +151,17 @@
     # label the selector was written against. Runs from the control plane
     # because a worker's own kubelet.conf has no permission to label any
     # node, including itself.
+    # node.longhorn.io/create-default-disk: cluster/longhorn/values.yaml sets
+    # defaultSettings.createDefaultDiskLabeledNodes: true - a deliberate
+    # opt-in ("only create a disk on nodes I explicitly say to", rather than
+    # every eligible node automatically) that only does anything once
+    # something actually applies the label it is gated on. Nothing did, so
+    # Longhorn never created a disk on either worker: both Node.longhorn.io
+    # objects showed disks: {} indefinitely, and every PVC sat detached with
+    # "un-schedulable replicas" - there is nowhere for a replica to live
+    # without a disk to put it on. Same root cause class as the role label
+    # above, one field over: a values.yaml decision that assumed a label
+    # some prior step would set, when nothing ever did.
     - name: Label worker nodes
       kubernetes.core.k8s:
         kind: Node
@@ -159,6 +170,7 @@
           metadata:
             labels:
               node-role.kubernetes.io/worker: "true"
+              node.longhorn.io/create-default-disk: "true"
       loop: "{{ groups['workers'] }}"
       become: true
 
