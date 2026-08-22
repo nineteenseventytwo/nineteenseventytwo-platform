@@ -47,8 +47,30 @@ webhooks:
         apiVersions: ["v1"]
         resources: ["pods"]
     sideEffects: None
-    # v1, not upstream's v1beta1. The v1beta1 AdmissionReview was removed in
-    # Kubernetes 1.22; leaving it as upstream ships it means the API server can
-    # negotiate no common version and every call fails — silently, because
-    # failurePolicy is Ignore.
-    admissionReviewVersions: ["v1"]
+    # v1beta1, not v1 — despite v1beta1 being the deprecated one. The webhook
+    # binary (v0.6.17, the latest tag as of this writing) builds its response
+    # as a bare v1beta1.AdmissionReview{} and never sets TypeMeta on it before
+    # writing the HTTP response; grep the vendored source and there is no
+    # APIVersion/Kind assignment anywhere in its Handle func. A v1-negotiated
+    # apiserver strictly requires the response to declare
+    # apiVersion: admission.k8s.io/v1, kind: AdmissionReview and rejects a
+    # response missing them — confirmed live on this cluster's 1.36 apiserver:
+    # "failed calling webhook ...: received invalid webhook response: expected
+    # webhook response of admission.k8s.io/v1, Kind=AdmissionReview, got /,
+    # Kind=", every single time, for every real admission call. Because
+    # failurePolicy is Ignore, this fails silently — pods start with no AWS
+    # credentials and the symptom is Vault refusing to unseal, with nothing in
+    # the pod's own events to explain it. This is a known, still-open upstream
+    # bug (aws/amazon-eks-pod-identity-webhook#225) with no fix released.
+    #
+    # v1beta1 AdmissionReview, despite the API being long deprecated as a
+    # served resource, is still accepted by the apiserver as an admission
+    # webhook wire format — confirmed live on 1.36: negotiating v1beta1 alone
+    # gets a clean response and the correct AWS_ROLE_ARN /
+    # AWS_WEB_IDENTITY_TOKEN_FILE injection, no apiserver error. v1 is
+    # deliberately not listed as a fallback: it is not a safety net here, only
+    # a silent way back into this exact bug if v1beta1 is ever unsupported by
+    # a future apiserver, worse for being intermittent across upgrades rather
+    # than an outright negotiation failure at admission-webhook-registration
+    # time.
+    admissionReviewVersions: ["v1beta1"]
