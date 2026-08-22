@@ -83,6 +83,23 @@
         proto: tcp
         comment: "ssh from VLAN 10"
 
+    # make publish-oidc, make kubeconfig's own kubectl smoke-checks, and
+    # anything else run directly on the workstation (as opposed to via the
+    # containerized ansible-runner, which reaches the API server over SSH from
+    # inside the lab subnet and never needed this) talk to the apiserver
+    # straight from VLAN 10. Scoped to just this one port rather than folded
+    # into hardening_ufw_cluster_rules/_sources, which would also open etcd,
+    # kubelet, and the whole Cilium mesh to the workstation for no reason —
+    # none of those are ever dialled from outside the lab subnet.
+    - name: Allow the workstation to reach the apiserver directly
+      community.general.ufw:
+        rule: allow
+        src: "{{ workstation_subnet }}"
+        port: "6443"
+        proto: tcp
+        comment: "kube-apiserver from VLAN 10"
+      when: kubelet_node | default(false)
+
     - name: Allow SSH from the console node
       community.general.ufw:
         rule: allow
