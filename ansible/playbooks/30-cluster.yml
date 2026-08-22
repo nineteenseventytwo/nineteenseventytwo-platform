@@ -139,6 +139,29 @@
       delay: 10
       become: true
 
+    # kubeadm labels the control-plane node with node-role.kubernetes.io/
+    # control-plane automatically; it has never done the same for workers -
+    # that label is a convention every consumer downstream is free to assume
+    # but nothing upstream actually sets. cluster/longhorn/values.yaml's
+    # systemManagedComponentsNodeSelector already assumed it existed, which
+    # left every Longhorn CSI sidecar (attacher, provisioner, resizer,
+    # snapshotter) permanently Pending - "0/3 nodes are available: 1 node(s)
+    # had untolerated taint(s), 2 node(s) didn't match Pod's node affinity"
+    # - since the two nodes that could otherwise take them never carried the
+    # label the selector was written against. Runs from the control plane
+    # because a worker's own kubelet.conf has no permission to label any
+    # node, including itself.
+    - name: Label worker nodes
+      kubernetes.core.k8s:
+        kind: Node
+        name: "{{ item }}"
+        definition:
+          metadata:
+            labels:
+              node-role.kubernetes.io/worker: "true"
+      loop: "{{ groups['workers'] }}"
+      become: true
+
     # kubernetes.core.k8s also runs on the remote host — same story as the
     # Cilium values file two plays back. query('fileglob') is a lookup plugin
     # and always evaluates on the control node (nothing makes a lookup run
