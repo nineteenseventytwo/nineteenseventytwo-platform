@@ -118,3 +118,22 @@ metadata:
     # separate scale set scaled to zero, and why almost nothing should use it.
     pod-security.kubernetes.io/enforce: privileged
     platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-exporter-system
+  labels:
+    # node-exporter reads /proc, /sys and the root filesystem from the host
+    # and binds hostPort 9100 on hostNetwork — genuinely privileged, the same
+    # class of thing as longhorn-system's block-device mounts above. Split
+    # into its own namespace (the monitoring release's default) rather than
+    # raising all of monitoring to privileged, so Grafana/Prometheus/
+    # Alertmanager/kube-state-metrics keep baseline enforcement. Wired up via
+    # prometheus-node-exporter.namespaceOverride in cluster/monitoring/
+    # values.yaml. Confirmed live: without this the DaemonSet's pods were
+    # rejected outright — "violates PodSecurity baseline:latest: host
+    # namespaces, hostPath volumes, hostPort" — zero node-exporter pods ever
+    # scheduled, on any node, from first sync.
+    pod-security.kubernetes.io/enforce: privileged
+    platform.nineteenseventytwo/tier: infra
