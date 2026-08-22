@@ -92,9 +92,20 @@ CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-e ANSIBLE_CONFIG=/work/ansible/ansible.cfg \
 	$(ANSIBLE_RUNNER)
 
+# abspath, not $(KUBECONFIG) directly: docker/podman's -v only treats a source
+# starting with / as a bind mount. Anything else — including a perfectly valid
+# relative path like the one `make kubeconfig` itself writes to
+# (./build/kubeconfig, per docs/03-cluster.md) — it reads as a *named volume*
+# to create, and named volume names can't contain /, so this fails with
+# "names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*" rather than anything that
+# reads like a path problem. The default below is already absolute
+# ($(HOME)/... or $(RUNNER_TEMP)/...), which is why this never surfaced until
+# someone reasonably overrode it with the relative path the docs themselves
+# print. abspath is a no-op on an already-absolute path, so this is safe
+# either way.
 CONTAINER_RUN_KUBE = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
-	-v $(KUBECONFIG):/home/ansible/.kube/config:ro \
+	-v $(abspath $(KUBECONFIG)):/home/ansible/.kube/config:ro \
 	$(ANSIBLE_RUNNER)
 
 # Linting reads files and nothing else — no key, no kubeconfig, no network.
