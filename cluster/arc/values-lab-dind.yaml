@@ -11,6 +11,12 @@
 githubConfigUrl: "https://github.com/nineteenseventytwo"
 githubConfigSecret: arc-github-app
 
+# See values-lab-deploy.yaml — the chart's lookup-based auto-discovery of
+# the controller's ServiceAccount failed against Argo CD's repo-server.
+controllerServiceAccount:
+  name: arc-controller-gha-rs-controller
+  namespace: arc-systems
+
 minRunners: 0
 maxRunners: 1
 
