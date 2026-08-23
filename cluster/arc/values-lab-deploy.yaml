@@ -10,6 +10,16 @@
 githubConfigUrl: "https://github.com/nineteenseventytwo"
 githubConfigSecret: arc-github-app
 
+# The chart's own lookup-based auto-discovery (matching a Deployment by
+# app.kubernetes.io/part-of=gha-rs-controller) failed against Argo CD's
+# repo-server — confirmed live, reproducible across repeated hard-refreshes,
+# not a stale cache. Set explicitly rather than granting repo-server
+# broader list RBAC just for this. Matches 80-arc-controller.yaml's
+# releaseName (arc-controller) + the chart's fixed SA-name suffix.
+controllerServiceAccount:
+  name: arc-controller-gha-rs-controller
+  namespace: arc-systems
+
 # Scale to zero when idle. On three 2 GB nodes, an idle runner is memory you
 # do not have.
 minRunners: 0
