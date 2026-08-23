@@ -62,7 +62,48 @@ vault write auth/kubernetes/role/external-secrets \
 
 # 4. KV v2 mount, then load the bootstrap secrets from SOPS.
 vault secrets enable -path=kv -version=2 kv
+```
 
+Decrypt the SOPS file on your workstation first — this shell has no sops/age,
+and shouldn't:
+
+```bash
+sops -d ansible/inventory/lab/group_vars/all/secrets.sops.yml
+```
+
+Then, back inside the vault pod shell, paste the decrypted values into the
+three loads below. Every path and property name here is pinned by an
+`ExternalSecret`'s `remoteRef` (`cluster/*/externalsecret-*.yaml`) — if you
+rename a key on either side without the other, ESO's error just says the
+property wasn't found, not which of the two moved. There is no command that
+does this load for you; that gap is exactly what let `cloudflare_api_token`
+ship to Vault as the SOPS example file's literal `"..."` placeholder on the
+first rebuild of this cluster — the KV mount succeeded, so nothing looked
+unfinished, and cert-manager only exposed it 20 hours later, as a Cloudflare
+API rejection with no obvious connection back to this step.
+
+```bash
+vault kv put kv/platform/github-app \
+  app_id="<github_app_id>" \
+  installation_id="<github_app_installation_id>" \
+  private_key="<github_app_private_key>"
+
+vault kv put kv/platform/cloudflare \
+  api_token="<cloudflare_api_token>"
+```
+
+Grafana's admin credentials are Tier-2-native — generated here, not carried
+through SOPS, since nothing before Vault exists needs them:
+
+```bash
+vault kv put kv/platform/grafana \
+  admin-user="admin" \
+  admin-password="$(openssl rand -base64 24)"
+```
+
+Back in the same vault pod shell from step 4:
+
+```bash
 # 5. SSH CA (Tier 3).
 vault secrets enable -path=ssh-client-signer ssh
 vault write ssh-client-signer/config/ca generate_signing_key=true
