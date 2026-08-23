@@ -74,7 +74,13 @@ server:
     hostname: "argocd.eightbitsaxlounge.com"   # tracks lab_domain
     tls: true
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
+      # TEMP: staging, not prod — see docs/plan/05-provisioning-completion-plan.md
+      # WP-1.2. The Cloudflare DNS-01 token is malformed and the three certs
+      # here were retrying against LE prod every few minutes for 20h+, eating
+      # into the weekly failed-validation limit. Flip back once staging issues
+      # cleanly with a working token — 04-secrets.md says do this in this
+      # order and it was skipped the first time.
+      cert-manager.io/cluster-issuer: letsencrypt-staging
 
 applicationSet:
   replicas: 1
