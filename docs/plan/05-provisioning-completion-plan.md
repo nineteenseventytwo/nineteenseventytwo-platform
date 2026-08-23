@@ -237,15 +237,29 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
 `true`, `bootstrap/ssh/ca.pub` is populated, and `1972-master-1` already has
 `TrustedUserCAKeys /etc/ssh/ca.pub`.
 
-- [ ] Confirm all four nodes have the CA and that the deployed file matches the
-      repo's `ca.pub` byte for byte
-- [ ] Exercise `bootstrap/ssh/sign.sh 192.168.20.202` — a real 5-minute
-      certificate login, not a key login that happens to still work
-- [ ] Confirm the break-glass static key on `1972-console-1` is present, offline,
-      and documented
+- [x] Confirm all four nodes have the CA and that the deployed file matches the
+      repo's `ca.pub` byte for byte — confirmed 2026-08-23, all four
+- [x] Exercise `bootstrap/ssh/sign.sh 192.168.20.202` — a real 5-minute
+      certificate login, not a key login that happens to still work —
+      confirmed 2026-08-23 with the initial root token (see 3.3's new item on
+      that — no scoped signing policy exists yet)
+- [x] Confirm the break-glass static key on `1972-console-1` is present, offline,
+      and documented — confirmed 2026-08-23: passphrase-protected (verified it
+      rejects a wrong/empty passphrase), `bootstrap/ssh/break-glass.pub`
+      committed and matches console's live `authorized_keys` byte-for-byte,
+      private key removed from the workstation
 - [ ] **Then** retire `ansible-console` and `ansible-workstation` from
       `authorized_keys` — this is the step that makes Tier 3 real rather than
-      additive, and the secret inventory already marks both "retired at Phase D"
+      additive, and the secret inventory already marks both "retired at Phase D".
+      Tooling for this landed in PR #47 (`hardening_ssh_retire_legacy_keys`),
+      defaulted off; flipping it is the one step left
+- [ ] **Found while testing sign.sh, unrelated to it**: none of
+      `argocd.`/`vault.`/`grafana.eightbitsaxlounge.com` resolve from a
+      workstation on VLAN 10, despite `01-network-validation.md` explicitly
+      calling for Unbound host overrides for all three. Real OPNsense config
+      gap — every live test this session against these hostnames used either
+      `curl --resolve` or a `/etc/hosts` override to work around it. Affects
+      normal browser access to all three UIs, not just CLI tooling
 
 ### 3.2 TLS (Tier 4) — follows WP-1.2
 
@@ -267,6 +281,16 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       role — a role with no consumer is a standing grant that nothing tests
 - [ ] Confirm the only remaining GitHub secrets are `SOPS_AGE_KEY` and the
       GitHub App key
+- [ ] **Write a scoped Vault policy for SSH signing.** Found 2026-08-23,
+      confirming `bootstrap/ssh/sign.sh` for real: `vault policy list` shows
+      only `default`, `external-secrets`, and `root` — no policy was ever
+      created for the human's day-to-day `ssh-client-signer/sign/admin`
+      calls, so the initial root token is currently the *only* credential
+      that can run `sign.sh` at all. Works for testing, but "use root to
+      SSH in" defeats some of the point of Vault-issued certs. Add something
+      like `path "ssh-client-signer/sign/admin" { capabilities = ["create",
+      "update"] }`, attached to a real auth method (Vault's `userpass`, not
+      another static token) rather than a second token to manage
 
 ---
 

@@ -23,6 +23,35 @@
   when: hardening_ssh_trust_ca | bool
   notify: Restart sshd
 
+# Split into two tasks rather than one authorized_key call with an
+# empty-string key: that module's key parameter expects one or more
+# actual keys, and this is deliberately not the place to find out by trial
+# and error what it does with "" against a real node. copy with empty
+# content is unambiguous for the empty case; authorized_key's own
+# exclusive: true is what reconciles the non-empty (console/break-glass)
+# case, removing anything not listed.
+- name: Empty authorized_keys where no key survives the cutover
+  ansible.builtin.copy:
+    dest: "/home/{{ admin_user }}/.ssh/authorized_keys"
+    content: ""
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+  become: true
+  when:
+    - hardening_ssh_retire_legacy_keys | bool
+    - hardening_ssh_authorized_keys | length == 0
+
+- name: Reconcile authorized_keys to exactly the surviving key(s)
+  ansible.posix.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ hardening_ssh_authorized_keys | join('\n') }}"
+    exclusive: true
+  become: true
+  when:
+    - hardening_ssh_retire_legacy_keys | bool
+    - hardening_ssh_authorized_keys | length > 0
+
 - name: Apply sysctl hardening
   ansible.posix.sysctl:
     name: "{{ item.key }}"

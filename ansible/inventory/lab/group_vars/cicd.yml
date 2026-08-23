@@ -19,3 +19,22 @@ runner_host_user: "github-runner"
 hardening_ufw_allow_docker_bridge_ssh: true
 
 console_memory_guard_mb: 2048
+
+# The one key that survives the Phase D cutover — see the hardening role's
+# defaults for what hardening_ssh_retire_legacy_keys actually does.
+#
+# errors='ignore' is load-bearing, not decoration: this group_var is read on
+# every playbook run against console regardless of hardening_ssh_retire_
+# legacy_keys, since Ansible has no way to know a `when:` will short-circuit
+# without evaluating what it's short-circuiting past first in every case that
+# matters here. A plain lookup() would hard-fail make test-nodes and every
+# other console run the moment this file merged, well before anyone has
+# generated a break-glass key. With errors='ignore' this resolves to an empty
+# list until bootstrap/ssh/break-glass.pub exists — which importantly means
+# flipping hardening_ssh_retire_legacy_keys to true with that file still
+# absent empties console's authorized_keys too, same as every other node.
+# Verify the file is there and its content is right — cat it, do not trust
+# this comment — before that flag ever goes to true.
+hardening_ssh_authorized_keys: >-
+  {{ [lookup('file', playbook_dir + '/../../bootstrap/ssh/break-glass.pub', errors='ignore')]
+     | select('string') | reject('equalto', '') | list }}
