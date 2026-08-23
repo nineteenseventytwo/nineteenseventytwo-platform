@@ -4,6 +4,9 @@ name: _netpol-test-throwaway
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: lab-deploy
