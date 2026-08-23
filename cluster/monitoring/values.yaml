@@ -64,10 +64,7 @@ grafana:
     enabled: true
     ingressClassName: nginx
     annotations:
-      # TEMP: staging, not prod — see docs/plan/05-provisioning-completion-plan.md
-      # WP-1.2. Flip back once staging issues cleanly with a working
-      # Cloudflare token.
-      cert-manager.io/cluster-issuer: letsencrypt-staging
+      cert-manager.io/cluster-issuer: letsencrypt-prod
     hosts: ["grafana.eightbitsaxlounge.com"]   # tracks lab_domain
     tls:
       - secretName: grafana-tls

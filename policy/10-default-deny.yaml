@@ -522,3 +522,27 @@ spec:
   endpointSelector: {}
   ingress:
     - fromEntities: [remote-node, host]
+---
+# cert-manager's own DNS-01 propagation self-check bypasses in-cluster CoreDNS
+# entirely — cluster/cert-manager/values.yaml pins
+# dns01RecursiveNameservers: "1.1.1.1:53,9.9.9.9:53" with
+# dns01RecursiveNameserversOnly: true, so allow-cert-manager's DNS rule
+# (scoped to kube-system) never covers this. Live-verified: challenges sat on
+# "Waiting for DNS-01 challenge propagation: dial tcp 9.9.9.9:53: i/o
+# timeout" until this rule landed, then went valid within seconds of a fresh
+# challenge (cert-manager backs off retries on repeated failure, so a stuck
+# Challenge can take a while to notice a fix — delete it to force a fresh
+# attempt rather than assuming the fix didn't work).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-cert-manager-dns01-recursive
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDR: ["1.1.1.1/32", "9.9.9.9/32"]
+      toPorts:
+        - ports:
+            - {port: "53", protocol: UDP}
+            - {port: "53", protocol: TCP}
