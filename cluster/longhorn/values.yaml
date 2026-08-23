@@ -36,13 +36,18 @@ defaultSettings:
   concurrentAutomaticEngineUpgradePerNodeLimit: 1
   guaranteedInstanceManagerCPU: 10
 
-# Volume backups to S3, with no credential.
+# Volume backups to S3, via IRSA — not the AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY pair Longhorn's S3 docs lead with.
 #
-# Longhorn's usual S3 path wants a Secret holding AWS_ACCESS_KEY_ID and
-# AWS_SECRET_ACCESS_KEY. There is deliberately no such Secret here:
-# backupTargetCredentialSecret stays empty, the pod-identity-webhook injects a
-# role and a projected token from the serviceAccount annotation below, and the
-# AWS SDK inside longhorn-manager picks them up on its own.
+# backupTargetCredentialSecret cannot be empty: confirmed live, Longhorn's
+# backup-target client refuses an S3 target outright ("could not access s3
+# without credential secret") even once the pod-identity-webhook has injected
+# AWS_ROLE_ARN / AWS_WEB_IDENTITY_TOKEN_FILE into the manager pod's own env —
+# that env is not enough on its own. secret-backup-credential.yaml carries a
+# single AWS_IAM_ROLE_ARN key, which is what tells this specific client path
+# to use IRSA (longhorn/longhorn#1526) instead of demanding a real key pair.
+# It is not a credential — the same role ARN is already committed below and
+# in nineteenseventytwo-cloud's trust policy.
 #
 # The bucket, its lifecycle rules and the role are in nineteenseventytwo-cloud
 # (live/aws/platform-prod). Backups are the one line item in the cost model
@@ -50,7 +55,7 @@ defaultSettings:
 # left on hourly will still find that out for you.
 defaultBackupStore:
   backupTarget: "s3://nineteenseventytwo-longhorn-backups-972034964468@eu-west-2/"
-  backupTargetCredentialSecret: ""
+  backupTargetCredentialSecret: "longhorn-backup-credential"
   pollInterval: 300
 
 longhornManager:

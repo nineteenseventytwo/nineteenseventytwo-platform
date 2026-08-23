@@ -90,7 +90,10 @@ server:
     enabled: true
     ingressClassName: nginx
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
+      # TEMP: staging, not prod — see docs/plan/05-provisioning-completion-plan.md
+      # WP-1.2. Flip back once staging issues cleanly with a working
+      # Cloudflare token.
+      cert-manager.io/cluster-issuer: letsencrypt-staging
     hosts:
       - host: "vault.eightbitsaxlounge.com"   # tracks lab_domain
     tls:
