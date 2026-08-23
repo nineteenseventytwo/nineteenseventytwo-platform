@@ -8,6 +8,7 @@ commit a private key.
 |---|---|
 | `mark-workstation.pub` | Your workstation public key. Rendered into every node's cloud-init. **You must add this before the first `make bootstrap-render`.** |
 | `ca.pub` | Vault SSH CA public key, added in Phase D. Ansible's `hardening` role drops it at `/etc/ssh/ca.pub` and sets `TrustedUserCAKeys`. |
+| `break-glass.pub` | The one key that survives the Phase D cutover. Public half only — the private key is generated once, added to `1972-console-1`'s `authorized_keys` here, and then kept **offline**, never on this machine or any node. Absent by design until you're actually ready for cutover; `hardening_ssh_retire_legacy_keys` (`ansible/roles/hardening/defaults/main.yml`) is inert without it. |
 
 ## Phase A — keys
 
