@@ -284,3 +284,241 @@ spec:
       app.kubernetes.io/name: pod-identity-webhook
   egress:
     - toEntities: [kube-apiserver]
+---
+# Nothing should ever run in default — no allow-pair, on purpose.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23): ingress from ingress-nginx (the vault UI/API
+# route — TCP handshake confirmed through this rule, TLS itself fails for the
+# unrelated reason tracked as WP-1.2), external-secrets (ESO's Kubernetes-auth
+# reads — confirmed via clean ESO logs and a successful ExternalSecret
+# resync), and monitoring; same-namespace traffic (there is only one pod
+# today, but Vault HA would add raft peers); egress to AWS STS/KMS on 443
+# (confirmed with a real HTTP 403 from sts.eu-west-2.amazonaws.com — a packet
+# that reached AWS and got an application-level response, not a network
+# timeout).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vault
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-secrets
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+# Reserved-identity apiserver egress — same pattern and same caveats as
+# allow-argocd-apiserver in this file: toEntities, unscoped by port. Vault's
+# Kubernetes auth backend calls TokenReview against the apiserver whenever
+# ESO or a workload authenticates.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-vault-apiserver
+  namespace: vault
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23): egress to vault:8200 (clean ESO logs, no
+# dial/timeout errors, after a full pod restart forced a fresh connection);
+# apiserver egress (ESO watches ExternalSecret/SecretStore CRDs); same-
+# namespace traffic; ingress from monitoring (metrics scrape).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-secrets
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+      ports:
+        - {protocol: TCP, port: 8200}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-external-secrets-apiserver
+  namespace: external-secrets
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+# externalsecret-validate / secretstore-validate: the apiserver calls this
+# webhook on every ExternalSecret/SecretStore write, from a node's host IP —
+# same reserved-identity ingress shape as pod-identity-webhook's own rule in
+# this file. Live-verified: a throwaway SecretStore was accepted cleanly
+# through this rule.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-external-secrets-webhook-ingress
+  namespace: external-secrets
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [remote-node, host]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23): a throwaway Certificate against the
+# internal-ca ClusterIssuer went Ready in under 8 seconds through this rule —
+# a full round trip through the admission webhook, the apiserver, and the
+# in-cluster signer. Internet egress on 443 (ACME + the Cloudflare API) is
+# the same proven ipBlock-except shape as allow-argocd's own internet rule;
+# not independently live-tested here since the Cloudflare token itself is
+# broken (WP-1.2) — the request already reaches Cloudflare and gets a real
+# API-level rejection, not a network timeout, which is what this rule needs
+# to be true for the token fix to matter at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cert-manager
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-cert-manager-apiserver
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+# cert-manager-webhook: same reserved-identity admission-call shape as every
+# other webhook rule in this file. Live-verified: the throwaway Certificate
+# above only got created because this rule let the admission call through.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-cert-manager-webhook-ingress
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [remote-node, host]
