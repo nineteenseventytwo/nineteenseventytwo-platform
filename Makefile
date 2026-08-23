@@ -231,6 +231,10 @@ test-network: ## Run the VLAN 20 validation matrix (docs/01-network-validation.m
 test-nodes: ## Assert every node matches the hardened baseline
 	$(PLAYBOOK) ansible/playbooks/site.yml --check --diff
 
+.PHONY: verify-default-deny
+verify-default-deny: ## Assert every namespace has default-deny-all or is on the documented exemption list
+	tests/verify-default-deny.sh
+
 # --------------------------------------------------------------------------
 # Phase B — nodes and CI/CD
 # --------------------------------------------------------------------------

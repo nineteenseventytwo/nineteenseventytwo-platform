@@ -38,6 +38,19 @@ goss -g tests/goss/node.yaml validate --format documentation
 `memory-cgroups-enabled` will fail on `1972-console-1`, correctly — it is not a
 cluster node and does not need memory cgroups.
 
+## verify-default-deny.sh
+
+Asserts every namespace has a `default-deny-all` NetworkPolicy or is on the
+explicit exemption list at the top of `policy/10-default-deny.yaml`. Exists
+because "default-deny in every namespace" was true of the README, not the
+cluster, for months — this makes it a check instead of a claim.
+
+```bash
+make verify-default-deny
+```
+
+Exit code is the count of uncovered, unexempted namespaces.
+
 ## What is deliberately not tested here
 
 Cluster conformance and CIS benchmarking. Run Kubescape against the **empty**
