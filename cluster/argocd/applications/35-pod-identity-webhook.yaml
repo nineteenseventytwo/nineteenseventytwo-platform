@@ -24,8 +24,6 @@ spec:
     repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
     targetRevision: main
     path: cluster/pod-identity-webhook
-    directory:
-      recurse: false
   syncPolicy:
     automated: {prune: true, selfHeal: true}
     syncOptions:

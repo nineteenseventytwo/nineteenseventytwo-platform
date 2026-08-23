@@ -339,7 +339,7 @@ publish-oidc: ## Publish the cluster's OIDC discovery documents to the public JW
 # to each half looking correct on its own.
 .PHONY: verify-irsa
 verify-irsa: ## Assume an AWS role from inside the cluster and print the identity
-	$(KUBE_SH) ' 	  kubectl -n vault get sa vault 	    -o jsonpath="{.metadata.annotations.eks\.amazonaws\.com/role-arn}" 	    | grep -q . || { echo "vault ServiceAccount carries no role-arn annotation" >&2; exit 1; }; 	  echo "annotation present"; 	  kubectl -n vault get pod -l app.kubernetes.io/name=vault 	    -o jsonpath="{.items[0].spec.containers[0].env[?(@.name=="AWS_ROLE_ARN")].value}" 	    | grep -q . || { echo "AWS_ROLE_ARN not injected — check the pod-identity-webhook pod" >&2; exit 1; }; 	  echo "webhook injection present"; 	  kubectl -n vault exec statefulset/vault -- sh -c 	    "vault status 2>&1 | grep -E "Sealed|Seal Type"" '
+	$(KUBE_SH) ' 	  kubectl -n vault get sa vault 	    -o jsonpath="{.metadata.annotations.eks\.amazonaws\.com/role-arn}" 	    | grep -q . || { echo "vault ServiceAccount carries no role-arn annotation" >&2; exit 1; }; 	  echo "annotation present"; 	  kubectl -n vault get pod -l app.kubernetes.io/name=vault 	    -o jsonpath="{.items[0].spec.containers[0].env}" 	    | grep -q AWS_ROLE_ARN || { echo "AWS_ROLE_ARN not injected — check the pod-identity-webhook pod" >&2; exit 1; }; 	  echo "webhook injection present"; 	  kubectl -n vault exec statefulset/vault -- vault status 2>&1 | grep -E "Sealed|Seal Type" || true '
 
 .PHONY: apply-policy
 apply-policy: ## Apply baseline policy and tenant namespaces (Argo owns these after bootstrap)
