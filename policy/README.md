@@ -7,7 +7,7 @@ Cluster-scoped guardrails. Applied once by `ansible/playbooks/30-cluster.yml`
 | File | What it enforces |
 |---|---|
 | `00-namespaces.yaml` | Infra namespaces with their Pod Security Standards labels |
-| `10-default-deny.yaml` | Default-deny ingress + egress in every namespace, with the DNS exception |
+| `10-default-deny.yaml` | Default-deny ingress + egress in every namespace that carries workloads, with the DNS exception. Exemptions (CNI/DNS-critical namespaces, and hostNetwork-only ones where standard NetworkPolicy isn't enforced) are documented at the top of the file. |
 | `20-limitrange-default.yaml` | A default request/limit so an unspecified pod cannot claim a whole node |
 | `tenants/*.yaml` | Per-app namespace + ResourceQuota + LimitRange + ServiceAccount + Role |
 

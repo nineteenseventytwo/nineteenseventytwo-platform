@@ -9,6 +9,22 @@
 # Note the layer this operates at. Pod-to-pod traffic between two nodes on
 # VLAN 20 is switch-local — OPNsense never sees it, so inter-workload isolation
 # is a NetworkPolicy problem and cannot be solved at the firewall.
+#
+# Five namespaces are deliberately not covered below, not missed:
+#   - kube-system, cilium-secrets, kube-node-lease, kube-public: no workloads
+#     this cluster's threat model treats as tenant-adjacent, and kube-system
+#     specifically is where CoreDNS and the CNI itself live — a wrong rule
+#     here takes the cluster down and Argo CD with it before anything could
+#     fix it.
+#   - node-exporter-system: every pod is hostNetwork: true by construction.
+#     Confirmed live (2026-08-23): a deny-all ingress policy applied to this
+#     namespace left an already-working Prometheus scrape target completely
+#     unaffected — standard NetworkPolicy does not govern host-networked
+#     traffic at all in this cluster. See that namespace's own section below
+#     for the full test and what it also turned up.
+# Every other namespace below was live-verified before landing, not written
+# by pattern-matching alone — see each section's own comment for what was
+# actually tested.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -546,3 +562,408 @@ spec:
         - ports:
             - {port: "53", protocol: UDP}
             - {port: "53", protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ingress-nginx
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23): all three existing ingress routes (argocd,
+# grafana, vault) returned real HTTP responses through this rule, and the
+# ingress-nginx-controller-admission webhook accepted a throwaway Ingress.
+# Ingress on 80/443 is intentionally open — externalTrafficPolicy: Local means
+# no SNAT, so the source seen here is the real client (same-VLAN or
+# cross-VLAN-via-OPNsense); OPNsense is the actual access-control point for
+# this namespace, same reasoning as the internet-egress rules elsewhere in
+# this file. Egress uses the same unscoped namespaceSelector: {} shape as
+# allow-prometheus-scrape-egress in this file, and for the same reason: the
+# backend set changes every time an Ingress lands in a new namespace, most
+# concretely the apps/ migration this repo hasn't started yet.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-nginx
+  namespace: ingress-nginx
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: []
+      ports:
+        - {protocol: TCP, port: 80}
+        - {protocol: TCP, port: 443}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 10254}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector: {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-nginx-apiserver
+  namespace: ingress-nginx
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-nginx-webhook-ingress
+  namespace: ingress-nginx
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [remote-node, host]
+---
+# Found while live-verifying allow-ingress-nginx above: grafana has never had
+# an ingress-allow rule in this namespace's default-deny — confirmed via a
+# 504 from the ingress route and a direct connect-timeout from inside
+# ingress-nginx-controller to monitoring-grafana.monitoring.svc, neither of
+# which is explained by anything added today. Pre-existing gap, independent
+# of this change; fixed here because it blocked verifying the rule above.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - {protocol: TCP, port: 3000}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: longhorn-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23), carefully — this namespace holds every PVC in
+# the cluster including Vault's own storage, so a wrong rule here risks a
+# circular outage. All 5 volumes stayed attached/healthy throughout, no
+# CSI/instance-manager pod restarted, longhorn-manager logs carried no new
+# errors, the admission webhook accepted a live annotate round-trip on a real
+# Volume CR, and the longhorn-ui route returned a real response through
+# ingress-nginx. Same-namespace allow covers the CSI sidecars (which talk to
+# their driver over a shared unix socket, not this policy, but still need
+# in-namespace reach for engine/replica and instance-manager traffic) and the
+# manager-to-manager/replica data path. Egress on 443 is the S3 backup path
+# from WP-1.3 — BackupTarget flipped to AVAILABLE=true the moment this rule
+# landed, closing that item out entirely.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-longhorn
+  namespace: longhorn-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - {protocol: TCP, port: 8000}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-longhorn-apiserver
+  namespace: longhorn-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-longhorn-webhook-ingress
+  namespace: longhorn-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [remote-node, host]
+---
+# metallb-controller is the only pod in this namespace standard NetworkPolicy
+# actually reaches — frr-k8s, its webhook sidecar, speaker, and the
+# statuscleaner are all hostNetwork: true, and Kubernetes NetworkPolicy does
+# not govern host-networked traffic at all. Confirmed live in this cluster
+# (2026-08-23), not assumed: a deny-all ingress policy applied to
+# node-exporter-system — 100% hostNetwork, see the note in that namespace's
+# section — left an already-working Prometheus scrape target completely
+# unaffected. default-deny-all below is still namespace-wide for consistency
+# with every other section in this file, but only allow-metallb-controller
+# does anything real; the hostNetwork components are ungoverned by design,
+# not by omission — OPNsense/VLAN 20 is the actual boundary for them, same as
+# the node-exporter-system note below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: metallb-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Live-verified (2026-08-23): the ingress-nginx LoadBalancer kept its IP and
+# real HTTPS traffic (192.168.20.240) kept flowing throughout, the controller
+# pod stayed healthy, and the metallb-webhook-configuration admission path
+# accepted a live annotate round-trip on the real IPAddressPool CR.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metallb-controller
+  namespace: metallb-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 9120}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-metallb-controller-apiserver
+  namespace: metallb-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-metallb-controller-webhook-ingress
+  namespace: metallb-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  ingress:
+    - fromEntities: [remote-node, host]
+---
+# node-exporter-system: deliberately no NetworkPolicy. Every pod here is
+# hostNetwork: true by construction (node-exporter reads /proc and /sys from
+# the host and binds a hostPort — see the pod-security rationale for this
+# same namespace in 00-namespaces.yaml). Confirmed live (2026-08-23):
+# applying a deny-all ingress policy left a working Prometheus scrape target
+# completely unaffected, before-and-after identical. Standard NetworkPolicy
+# does not reach host-networked traffic at all — writing a rule here would
+# be theater, implying protection this mechanism cannot provide, and see
+# metallb-system's identical situation above. OPNsense / VLAN 20 firewall
+# rules are the real boundary for this traffic, not this file.
+#
+# Found while running that test, unrelated to it: two of the three
+# node-exporter scrape targets (both workers, including same-node scraping
+# on the node Prometheus itself runs on) are already down with "context
+# deadline exceeded" — pre-existing, present before this file touched this
+# namespace at all, and not explained by any NetworkPolicy since none
+# existed here beforehand either. Master's target is up. Smells like a
+# host-level (UFW) firewall difference between control-plane and worker
+# inventory groups, not anything in cluster/ or policy/ — needs its own
+# investigation in ansible/roles/hardening, out of scope here.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: arc-systems
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# The scale-set listeners (long-poll GitHub for queued jobs) and the
+# controller-manager both live here, not in arc-runners — ephemeral runner
+# pods only land in arc-runners once a job is actually queued, and none was
+# at the time this was written. Live-verified (2026-08-23): the listener's
+# "Getting next message" poll loop against GitHub kept running cleanly
+# through this rule with no gap or reconnect, confirmed with a fresh log line
+# well after the policy landed, not just an absence-of-error check.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-arc-systems
+  namespace: arc-systems
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-arc-systems-apiserver
+  namespace: arc-systems
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: arc-runners
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Ephemeral runner pods only exist here while a job is queued or running, so
+# this rule was tested with a real one: a throwaway workflow_dispatch job
+# against the lab-deploy scale set, merged briefly to main to make it
+# dispatchable, then removed. The runner pod connected to
+# broker.actions.githubusercontent.com over HTTPS and got a real GitHub
+# API-level response back — "HTTP Status: Forbidden", "Runner version
+# v2.331.0 is deprecated" — through this rule. That's the same class of
+# proof as vault's STS 403 elsewhere in this file: a packet that reached its
+# destination and got an application response, not a network timeout. The
+# runner image version itself was the actual, unrelated bug (bumped
+# separately, see cluster/arc/values-lab-*.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-arc-runners
+  namespace: arc-runners
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-arc-runners-apiserver
+  namespace: arc-runners
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]
