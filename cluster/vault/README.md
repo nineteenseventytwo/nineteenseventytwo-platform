@@ -124,6 +124,56 @@ vault read -field=public_key ssh-client-signer/config/ca
 Put that last public key at `bootstrap/ssh/ca.pub`, set
 `hardening_ssh_trust_ca: true`, and re-run `make deploy-nodes`.
 
+```bash
+# 6. AppRole for CI's SSH signing (Phase D automation). CI (deploy-nodes.yml,
+# deploy-cluster.yml) runs from 1972-console-1, deliberately outside the
+# cluster (ADR-0007) — Kubernetes auth, what ESO uses, only works for a pod
+# in *this* cluster, so it's the wrong tool here. AppRole is what Vault's own
+# docs recommend for exactly this: a trusted, non-human, non-Kubernetes
+# client. secret_id_bound_cidrs pins it to console's own static address, so a
+# copy of this credential is useless from anywhere else.
+vault auth enable approle
+
+vault policy write ci-ssh-signer - <<'POLICY'
+path "ssh-client-signer/sign/admin" { capabilities = ["create", "update"] }
+POLICY
+
+vault write auth/approle/role/ci-ssh-signer \
+  token_policies="ci-ssh-signer" \
+  token_ttl=5m \
+  token_max_ttl=10m \
+  secret_id_bound_cidrs="192.168.20.201/32" \
+  secret_id_num_uses=0 \
+  secret_id_ttl=0
+
+vault read -field=role_id auth/approle/role/ci-ssh-signer/role-id
+vault write -field=secret_id -f auth/approle/role/ci-ssh-signer/secret-id
+```
+
+Neither output value goes in this repo, in SOPS, or in a GitHub secret —
+same reasoning as `ansible-console`'s own key just above: this is a
+machine-to-machine credential for a host that already holds one, not a
+bootstrap secret Vault gets seeded from. Place them directly on console:
+
+```bash
+ssh mchellmer@192.168.20.201
+sudo install -o mchellmer -g docker -m 0640 /dev/stdin ~/.ssh/vault-ci-role-id <<< "<role_id output above>"
+sudo install -o mchellmer -g docker -m 0640 /dev/stdin ~/.ssh/vault-ci-secret-id <<< "<secret_id output above>"
+```
+
+`group: docker, mode: 0640` matches `ansible-console`'s own key exactly, for
+the same reason (see the comment on that key's generation task in
+`20-cicd-host.yml`): CI reads both files from *inside* the containerized
+runner, a sibling container over the shared docker socket, and only
+docker-group membership bridges that identity gap.
+
+`secret_id_num_uses=0` and `secret_id_ttl=0` mean this credential doesn't
+expire on its own — the CIDR binding is the primary control. Rotate it the
+same way the age key gets rotated: annually, or immediately on suspicion
+(`vault write -f auth/approle/role/ci-ssh-signer/secret-id` mints a new one;
+`vault write auth/approle/role/ci-ssh-signer/secret-id-accessor/destroy
+secret_id_accessor=<accessor>` kills the old one independently).
+
 ## Break-glass
 
 Keep one static SSH key on `1972-console-1`, offline, for when Vault is the thing
