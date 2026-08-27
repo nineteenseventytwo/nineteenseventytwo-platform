@@ -73,13 +73,23 @@
 # permissions problem. The directory always exists; the files inside it are
 # placed by hand once (cluster/vault/README.md) and are simply absent until
 # then, which sign-ci.sh reports clearly.
+#
+# mode 0751, not 0750 — confirmed live against the running container, not
+# assumed: the runner process is uid 1001 (the base image's fixed "runner"
+# user), which lines up with neither runner_host_user's uid nor its group on
+# the host, the same mismatch github-app.pem's own task already documents.
+# 0750 left the container unable to even traverse into the directory
+# ("Permission denied" opening it, confirmed with docker exec). The execute
+# bit for "other" is the minimum fix; it grants traversal to a *named* file,
+# not directory listing — ls still fails for anyone who isn't the owner or in
+# the group, which is the same minimal-exposure trade github-app.pem makes.
 - name: Create the Vault CI credential directory
   ansible.builtin.file:
     path: "{{ runner_host_vault_ci_dir }}"
     state: directory
     owner: "{{ runner_host_user }}"
     group: "{{ runner_host_user }}"
-    mode: "0750"
+    mode: "0751"
   become: true
 
 - name: Install the GitHub App private key

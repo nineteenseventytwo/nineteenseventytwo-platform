@@ -18,6 +18,17 @@ lab_dns:
 lab_mtu: 1500
 lab_dhcp_pool: "192.168.20.100-192.168.20.199"
 lab_metallb_pool: "192.168.20.240-192.168.20.250"
+# First address in the pool above, pinned explicitly (not just "whatever
+# MetalLB assigns first") at cluster/ingress-nginx/values.yaml's
+# loadBalancerIP — committed on both sides deliberately, same as the role
+# ARNs in docs/06-aws-federation.md, because runner_host needs it too: the
+# OPNsense Unbound overrides 01-network-validation.md calls for
+# (argocd./vault./grafana.eightbitsaxlounge.com) were never actually
+# configured, so neither the workstation nor 1972-console-1 can resolve any
+# of them today. compose.yml.j2 uses this to give the runner container a
+# working extra_hosts entry for vault.eightbitsaxlounge.com regardless — a
+# real gap this papers over for one consumer, not a fix for the gap itself.
+ingress_nginx_lb_ip: "192.168.20.240"
 
 # Cloudflare-hosted zone used for both node names and internal-only lab
 # service hostnames (Argo CD, Vault, Grafana — none of these have an inbound
