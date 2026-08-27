@@ -1,0 +1,176 @@
+<mxfile host="app.diagrams.net" modified="2026-08-25T07:20:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+  <diagram name="Security Awareness" id="security-awareness-1">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Security awareness — what generates a signal, where it lands, and what actually wakes someone up" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-30" width="1200" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Column headers -->
+        <mxCell id="hdr1" value="1 — SOURCES" style="text;html=1;align=left;fontStyle=1;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="260" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="hdr2" value="2 — DETECTION  (delegated to the security account)" style="text;html=1;align=left;fontStyle=1;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="330" y="10" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="hdr3" value="3 — EVIDENCE STORE" style="text;html=1;align=left;fontStyle=1;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="860" y="10" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="hdr4" value="4 — ALERTING" style="text;html=1;align=left;fontStyle=1;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="10" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ===== SOURCES ===== -->
+        <mxCell id="srcBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="20" y="35" width="290" height="620" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acctBox" value="AWS ORG  o-gpv61aczar&#10;5 accounts (ADR-0001)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;fontStyle=1;fontSize=11;spacingLeft=8;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="55" width="260" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="mgmt         805982517487" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=15;" vertex="1" parent="1">
+          <mxGeometry x="48" y="100" width="234" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="security     517148962038   ← delegated admin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="48" y="132" width="234" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="shared       617464676730" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=15;" vertex="1" parent="1">
+          <mxGeometry x="48" y="164" width="234" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="platform-prod  972034964468" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=15;" vertex="1" parent="1">
+          <mxGeometry x="48" y="196" width="234" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" value="sandbox      671980843447" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=15;" vertex="1" parent="1">
+          <mxGeometry x="48" y="228" width="234" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcCluster" value="THE PI CLUSTER&#10;on-prem kubeadm, VLAN 20&#10;· Prowler CronJob (security ns)&#10;   — not deployed yet;&#10;     enable_prowler_role stays off&#10;     until the CronJob exists&#10;· reaches AWS only via IRSA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="300" width="260" height="115" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcSignIn" value="SIGN-IN EVENTS&#10;· root&#10;· BreakGlassAdmin role assumption&#10;&#10;The two that should never be routine." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="430" width="260" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcSpend" value="SPEND&#10;$20/mo org budget · $5/mo sandbox&#10;&#10;A cost spike IS a security signal — it is&#10;what a compromised credential looks like." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="535" width="260" height="105" as="geometry" />
+        </mxCell>
+
+        <!-- ===== DETECTION ===== -->
+        <mxCell id="detBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="330" y="35" width="510" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="detLbl" value="security account  ·  517148962038&#10;delegated administrator for every service that supports it" style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="340" y="40" width="480" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d1" value="CLOUDTRAIL — organisation trail&#10;is_organization_trail · is_multi_region_trail&#10;enable_log_file_validation&#10;Management events only — the first copy is free;&#10;data events are what turn the bill into a line item&#10;you notice." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="345" y="80" width="480" height="105" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d2" value="GUARDDUTY — org detector, SIX_HOURS publishing&#10;auto_enable_organization_members = ALL&#10;   a new account arriving unmonitored is the failure&#10;   mode this prevents&#10;OFF, each priced deliberately:&#10;   EKS_AUDIT_LOGS          on-prem kubeadm, no EKS&#10;                           control plane to read&#10;   EBS_MALWARE_PROTECTION  charged per GB scanned&#10;   RDS / LAMBDA            no such resources; denied&#10;                           by SCP anyway" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="345" y="195" width="480" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d3" value="IAM ACCESS ANALYZER — type: ORGANIZATION&#10;What in any account can be reached from OUTSIDE the&#10;org. Organisation-scoped, so it sees across account&#10;boundaries — exactly where an over-broad bucket or&#10;role trust policy hides." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="345" y="355" width="480" height="95" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d4" value="PROWLER — CIS posture, on a schedule, in JSON&#10;Runs elsewhere (cluster CronJob or a GitHub Actions&#10;job) and writes ACROSS an account boundary into the&#10;security account. Either way no stored credential.&#10;Bucket policy is scoped to findings/ so the scanner's&#10;credential is not also a general-purpose upload path." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="345" y="460" width="480" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d5" value="DELIBERATELY ABSENT: AWS Config · Security Hub&#10;Config bills per configuration item recorded and per rule&#10;evaluation; Security Hub's CSPM checks consume billable&#10;Config items on top of its own per-resource price.&#10;Prowler gives the same CIS visibility free.  ADR-0005" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="345" y="580" width="480" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ===== EVIDENCE ===== -->
+        <mxCell id="evBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="860" y="35" width="310" height="620" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="S3 — CloudTrail log archive&#10;&#10;· Object Lock, COMPLIANCE mode&#10;· KMS CMK, rotation enabled&#10;· versioning + public access block&#10;· Glacier Instant Retrieval lifecycle&#10;&#10;COMPLIANCE not GOVERNANCE:&#10;GOVERNANCE lets a principal with&#10;s3:BypassGovernanceRetention delete&#10;these anyway — which defeats the point&#10;of holding a tamper-evident record of&#10;how an attacker WITH ADMIN got in.&#10;&#10;Versioning stops an overwrite.&#10;Object Lock stops a delete — including&#10;by the account root." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="875" y="60" width="280" height="270" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" value="S3 — Prowler findings&#10;&#10;· versioning · SSE · full public&#10;   access block&#10;· lifecycle expiry&#10;· bucket policy scoped to findings/&#10;   for three named principals only&#10;&#10;Not Glacier: a finding you cannot&#10;read is a finding you will not act on." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="875" y="345" width="280" height="165" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="Glacier Instant Retrieval, not Deep&#10;Archive — a log you cannot read for&#10;twelve hours is not much use during&#10;an incident, which is the only time&#10;you will want it." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f2ff;strokeColor=#6c8ebf;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="875" y="525" width="280" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ===== ALERTING ===== -->
+        <mxCell id="alBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="35" width="570" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="alLbl" value="mgmt account  ·  805982517487" style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="40" width="400" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="al1" value="EVENTBRIDGE RULES&#10;· {org}-root-sign-in&#10;· {org}-break-glass-assumed&#10;&#10;⚠  BOTH IN us-east-1, ON PURPOSE.&#10;Console sign-in events — including root —&#10;are delivered to EventBridge only in&#10;us-east-1, whatever region the sign-in&#10;appears to come from. A rule in eu-west-2&#10;looks correct, costs nothing, and&#10;NEVER FIRES." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="65" width="540" height="165" as="geometry" />
+        </mxCell>
+
+        <mxCell id="al2" value="SNS  {org}-security-alerts&#10;two topics — us-east-1 (sign-in events) and eu-west-2 primary&#10;topic policy restricts publish to the EventBridge service principal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="245" width="540" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="al3" value="EMAIL SUBSCRIPTION&#10;aws-security@eightbitsaxlounge.com&#10;&#10;★ MANUAL: must be CONFIRMED from the inbox after&#10;the first apply. Terraform reports the subscription as&#10;created while it sits in PendingConfirmation and delivers&#10;nothing — an alerting path that looks green and is not." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="335" width="540" height="105" as="geometry" />
+        </mxCell>
+
+        <mxCell id="al4" value="BUDGET ALERTS&#10;org $20/mo at 25% · 50% · 100%   ·   sandbox $5/mo&#10;→ aws-billing@eightbitsaxlounge.com&#10;&#10;A cost spike is exactly what a compromised credential&#10;looks like against a $20 budget." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="455" width="540" height="95" as="geometry" />
+        </mxCell>
+
+        <mxCell id="al5" value="ALTERNATE CONTACTS — where AWS sends abuse reports and&#10;compromise notices. contact.phone is EMPTY on purpose: the API&#10;requires one, and a placeholder there looks populated in an audit&#10;while reaching nobody in an incident. Fill it in, or leave the&#10;contacts unset knowingly." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="565" width="540" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Flow edges -->
+        <mxCell id="fe1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="acctBox" target="d1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="acctBox" target="d2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;" edge="1" parent="1" source="acctBox" target="d3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe4" value="IRSA — cluster-prowler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=9;" edge="1" parent="1" source="srcCluster" target="d4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="d1" target="e1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="d4" target="e2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe7" value="sign-in event" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="srcSignIn" target="al1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="475" /><mxPoint x="1180" y="147" /></Array></mxGeometry></mxCell>
+        <mxCell id="fe8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="al1" target="al2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="al2" target="al3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe10" value="threshold breach" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="srcSpend" target="al4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="588" /><mxPoint x="1180" y="502" /></Array></mxGeometry></mxCell>
+        <mxCell id="fe11" value="GuardDuty findings&#10;(no SNS route yet — findings&#10;live in the console)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=9;" edge="1" parent="1" source="d2" target="al2"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Bottom: gaps -->
+        <mxCell id="gapBox" value="KNOWN GAPS — written down rather than left to be discovered" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="20" y="690" width="1740" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" value="Prowler is not deployed.&#10;enable_prowler_role stays off&#10;until the CronJob and its&#10;`security` namespace exist.&#10;The bucket and the role are&#10;ready; nothing writes to them." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="720" width="330" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" value="GuardDuty findings have no&#10;notification route.&#10;The detector is on and&#10;org-wide, but findings sit in&#10;the console. Only root sign-in&#10;and break-glass reach SNS." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="380" y="720" width="330" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" value="The email subscription is&#10;only real once confirmed.&#10;Until someone clicks the link&#10;in the inbox, every alert&#10;above terminates in a&#10;PendingConfirmation topic." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="725" y="720" width="330" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="g4" value="Nothing watches the CLUSTER.&#10;GuardDuty cannot read an&#10;on-prem kubeadm control plane&#10;(EKS_AUDIT_LOGS is off because&#10;there is no EKS). Cluster audit&#10;logging is not centralised&#10;anywhere in this picture." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="720" width="330" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="g5" value="No on-call, no escalation.&#10;Every path above ends at one&#10;mailbox. That is proportionate&#10;for a homelab and worth&#10;stating rather than implying&#10;a rota that does not exist." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1415" y="720" width="330" height="105" as="geometry" />
+        </mxCell>
+
+        <!-- Why delegated admin -->
+        <mxCell id="whyBox" value="WHY THE SECURITY ACCOUNT, NOT THE MANAGEMENT ACCOUNT&#10;&#10;Every security service that supports it is administered from `security` — GuardDuty, Access Analyzer, and the CloudTrail organisation trail. The management account holds the keys to the organisation; giving it day-to-day operation of the detectors and the log archive as well means the account with the most power is also the account you sign into most often.&#10;&#10;Registration is a management-account action, which is why the delegation lives in the org-management stack — and why org-management must be applied BEFORE security. The security stack's GuardDuty organisation configuration fails with a BadRequestException if it has not run.&#10;&#10;CloudTrail's delegated administrator owns the trail, so the trail and its log bucket live in the same account. The alternative — a trail in mgmt writing to a bucket in security — works, but splits the thing being protected from the thing protecting it across an account boundary for no benefit." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;verticalAlign=top;align=left;fontSize=11;spacingLeft=10;spacingTop=8;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="20" y="860" width="1740" height="200" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
