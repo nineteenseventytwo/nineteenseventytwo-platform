@@ -41,6 +41,10 @@ services:
 {% endif %}
       - {{ runner_host_workdir }}-{{ i }}:{{ runner_host_workdir }}-{{ i }}
       - {{ runner_host_home }}/github-app.pem:/github-app.pem:ro
+      # AppRole credentials + ansible-console's public key, for
+      # bootstrap/ssh/sign-ci.sh. Read-only, and public-half-only by design —
+      # see runner_host_vault_ci_dir in the role defaults.
+      - {{ runner_host_vault_ci_dir }}:/vault-ci:ro
 {% if runner_host_mount_docker_socket %}
     group_add:
       # Host's docker group GID, not the container image's own — they differ,

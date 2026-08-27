@@ -66,6 +66,22 @@
 # the :ro bind mount, and its uid doesn't line up with the host's
 # github-runner system user. The key's real confidentiality boundary is
 # sops in git, not host file perms on a single-tenant box.
+# A directory, not two file mounts: docker silently creates a *directory* for
+# a bind-mount source that doesn't exist yet, so mounting the two credential
+# files individually would leave the runner container with two empty dirs
+# where files should be, and sign-ci.sh failing on something that reads like a
+# permissions problem. The directory always exists; the files inside it are
+# placed by hand once (cluster/vault/README.md) and are simply absent until
+# then, which sign-ci.sh reports clearly.
+- name: Create the Vault CI credential directory
+  ansible.builtin.file:
+    path: "{{ runner_host_vault_ci_dir }}"
+    state: directory
+    owner: "{{ runner_host_user }}"
+    group: "{{ runner_host_user }}"
+    mode: "0750"
+  become: true
+
 - name: Install the GitHub App private key
   ansible.builtin.copy:
     content: "{{ github_app_private_key }}"

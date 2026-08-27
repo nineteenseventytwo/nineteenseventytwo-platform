@@ -19,6 +19,13 @@ runner_host_image: "{{ gha_runner_image }}:{{ runner_host_image_tag }}"
 # long-lived stack whose containers are only recreated by an explicit
 # `make deploy-cicd` from the workstation.
 runner_host_image_tag: "{{ lookup('file', playbook_dir + '/../../images/gha-runner/version.txt') | trim }}"
+# Bind-mounted read-only into the runner container. Holds the AppRole
+# credentials bootstrap/ssh/sign-ci.sh authenticates with, plus a copy of
+# ansible-console's *public* key for it to sign. Deliberately not
+# /home/{{ admin_user }}/.ssh: that directory is not mounted into the runner
+# container and never should be — signing needs the public half only, so the
+# private key stays out of the runner's reach entirely.
+runner_host_vault_ci_dir: "{{ runner_host_home }}/vault-ci"
 runner_host_ephemeral: true
 runner_host_replicas: 2
 runner_host_scope: org

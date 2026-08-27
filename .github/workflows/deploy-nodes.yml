@@ -87,12 +87,19 @@ jobs:
           VAULT_ADDR: https://vault.eightbitsaxlounge.com
         run: bootstrap/ssh/sign-ci.sh
 
+      # $RUNNER_TEMP is host-path-identical (same mechanism as the age key
+      # above), so the sibling ansible-runner container the Makefile spawns
+      # can bind-mount the cert sign-ci.sh just wrote. Without this the
+      # Makefile would look for it next to the key on console's filesystem,
+      # where nothing put one.
+
       # The work itself is a make target, identical to what runs on a
       # workstation. Everything above this line is orchestration.
       - name: Converge the nodes
         env:
           ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
           SSH_KEY: /home/mchellmer/.ssh/ansible-console
+          SSH_CERT: ${{ runner.temp }}/ansible-console-cert.pub
           DOCKER_GID: ${{ steps.dockergid.outputs.value }}
           CHECK: ${{ inputs.check_mode && '1' || '' }}
         run: make deploy-nodes

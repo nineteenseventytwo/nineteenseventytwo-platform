@@ -157,15 +157,21 @@ bootstrap secret Vault gets seeded from. Place them directly on console:
 
 ```bash
 ssh mchellmer@192.168.20.201
-sudo install -o mchellmer -g docker -m 0640 /dev/stdin ~/.ssh/vault-ci-role-id <<< "<role_id output above>"
-sudo install -o mchellmer -g docker -m 0640 /dev/stdin ~/.ssh/vault-ci-secret-id <<< "<secret_id output above>"
+sudo install -o github-runner -g github-runner -m 0400 /dev/stdin \
+  /opt/github-runner/vault-ci/role-id <<< "<role_id output above>"
+sudo install -o github-runner -g github-runner -m 0400 /dev/stdin \
+  /opt/github-runner/vault-ci/secret-id <<< "<secret_id output above>"
 ```
 
-`group: docker, mode: 0640` matches `ansible-console`'s own key exactly, for
-the same reason (see the comment on that key's generation task in
-`20-cicd-host.yml`): CI reads both files from *inside* the containerized
-runner, a sibling container over the shared docker socket, and only
-docker-group membership bridges that identity gap.
+**Not `~/.ssh/`.** `sign-ci.sh` runs *inside* the runner container, which
+mounts `/opt/github-runner/vault-ci` (read-only) and does not mount
+`/home/mchellmer/.ssh` — deliberately, since signing needs only the public
+half of `ansible-console`'s keypair and the private key has no business in
+that container. `make deploy-cicd` creates this directory and drops
+`ansible-console.pub` into it; the two files above are the only part done by
+hand. Owned by `github-runner` because that is the user the container runs
+as — unlike `ansible-console` itself, which is read by a *sibling* container
+and so needs the docker-group trick described in `20-cicd-host.yml`.
 
 `secret_id_num_uses=0` and `secret_id_ttl=0` mean this credential doesn't
 expire on its own — the CIDR binding is the primary control. Rotate it the
