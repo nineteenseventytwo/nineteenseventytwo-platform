@@ -51,15 +51,34 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   `grafana.` — so they resolve on VLAN 20 without waiting on public DNS
   propagation.
 
-  **Concretely, three overrides** (Services → Unbound DNS → Overrides), each a
-  Host record pointing at the pinned ingress LB address
-  (`cluster/ingress-nginx/values.yaml`'s `loadBalancerIP`):
+  **Concretely, three overrides**, each a Host record pointing at the pinned
+  ingress LB address (`cluster/ingress-nginx/values.yaml`'s `loadBalancerIP`):
 
   | Host | Domain | Type | IP |
   |---|---|---|---|
   | `argocd` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
   | `vault` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
   | `grafana` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
+
+  In the OPNsense web UI:
+
+  1. **Services → Unbound DNS → Overrides**.
+  2. Under **Host Overrides**, click **+** to add one.
+  3. Fill in, per row of the table above: **Host** (`argocd`), **Domain**
+     (`eightbitsaxlounge.com`), **Type** `A`, **IP address**
+     (`192.168.20.240`). Description is free text — `lab ingress` or similar
+     is enough to explain it to a future you.
+  4. **Save**, then repeat for `vault` and `grafana` — same domain, same IP,
+     only **Host** changes.
+  5. **Apply** at the top of the Overrides tab once all three are added.
+     Nothing takes effect until this step; the individual **Save** on each
+     row only stages it.
+  6. Confirm with `tests/network-check.sh 12` from a Pi on VLAN 20, or
+     `dig argocd.eightbitsaxlounge.com @192.168.20.1` by hand — both should
+     answer `192.168.20.240` within a few seconds. If a `dig` run just
+     before adding these already cached a different (or empty) answer for
+     one of the three names, that cache can outlive the change briefly —
+     re-run rather than trust a result from before step 5.
 
   **This is easy to skip without noticing**, and did get skipped on the first
   build of this cluster: `tests/network-check.sh 12` is the check, not the
