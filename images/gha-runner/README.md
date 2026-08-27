@@ -26,10 +26,37 @@ ansible-runner ...` through the mounted socket.
 Publishing is tied to bumping `version.txt` — no manual trigger.
 `image-gha-runner-build.yml` builds and pushes `:latest` (most recently
 built, any branch) from a branch; `image-gha-runner-promote.yml` moves
-`:stable` (what deploys pin to) onto that same digest on `main` without
-rebuilding. See
+`:stable` onto that same digest on `main` without rebuilding. See
 [ansible-runner's README](../ansible-runner/README.md#versioning) for the
 full two-workflow rationale, identical here.
+
+Unlike `ansible-runner`, though, **the runner stack does not consume
+`:stable`.** `runner_host_image_tag` pins the explicit version — read
+straight from this `version.txt` — because these are long-lived containers,
+and an unattended runner should not change underneath a job just because a
+tag moved. `ansible-runner` can float to `:stable` precisely because it is
+the opposite: a fresh short-lived container per invocation.
+
+## Rolling out a new version
+
+Publishing the image and *running* it are two separate acts, and the gap
+between them is real. `make deploy-cicd` carries `require-workstation` —
+it restarts the very runner stack a CI job would be executing on, so no
+workflow can perform this step. It is a deliberate human action:
+
+1. Bump `version.txt`, open a PR. `image-gha-runner-build.yml` builds,
+   scans and smoke-tests it from the branch.
+2. Merge. `image-gha-runner-promote.yml` retags the tested digest.
+3. **`make deploy-cicd` from a workstation.** Until this runs, console is
+   still running the previous image — the promote step publishes a tag, it
+   does not touch the host.
+
+Between 2 and 3, `main` contains workflows that may expect capabilities the
+deployed runner does not have yet. That window is why adding a tool to this
+image and making a workflow depend on it are best split across two merges:
+ship and roll out the image first, then the workflow that needs it. Doing
+both at once is what broke `deploy-nodes` on the `vault` CLI addition — the
+image was correct and promoted, the runner was simply still the old one.
 
 ## Why it holds no state
 
