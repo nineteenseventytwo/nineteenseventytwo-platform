@@ -7,7 +7,7 @@ The §2.3 validation matrix, runnable. Run it on a Pi on a VLAN 20 access port
 re-runnability is the reason it is a script and not a table in a document.
 
 ```bash
-tests/network-check.sh          # all 11 tests
+tests/network-check.sh          # all 12 tests
 tests/network-check.sh 5 6      # just the MTU and arm64-archive tests
 ```
 

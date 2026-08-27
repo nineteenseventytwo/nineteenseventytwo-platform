@@ -124,14 +124,42 @@ vault read -field=public_key ssh-client-signer/config/ca
 Put that last public key at `bootstrap/ssh/ca.pub`, set
 `hardening_ssh_trust_ca: true`, and re-run `make deploy-nodes`.
 
+**Prerequisite for step 6, easy to have skipped**:
+`vault.eightbitsaxlounge.com` has to actually resolve from
+`1972-console-1` before `sign-ci.sh` can reach Vault at all. Nothing
+enforces this earlier in the sequence, and it fails silently until CI
+tries to sign a certificate. Check it —
+
+```bash
+tests/network-check.sh 12
+```
+
+— and if it fails, the fix is on OPNsense, not in this repo: add the three
+Unbound host overrides in
+[docs/01-network-validation.md](../../docs/01-network-validation.md#opnsense-rules-this-implies),
+then re-run the check above before continuing.
+
 ```bash
 # 6. AppRole for CI's SSH signing (Phase D automation). CI (deploy-nodes.yml,
 # deploy-cluster.yml) runs from 1972-console-1, deliberately outside the
 # cluster (ADR-0007) — Kubernetes auth, what ESO uses, only works for a pod
 # in *this* cluster, so it's the wrong tool here. AppRole is what Vault's own
 # docs recommend for exactly this: a trusted, non-human, non-Kubernetes
-# client. secret_id_bound_cidrs pins it to console's own static address, so a
-# copy of this credential is useless from anywhere else.
+# client.
+#
+# secret_id_bound_cidrs is the cluster's pod network, not console's own
+# address — corrected 2026-08-27 after live testing, not assumed. Console has
+# no network path to Vault that preserves its own IP: it can only reach Vault
+# through ingress-nginx (nothing else here has a LoadBalancer IP), and
+# nginx's reverse-proxy hop to the backend Service replaces the source
+# address with its own pod IP before vault-0 ever sees the request —
+# confirmed live as "source address 10.244.1.100 unauthorized by CIDR
+# restrictions" against the console-specific /32 this originally shipped
+# with. Binding to console specifically is not achievable over this network
+# path; the primary protection is the attached policy, scoped to exactly
+# ssh-client-signer/sign/admin and nothing else. A leaked secret_id, even
+# from inside the cluster's own pod network, can only ever request a
+# 5-minute cert for mchellmer — never broader.
 vault auth enable approle
 
 vault policy write ci-ssh-signer - <<'POLICY'
@@ -142,7 +170,7 @@ vault write auth/approle/role/ci-ssh-signer \
   token_policies="ci-ssh-signer" \
   token_ttl=5m \
   token_max_ttl=10m \
-  secret_id_bound_cidrs="192.168.20.201/32" \
+  secret_id_bound_cidrs="10.244.0.0/16" \
   secret_id_num_uses=0 \
   secret_id_ttl=0
 
@@ -157,9 +185,9 @@ bootstrap secret Vault gets seeded from. Place them directly on console:
 
 ```bash
 ssh mchellmer@192.168.20.201
-sudo install -o github-runner -g github-runner -m 0400 /dev/stdin \
+sudo install -o github-runner -g github-runner -m 0444 /dev/stdin \
   /opt/github-runner/vault-ci/role-id <<< "<role_id output above>"
-sudo install -o github-runner -g github-runner -m 0400 /dev/stdin \
+sudo install -o github-runner -g github-runner -m 0444 /dev/stdin \
   /opt/github-runner/vault-ci/secret-id <<< "<secret_id output above>"
 ```
 
@@ -169,9 +197,21 @@ mounts `/opt/github-runner/vault-ci` (read-only) and does not mount
 half of `ansible-console`'s keypair and the private key has no business in
 that container. `make deploy-cicd` creates this directory and drops
 `ansible-console.pub` into it; the two files above are the only part done by
-hand. Owned by `github-runner` because that is the user the container runs
-as — unlike `ansible-console` itself, which is read by a *sibling* container
-and so needs the docker-group trick described in `20-cicd-host.yml`.
+hand.
+
+Mode `0444`, not `0400` — confirmed live, not assumed: the runner process is
+uid 1001 (the base image's own fixed `runner` user), which lines up with
+neither `github-runner`'s host uid nor its group. `0400` left the container
+unable to read either file at all. Same mismatch `github-app.pem`'s own task
+documents, and the same trade: the files are world-readable inside a
+single-tenant container, but the directory's own mode (`0751`, set by the
+`runner_host` role) still blocks anyone who isn't the owner from listing
+what's in it — traversal to a named file, not disclosure of what files
+exist. Owned by `github-runner:github-runner` for consistency with the rest
+of this directory, even though the actual reading process is neither that
+user nor in that group; unlike `ansible-console`'s own key, this is read
+directly by the runner container itself, not a sibling over the docker
+socket, so the docker-group trick in `20-cicd-host.yml` doesn't apply here.
 
 `secret_id_num_uses=0` and `secret_id_ttl=0` mean this credential doesn't
 expire on its own — the CIDR binding is the primary control. Rotate it the
