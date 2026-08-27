@@ -124,6 +124,21 @@ vault read -field=public_key ssh-client-signer/config/ca
 Put that last public key at `bootstrap/ssh/ca.pub`, set
 `hardening_ssh_trust_ca: true`, and re-run `make deploy-nodes`.
 
+**Prerequisite for step 6, easy to have skipped**:
+`vault.eightbitsaxlounge.com` has to actually resolve from
+`1972-console-1` before `sign-ci.sh` can reach Vault at all. Nothing
+enforces this earlier in the sequence, and it fails silently until CI
+tries to sign a certificate. Check it —
+
+```bash
+tests/network-check.sh 12
+```
+
+— and if it fails, the fix is on OPNsense, not in this repo: add the three
+Unbound host overrides in
+[docs/01-network-validation.md](../../docs/01-network-validation.md#opnsense-rules-this-implies),
+then re-run the check above before continuing.
+
 ```bash
 # 6. AppRole for CI's SSH signing (Phase D automation). CI (deploy-nodes.yml,
 # deploy-cluster.yml) runs from 1972-console-1, deliberately outside the

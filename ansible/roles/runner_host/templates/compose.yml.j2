@@ -24,12 +24,6 @@ services:
     container_name: github-runner-{{ i }}
     image: {{ runner_host_image }}
     env_file: [runner.env]
-    # sign-ci.sh's VAULT_ADDR — neither this host nor a workstation can
-    # resolve it via OPNsense today (see ingress_nginx_lb_ip's comment in
-    # group_vars/all/vars.yml). Scoped to just this one hostname: nothing
-    # else in this container talks to argocd./grafana.eightbitsaxlounge.com.
-    extra_hosts:
-      - "vault.{{ lab_domain }}:{{ ingress_nginx_lb_ip }}"
     environment:
 {% if runner_host_scope == 'org' %}
       ORG_NAME: "{{ github_org }}"

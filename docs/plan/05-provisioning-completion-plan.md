@@ -253,13 +253,17 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       additive, and the secret inventory already marks both "retired at Phase D".
       Tooling for this landed in PR #47 (`hardening_ssh_retire_legacy_keys`),
       defaulted off; flipping it is the one step left
-- [ ] **Found while testing sign.sh, unrelated to it**: none of
-      `argocd.`/`vault.`/`grafana.eightbitsaxlounge.com` resolve from a
-      workstation on VLAN 10, despite `01-network-validation.md` explicitly
-      calling for Unbound host overrides for all three. Real OPNsense config
-      gap — every live test this session against these hostnames used either
-      `curl --resolve` or a `/etc/hosts` override to work around it. Affects
-      normal browser access to all three UIs, not just CLI tooling
+- [ ] **Found while testing sign.sh, and again while testing sign-ci.sh**:
+      none of `argocd.`/`vault.`/`grafana.eightbitsaxlounge.com` resolve
+      from either VLAN 10 or `1972-console-1`, despite
+      `01-network-validation.md` explicitly calling for Unbound host
+      overrides for all three. Second time affected CI's own certificate
+      signing directly, not just browser/CLI convenience — a compose-level
+      `extra_hosts` workaround was tried and deliberately reverted in favour
+      of fixing the actual gap, since it only helped the one consumer.
+      `tests/network-check.sh 12` now checks this and
+      `01-network-validation.md` gives the exact three Host-record values —
+      **adding them on OPNsense is still the one action item left here**
 
 ### 3.2 TLS (Tier 4) — follows WP-1.2
 

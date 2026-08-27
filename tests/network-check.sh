@@ -15,6 +15,13 @@ WORKSTATION_HOST="${WORKSTATION_HOST:-192.168.10.50}"
 MASTER_HOST="${MASTER_HOST:-192.168.20.202}"
 PEER_HOST="${PEER_HOST:-192.168.20.203}"
 OTHER_VLAN_HOST="${OTHER_VLAN_HOST:-192.168.30.1}"
+# ansible/inventory/lab/group_vars/all/vars.yml's lab_domain — not read from
+# there directly, this script has no ansible dependency by design.
+LAB_DOMAIN="${LAB_DOMAIN:-eightbitsaxlounge.com}"
+# cluster/ingress-nginx/values.yaml's loadBalancerIP — same value, same
+# "committed on both sides deliberately" reasoning as the role ARNs in
+# docs/06-aws-federation.md, now for a third place, not two.
+LAB_INGRESS_IP="${LAB_INGRESS_IP:-192.168.20.240}"
 
 PASS=0
 FAIL=0
@@ -172,6 +179,34 @@ if want 11; then
     report 11 "intra-VLAN 20 Pi to Pi" pass
   else
     report 11 "intra-VLAN 20 Pi to Pi" fail "cannot reach ${PEER_HOST} (is it up?)"
+  fi
+fi
+
+
+# 12 -----------------------------------------------------------------------
+# Unbound host overrides for the lab tool hostnames — called for in this
+# doc's own "OPNsense rules this implies" section since the beginning, never
+# actually configured, and never actually checked anywhere either. Found the
+# hard way (docs/plan/05-provisioning-completion-plan.md WP-3.1): every live
+# test against these hostnames this project ran used a `--resolve` or
+# `/etc/hosts` workaround, right up until it silently broke CI's own
+# certificate signing, which has no such workaround available to it. This is
+# that check, so it fails loudly here instead of quietly somewhere else.
+if want 12; then
+  if ! need dig; then
+    report 12 "Unbound overrides for lab tool hostnames" skip "dig not installed"
+  else
+    missing=()
+    for h in argocd vault grafana; do
+      ans=$(dig +short +time=3 +tries=1 "${h}.${LAB_DOMAIN}" "@${GATEWAY}" 2>/dev/null)
+      [[ "$ans" == "$LAB_INGRESS_IP" ]] || missing+=("${h}.${LAB_DOMAIN}${ans:+ -> $ans}")
+    done
+    if [[ ${#missing[@]} -eq 0 ]]; then
+      report 12 "Unbound overrides for lab tool hostnames" pass
+    else
+      report 12 "Unbound overrides for lab tool hostnames" fail \
+        "not resolving to ${LAB_INGRESS_IP}: ${missing[*]} — add Unbound host overrides on OPNsense, see docs/01-network-validation.md"
+    fi
   fi
 fi
 

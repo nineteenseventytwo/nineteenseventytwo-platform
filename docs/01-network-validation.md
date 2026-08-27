@@ -23,6 +23,7 @@ tests/network-check.sh
 | 9 | VLAN 10 → VLAN 20 SSH | connects | Run from the workstation |
 | 10 | VLAN 10 → VLAN 20 API | `nc -vz .202 6443` open | Run from the workstation, once the cluster exists |
 | 11 | Intra-VLAN 20 | Pi → Pi ping works | And note the firewall **never sees this traffic** |
+| 12 | Unbound overrides for lab tool hostnames | `dig argocd/vault/grafana.eightbitsaxlounge.com @192.168.20.1` → `192.168.20.240` | The overrides in the section below, actually checked. Skipped for months on the first build of this cluster — every one of Phase C/D's docs happened to reach these hostnames through a `curl --resolve` or `/etc/hosts` workaround instead, until CI's own certificate signing needed one and had none available (docs/plan/05-provisioning-completion-plan.md WP-3.1) |
 
 Tests 9 and 10 report as *skipped* on a Pi rather than silently passing —
 direction matters and a test that cannot run should say so.
@@ -49,6 +50,23 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   tool hostnames used in `cluster/*/values.yaml` — `argocd.`, `vault.`,
   `grafana.` — so they resolve on VLAN 20 without waiting on public DNS
   propagation.
+
+  **Concretely, three overrides** (Services → Unbound DNS → Overrides), each a
+  Host record pointing at the pinned ingress LB address
+  (`cluster/ingress-nginx/values.yaml`'s `loadBalancerIP`):
+
+  | Host | Domain | Type | IP |
+  |---|---|---|---|
+  | `argocd` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
+  | `vault` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
+  | `grafana` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
+
+  **This is easy to skip without noticing**, and did get skipped on the first
+  build of this cluster: `tests/network-check.sh 12` is the check, not the
+  five Phase C/D docs that each happen to reach these hostnames some other
+  way. Run it after adding the overrides, before assuming they're live —
+  Unbound's cache means a browser or `curl` that already resolved one of
+  these names elsewhere can look correct for a while regardless.
 
 ## Squid allowlist
 
