@@ -62,6 +62,30 @@
       register: console_pubkey
       tags: [ssh]
 
+    # sign-ci.sh runs *inside* the runner container, which does not mount
+    # /home/{{ admin_user }}/.ssh and should not — it only ever needs the
+    # public half to hand Vault for signing. Copying it into the mounted
+    # credential directory is what makes the private key's absence from that
+    # container a non-issue rather than a blocker.
+    #
+    # Skipped under --check: the runner_host role only *simulates* creating
+    # the destination directory in check mode, so this copy would fail with
+    # "Destination directory does not exist" — a dry-run artifact, not a real
+    # problem. Check mode cannot meaningfully validate a copy into a directory
+    # it also did not create, so it reports nothing here rather than a red
+    # failure that means nothing.
+    - name: Publish the console public key for the runner container
+      ansible.builtin.copy:
+        src: "/home/{{ admin_user }}/.ssh/ansible-console.pub"
+        dest: "{{ runner_host_vault_ci_dir }}/ansible-console.pub"
+        remote_src: true
+        owner: "{{ runner_host_user }}"
+        group: "{{ runner_host_user }}"
+        mode: "0444"
+      become: true
+      when: not ansible_check_mode
+      tags: [ssh]
+
 - name: Authorise the console key on every node
   hosts: cicd:cluster
   gather_facts: false

@@ -89,7 +89,13 @@ DOCKER_USER = --user "$(shell id -u):$(shell id -g)" $(if $(DOCKER_GID),--group-
 # running sign-ci.sh first — SSH picks the cert up automatically just by
 # finding it alongside the private key at this exact name; nothing else here
 # has to know cert auth is happening at all.
-SSH_CERT       := $(SSH_KEY)-cert.pub
+# ?=, not := — CI overrides this. sign-ci.sh writes the cert into
+# $RUNNER_TEMP rather than next to the key, because it runs inside the runner
+# container where the key's directory isn't mounted; $RUNNER_TEMP is
+# host-path-identical, so the sibling container this mounts into can actually
+# see it. On a workstation the default is right: sign.sh puts the cert next to
+# the key, where ssh finds it by name on its own.
+SSH_CERT       ?= $(SSH_KEY)-cert.pub
 SSH_CERT_MOUNT := $(if $(wildcard $(SSH_CERT)),-v $(SSH_CERT):/home/ansible/.ssh/id_ed25519-cert.pub:ro,)
 
 CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \

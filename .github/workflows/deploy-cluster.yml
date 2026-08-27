@@ -89,6 +89,9 @@ jobs:
         env:
           ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
           SSH_KEY: /home/mchellmer/.ssh/ansible-console
+          # See the identical env in deploy-nodes.yml for why the cert lives
+          # in $RUNNER_TEMP and not next to the key.
+          SSH_CERT: ${{ runner.temp }}/ansible-console-cert.pub
           DOCKER_GID: ${{ steps.dockergid.outputs.value }}
         run: make deploy-cluster
 
