@@ -1,0 +1,194 @@
+<mxfile host="app.diagrams.net" modified="2026-08-25T07:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+  <diagram name="Argo CD Sync Waves" id="argocd-waves-1">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1150" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Argo CD — what it syncs, and in what order (cluster/argocd/applications/)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-30" width="1000" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Left rail: sources and bootstrap -->
+        <mxCell id="railBox" value="SOURCES &amp; BOOTSTRAP" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="20" y="30" width="320" height="700" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcGit" value="git: nineteenseventytwo-platform@main&#10;cluster/argocd/applications/*.yaml&#10;(app-of-apps — the only thing applied by hand)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="60" width="290" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcHelm" value="upstream Helm repos&#10;helm.cilium.io · metallb.github.io · charts.jetstack.io&#10;charts.longhorn.io · charts.external-secrets.io&#10;helm.releases.hashicorp.com · prometheus-community&#10;ghcr.io/actions/...-charts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=10;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="135" width="290" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcMulti" value="Most apps are MULTI-SOURCE:&#10;upstream chart + values from this repo&#10;($values ref) — chart version pinned in&#10;the Application, values reviewed in git" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f2ff;strokeColor=#6c8ebf;fontSize=10;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="230" width="290" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srcBootstrap" value="make bootstrap-argocd&#10;installs Argo CD itself, then applies&#10;the Application manifests above" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=11;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="315" width="290" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="argocd" value="Argo CD&#10;namespace: argocd&#10;reconciles every Application below&#10;against git, continuously" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="395" width="290" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="noteRestart" value="&#9733; ONE MANUAL STEP&#10;Argo CD is installed BEFORE the&#10;pod-identity-webhook exists, so&#10;argocd-repo-server never passed&#10;through admission and carries no&#10;injected AWS credentials.&#10;kubectl -n argocd rollout restart&#10;  deploy/argocd-repo-server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="35" y="485" width="290" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="noteSync" value="make argocd-sync-wait&#10;blocks until every Application&#10;reports Synced/Healthy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="610" width="290" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="noteGate" value="deploy-cluster.yml (CI) nudges Argo CD&#10;and waits — CI does not apply manifests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=10;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="35" y="675" width="290" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Wave ladder header -->
+        <mxCell id="ladderHdr" value="SYNC WAVE ORDER" style="text;html=1;align=left;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="34" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="hdrWave" value="wave" style="text;html=1;align=center;fontStyle=1;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="380" y="52" width="55" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="hdrApp" value="Application → namespace" style="text;html=1;align=left;fontStyle=1;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="450" y="52" width="300" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="hdrSrc" value="source (chart @ pinned version, or repo path)" style="text;html=1;align=left;fontStyle=1;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="770" y="52" width="380" height="16" as="geometry" />
+        </mxCell>
+
+        <!-- Spine -->
+        <mxCell id="spine" style="endArrow=block;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="365" y="70" as="sourcePoint" />
+            <mxPoint x="365" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Wave rows -->
+        <mxCell id="w1n" value="-20" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="72" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w1a" value="cilium  →  kube-system" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="72" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w1s" value="cilium @ 1.20.0  +  cluster/cilium values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="72" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w2n" value="0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="120" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w2a" value="metallb  →  metallb-system" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="120" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w2s" value="metallb @ 0.16.1  +  repo values (pool .240-.250)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="120" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w3n" value="10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="168" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w3a" value="ingress-nginx  →  ingress-nginx" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="168" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w3s" value="ingress-nginx @ 4.15.1  +  repo values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="168" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w4n" value="20" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="216" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w4a" value="cert-manager  →  cert-manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="216" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w4s" value="cert-manager @ v1.21.1  +  ClusterIssuers&#10;(letsencrypt DNS-01 via Cloudflare, internal-ca)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="216" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w5n" value="25" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e6ff;strokeColor=#9673a6;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="264" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w5a" value="pod-identity-webhook  →  pod-identity-webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="264" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w5s" value="repo path: cluster/pod-identity-webhook&#10;(no upstream chart — plain manifests)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="264" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w6n" value="30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="312" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w6a" value="longhorn  →  longhorn-system" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="312" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w6s" value="longhorn @ 1.12.1  +  repo values (S3 backup target)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="312" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w7n" value="40" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="360" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w7a" value="external-secrets  →  external-secrets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="360" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w7s" value="external-secrets @ 2.9.0  +  repo values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="360" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w8n" value="50" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e6ff;strokeColor=#9673a6;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="408" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w8a" value="vault  →  vault" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="408" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w8s" value="vault @ 0.34.1  +  repo values (KMS auto-unseal)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="408" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w9n" value="60" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="456" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w9a" value="monitoring  →  monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="456" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w9s" value="kube-prometheus-stack @ 88.3.0  +  repo values&#10;(node-exporter lands in node-exporter-system)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="456" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w10n" value="70" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="504" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w10a" value="arc-controller  →  arc-systems" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="504" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w10s" value="gha-runner-scale-set-controller @ 0.14.2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="504" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w11n" value="80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="552" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w11a" value="arc-lab-deploy  →  arc-runners" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="552" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w11s" value="gha-runner-scale-set @ 0.14.2  (deploy runners)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="552" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w12n" value="80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="600" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w12a" value="arc-lab-dind  →  arc-runners" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="600" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w12s" value="gha-runner-scale-set @ 0.14.2  (docker-in-docker)&#10;same wave as arc-lab-deploy — no ordering between them" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="600" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w13n" value="90" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="648" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w13a" value="platform-manifests  →  (multi-ns)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="648" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w13s" value="repo path: cluster/&#10;ExternalSecrets, Certificates, Ingresses" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="648" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w14n" value="95" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="696" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w14a" value="platform-policy  →  (all namespaces)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="696" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w14s" value="repo path: policy/&#10;namespaces · default-deny NetworkPolicy · LimitRange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="696" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="w15n" value="100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;arcSize=30;" vertex="1" parent="1"><mxGeometry x="380" y="744" width="55" height="38" as="geometry" /></mxCell>
+        <mxCell id="w15a" value="apps  (ApplicationSet)&#10;→  ns: {tenant}-{app}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="450" y="744" width="300" height="38" as="geometry" /></mxCell>
+        <mxCell id="w15s" value="git generator over apps/*/*&#10;one child Application per tenant app dir" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="770" y="744" width="380" height="38" as="geometry" /></mxCell>
+
+        <mxCell id="eArgoLadder" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;" edge="1" parent="1" source="argocd"><mxGeometry relative="1" as="geometry"><mxPoint x="365" y="430" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="eGitArgo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="srcBootstrap" target="argocd"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Right annotations -->
+        <mxCell id="annBox" value="WHAT THE ORDER IS ACTUALLY FOR" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="30" width="480" height="500" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann1" value="Sync waves are ORDERING, not dependency&#10;resolution. Argo CD waits for a wave to report&#10;Healthy before starting the next. Nothing here&#10;declares &quot;X needs Y&quot; — the numbers encode it." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="60" width="450" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann2" value="-20 · Cilium first, or nothing has a network.&#10;Flannel could not enforce NetworkPolicy at all,&#10;which is why the CNI changed (ADR-0003)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="140" width="450" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann3" value="20 → 25 · cert-manager must be issuing before&#10;pod-identity-webhook, which needs a serving&#10;certificate to pass admission at all." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="205" width="450" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann4" value="25 → 30/50 · the webhook lands before Longhorn&#10;and Vault start, so their pods get IRSA credentials&#10;injected at admission time. Too late = no creds,&#10;no error near the pod (failurePolicy: Ignore)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="270" width="450" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann5" value="40 → 50 · ESO installed before Vault, but ESO&#10;cannot RESOLVE an ExternalSecret until Vault is&#10;unsealed and populated. Install order and&#10;working order are not the same thing." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="350" width="450" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann6" value="95 · policy/ lands LAST among platform waves but&#10;BEFORE tenant apps at 100 — every namespace is&#10;default-deny before a tenant workload exists in it." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="430" width="450" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ann7" value="100 · tenants never get a kubeconfig. The platform&#10;owns their namespaces (ADR-0004, ADR-0012); an&#10;app repo contributes a directory, not cluster access." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="495" width="450" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legendBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="580" width="480" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="legendTitle" value="Legend" style="text;html=1;fontStyle=1;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="586" width="100" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="green = platform component" style="text;html=1;fontSize=10;align=left;fontColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="608" width="220" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="purple = in the AWS-credential path (IRSA / Vault)" style="text;html=1;fontSize=10;align=left;fontColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="626" width="330" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="orange = policy / guardrail" style="text;html=1;fontSize=10;align=left;fontColor=#d79b00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="644" width="220" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="blue = tenant workloads" style="text;html=1;fontSize=10;align=left;fontColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="662" width="220" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5" value="★ = the only step a human performs" style="text;html=1;fontSize=10;align=left;fontColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1192" y="680" width="260" height="16" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

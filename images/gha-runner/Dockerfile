@@ -7,6 +7,10 @@ ARG RUNNER_VERSION=2.336.0
 FROM ghcr.io/actions/actions-runner:${RUNNER_VERSION}
 
 ARG DOCKER_CLI_VERSION=29.7.2
+# Pinned to the deployed Vault server version (vault status inside vault-0),
+# not "latest" — a CLI/server version drift here fails in ways that are hard
+# to distinguish from an actual auth or policy problem.
+ARG VAULT_VERSION=1.18.3
 
 ARG TARGETARCH=arm64
 
@@ -18,7 +22,7 @@ USER root
 
 RUN apt-get update \
  && apt-get install --no-install-recommends -y \
-      ca-certificates curl git jq make openssl \
+      ca-certificates curl git jq make openssl unzip \
  && rm -rf /var/lib/apt/lists/*
 
 RUN case "${TARGETARCH}" in \
@@ -31,6 +35,16 @@ RUN case "${TARGETARCH}" in \
  && mv /tmp/docker/docker /usr/local/bin/docker \
  && rm -rf /tmp/docker \
  && docker --version
+
+# For bootstrap/ssh/sign-ci.sh — the AppRole login + SSH cert signing step
+# ahead of `make deploy-nodes`/`deploy-cluster`, one static binary, same class
+# of tool as jq/openssl above rather than a reason to add Ansible to this
+# image (see the file header for why that stays out).
+RUN curl -fsSL -o /tmp/vault.zip \
+      "https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_${TARGETARCH}.zip" \
+ && unzip -q /tmp/vault.zip -d /usr/local/bin \
+ && rm /tmp/vault.zip \
+ && vault --version
 
 ENV RUNNER_ALLOW_RUNASROOT=0 \
     DISABLE_AUTO_UPDATE=true

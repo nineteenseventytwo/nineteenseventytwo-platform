@@ -2,8 +2,13 @@
 
 `ghcr.io/nineteenseventytwo/gha-runner`
 
-Upstream `actions/actions-runner` plus the docker CLI, git and make. Nothing
-else — it should track upstream closely and change rarely.
+Upstream `actions/actions-runner` plus the docker CLI, git, make, and the
+`vault` CLI. Nothing else — it should track upstream closely and change
+rarely.
+
+`vault` is here for `bootstrap/ssh/sign-ci.sh`, one static binary pinned to
+the deployed Vault server's own version — same class of addition as `jq`,
+not a reason to reconsider keeping Ansible out (see below).
 
 `version.txt` is this image's **own** semver, the same as `ansible-runner`'s.
 The upstream runner version is pinned separately in the Dockerfile's

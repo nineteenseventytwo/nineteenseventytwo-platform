@@ -76,6 +76,14 @@ jobs:
         run: |
           echo "value=$(stat -c %g /var/run/docker.sock)" >> "$GITHUB_OUTPUT"
 
+      # Only "Rebuild the cluster" touches SSH — see the comment there. Same
+      # cert-mechanics as deploy-nodes.yml's identical step.
+      - name: Sign a fresh SSH certificate for this run
+        if: inputs.rebuild
+        env:
+          VAULT_ADDR: https://vault.eightbitsaxlounge.com
+        run: bootstrap/ssh/sign-ci.sh
+
       - name: Rebuild the cluster
         if: inputs.rebuild
         env:

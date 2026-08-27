@@ -83,9 +83,19 @@ KUBECONFIG       ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/kube/config,$(HOME)/.k
 # (ansible/playbooks/20-cicd-host.yml).
 DOCKER_USER = --user "$(shell id -u):$(shell id -g)" $(if $(DOCKER_GID),--group-add $(DOCKER_GID))
 
+# Mounted only if it exists: a static key (mark-workstation, the pre-cutover
+# ansible-workstation/ansible-console) has no companion cert and works
+# unchanged. Once something has signed one — a human running sign.sh, or CI
+# running sign-ci.sh first — SSH picks the cert up automatically just by
+# finding it alongside the private key at this exact name; nothing else here
+# has to know cert auth is happening at all.
+SSH_CERT       := $(SSH_KEY)-cert.pub
+SSH_CERT_MOUNT := $(if $(wildcard $(SSH_CERT)),-v $(SSH_CERT):/home/ansible/.ssh/id_ed25519-cert.pub:ro,)
+
 CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 	-v $(PWD):/work -w /work \
 	-v $(SSH_KEY):/home/ansible/.ssh/id_ed25519:ro \
+	$(SSH_CERT_MOUNT) \
 	-v $(KNOWN_HOSTS):/home/ansible/.ssh/known_hosts:ro \
 	-v $(SOPS_AGE_DIR):/home/ansible/.config/sops/age:ro \
 	-e ANSIBLE_PRIVATE_KEY_FILE=/home/ansible/.ssh/id_ed25519 \

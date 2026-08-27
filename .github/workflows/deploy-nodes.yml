@@ -76,6 +76,17 @@ jobs:
         run: |
           echo "value=$(stat -c %g /var/run/docker.sock)" >> "$GITHUB_OUTPUT"
 
+      # ansible-console authenticates via a Vault-signed certificate now, not
+      # a static authorized_keys entry — cluster/vault/README.md's AppRole
+      # step. role_id/secret_id live only on this host, same as the key
+      # itself never entering GitHub. Makefile mounts the resulting
+      # ansible-console-cert.pub automatically once it exists alongside the
+      # key; nothing past this step has to know cert auth is happening.
+      - name: Sign a fresh SSH certificate for this run
+        env:
+          VAULT_ADDR: https://vault.eightbitsaxlounge.com
+        run: bootstrap/ssh/sign-ci.sh
+
       # The work itself is a make target, identical to what runs on a
       # workstation. Everything above this line is orchestration.
       - name: Converge the nodes

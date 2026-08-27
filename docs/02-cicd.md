@@ -160,6 +160,17 @@ version bump or `:latest` on a branch. `SSH_KEY` overrides the Makefile's
 workstation default to point at `ansible-console`, which never enters
 GitHub.
 
+A step ahead of this one runs `bootstrap/ssh/sign-ci.sh`, which signs a fresh
+5-minute certificate over that same keypair using a Vault AppRole credential
+that also never enters GitHub — see
+[`cluster/vault/README.md`](../cluster/vault/README.md)'s AppRole step for
+why AppRole and not Kubernetes auth (the short version: this runs on
+`1972-console-1`, which [ADR-0007](decisions/ADR-0007-console-outside-cluster.md)
+keeps deliberately outside the cluster, so there's no ServiceAccount token
+for Kubernetes auth to validate). The Makefile mounts the resulting cert
+automatically once it exists alongside the key — the step above is
+unchanged either way; it has no idea whether cert auth is in play.
+
 ### Publishing: build once, promote by re-tag
 
 Neither image workflow has a manual trigger — publishing is tied to bumping
