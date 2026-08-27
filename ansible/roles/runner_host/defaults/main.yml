@@ -1,9 +1,24 @@
 ---
 runner_host_home: /opt/github-runner
 runner_host_image: "{{ gha_runner_image }}:{{ runner_host_image_tag }}"
-# The gha-runner image's own version (images/gha-runner/version.txt), not the
-# upstream actions-runner version — see that image's README.
-runner_host_image_tag: "1.0.2"
+# The gha-runner image's own version, not the upstream actions-runner version
+# — see that image's README.
+#
+# Read from images/gha-runner/version.txt rather than repeated here. This was
+# a hardcoded "1.0.2" and drifted the moment version.txt went to 1.1.0 (the
+# vault CLI, added for bootstrap/ssh/sign-ci.sh): the image built, scanned and
+# promoted correctly, but the runner stack stayed pinned to a tag that
+# predated it, so deploy-nodes ran on an image with no vault binary and failed
+# with "vault CLI not found in this image". Nothing anywhere compared the two
+# numbers, and a floating tag is not the answer either — the pin is deliberate
+# (an unattended runner should not silently change underneath a job). One
+# source, still explicitly pinned.
+#
+# Deliberately not :stable, unlike ANSIBLE_RUNNER in the Makefile: that one is
+# pulled fresh per invocation by a short-lived container, while this is a
+# long-lived stack whose containers are only recreated by an explicit
+# `make deploy-cicd` from the workstation.
+runner_host_image_tag: "{{ lookup('file', playbook_dir + '/../../images/gha-runner/version.txt') | trim }}"
 runner_host_ephemeral: true
 runner_host_replicas: 2
 runner_host_scope: org
