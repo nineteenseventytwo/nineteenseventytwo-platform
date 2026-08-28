@@ -92,6 +92,12 @@ Run against the **empty** hardened cluster, before any workload exists to
 muddy it, and commit the result. A before/after pair across the Cilium and
 default-deny work is worth more than either scan alone.
 
+> The pre-install window for this cluster's own baseline closed before this
+> step was actually run — the committed `docs/baseline-nsa.json` is a
+> **post-install** scan (captured 2026-08-28, against a loaded cluster), not
+> the before/after pair described above. Treat this section as the
+> procedure for the *next* rebuild, where that window is open again.
+
 ## Verify
 
 - `make verify-irsa` — a pod can assume an AWS role with no credential

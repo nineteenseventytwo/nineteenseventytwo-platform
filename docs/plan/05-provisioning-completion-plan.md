@@ -374,11 +374,15 @@ set — the tenant namespaces, quotas and LimitRanges exist and hold nothing.
 
 ## WP-6 — Evidence and rehearsal
 
-- [ ] **The Kubescape baseline window has closed.** `03-cluster.md` step 5 says to
-      scan the *empty* hardened cluster; it is now full. Either scan now and label
-      it honestly as a post-install baseline, or defer it to the next rebuild and
-      say so in the doc. Do not quietly scan a loaded cluster and file it as the
-      "before" — the before/after pair is the whole point
+- [x] **The Kubescape baseline window has closed.** Scanned now (2026-08-28)
+      and labeled honestly as a post-install baseline rather than the missed
+      pre-install "before" — see `docs/03-cluster.md` step 5 and
+      `docs/baseline-nsa.json`. 72/100 overall compliance; 93 High findings
+      dominated by missing CPU/memory limits (44/50 and 21/50 workloads) and
+      non-root enforcement (34/50) — none of it new information, but now it's
+      a committed number instead of an assumption. Not tracked as a
+      to-do here since the next full rebuild is what actually reopens the
+      pre-install window (see the rehearsal item below)
 - [ ] **Rehearse the rebuild.** `05-migration.md`'s definition of done requires a
       full end-to-end run: imaging → `deploy-nodes` → `deploy-cicd` →
       `deploy-cluster` → `bootstrap-argocd`. Nothing else in this plan proves the
