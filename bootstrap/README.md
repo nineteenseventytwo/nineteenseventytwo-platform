@@ -70,3 +70,16 @@ rendering cloud-init; `render.sh` writes all of them into every node's
 `authorized_keys` and refuses to render if one is missing. `.gitignore` allows
 `bootstrap/ssh/*.pub` and blocks everything else in the directory that looks
 like a private key.
+
+## tenant-kubeconfig/
+
+Turns the CI-scoped ServiceAccount `policy/tenants/<tenant>.yaml` declares
+into the kubeconfig an app repo's pipeline actually reads, and publishes it to
+Vault (`kv/tenants/<tenant>/kubeconfig-<env>`). Run once per tenant
+environment, and again any time that ServiceAccount's token Secret is
+recreated:
+
+```bash
+bootstrap/tenant-kubeconfig/generate.sh eightbitsaxlounge eightbitsaxlounge-dev
+bootstrap/tenant-kubeconfig/generate.sh eightbitsaxlounge eightbitsaxlounge-prod
+```
