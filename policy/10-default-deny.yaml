@@ -101,6 +101,34 @@ spec:
   egress:
     - toEntities: [kube-apiserver]
 ---
+# Alertmanager's only receiver needing internet egress: the Slack webhook
+# wired up in cluster/monitoring/values.yaml. Scoped to the exact FQDN
+# rather than an ipBlock/0.0.0.0-0 rule, since Slack's webhook IPs aren't
+# stable and a stateful, alert-carrying pod doesn't need broad internet
+# egress just for this one receiver.
+#
+# Confirmed live (2026-08-28): a synthetic test alert registered fine in
+# Alertmanager (notifications_total{integration="slack"}=1, 0 failures
+# recorded) but never reached Slack. `wget https://hooks.slack.com` from the
+# pod itself timed out at connect, not at DNS resolution - allow-dns-egress
+# above was already sufficient; only the TCP:443 path was missing.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-alertmanager-slack-egress
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  egress:
+    - toFQDNs:
+        - matchName: hooks.slack.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
