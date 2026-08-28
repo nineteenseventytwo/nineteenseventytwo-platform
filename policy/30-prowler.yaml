@@ -80,6 +80,16 @@ spec:
               imagePullPolicy: Always
               args:
                 - aws
+                # Confirmed live (2026-08-28): with no region filter, Prowler
+                # scans every enabled AWS region by default (39 of them) and
+                # OOMKilled twice at a 1Gi limit before this was in place -
+                # the account only ever uses the two in config/aws.json's
+                # regions.allowed (nineteenseventytwo-cloud). Scanning regions
+                # this account never touches was pure waste, not a real
+                # safety margin.
+                - --region
+                - eu-west-2
+                - us-east-1
                 # findings/ matches the bucket policy's write scope exactly
                 # (s3:PutObject on <bucket>/findings/*) - Prowler mirrors this
                 # local directory name into the uploaded key.
@@ -88,8 +98,10 @@ spec:
                 - --output-bucket
                 - nineteenseventytwo-prowler-517148962038
               resources:
-                requests: {cpu: 250m, memory: 384Mi}
-                limits: {cpu: "1", memory: 1Gi}
+                requests: {cpu: 250m, memory: 512Mi}
+                # Still generous margin above the 2-region scan's actual
+                # footprint, not sized to the 39-region OOM this replaced.
+                limits: {cpu: "1", memory: 2Gi}
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
