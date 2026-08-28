@@ -26,7 +26,7 @@ spec:
       # Must stay on one line — the glob is parsed literally, so a folded
       # scalar would insert spaces into the pattern and match nothing.
       # yamllint disable-line rule:line-length
-      include: "{metallb/ipaddresspool.yaml,cert-manager/clusterissuer-*.yaml,cert-manager/externalsecret-*.yaml,external-secrets/clustersecretstore.yaml,arc/externalsecret-*.yaml,longhorn/secret-*.yaml}"
+      include: "{metallb/ipaddresspool.yaml,cert-manager/clusterissuer-*.yaml,cert-manager/externalsecret-*.yaml,external-secrets/clustersecretstore.yaml,arc/externalsecret-*.yaml,longhorn/secret-*.yaml,monitoring/externalsecret-*.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: default

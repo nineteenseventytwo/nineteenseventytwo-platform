@@ -42,13 +42,37 @@ alertmanager:
           resources:
             requests:
               storage: 2Gi
+    # Mounts the ExternalSecret-materialised Secret at
+    # /etc/alertmanager/secrets/slack-alerts/ — config.receivers below reads
+    # the URL from there by file path (api_url_file), never inline. This repo
+    # is public; a Slack incoming webhook URL is a bearer credential anyone
+    # holding it can post into the channel it targets with.
+    secrets:
+      - slack-alerts
   config:
-    # TODO: point at a real receiver. A null receiver means alerts fire into
-    # nothing, which is worse than no alerting because it looks like it works.
+    # 36 PrometheusRules already ship with this chart and were already
+    # evaluating — a null receiver meant every one of them fired into
+    # nothing, which is worse than no alerting because it looks like it
+    # works. group_wait/group_interval/repeat_interval are the chart's own
+    # defaults, made explicit rather than left implicit now that this
+    # actually sends somewhere a human will see it.
     route:
-      receiver: "null"
+      receiver: slack-alerts
+      group_by: ["namespace", "alertname"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
     receivers:
-      - name: "null"
+      - name: slack-alerts
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/slack-alerts/webhook-url
+            send_resolved: true
+            title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts }}*{{ .Labels.severity | toUpper }}*
+              ({{ .Labels.namespace }}) {{ .Annotations.summary }}
+              {{ .Annotations.description }}
+              {{ end }}
 
 grafana:
   enabled: true
