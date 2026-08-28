@@ -95,8 +95,23 @@ spec:
                 # local directory name into the uploaded key.
                 - --output-directory
                 - /home/prowler/output/findings
+                # --output-bucket's own --help is explicit that it "requires
+                # -M <mode>" - confirmed live the hard way: without this,
+                # local files were written (Prowler's own default formats)
+                # but nothing reached S3 at all, no error either.
+                - --output-formats
+                - csv
+                - json-ocsf
+                - html
                 - --output-bucket
                 - nineteenseventytwo-prowler-517148962038
+                # Prowler's own documented behaviour: exit 3 means "the scan
+                # ran fine and found FAIL results", not a crash - normal for
+                # basically every real account, every day. Findings are the
+                # output this Job exists to produce; without this flag the
+                # Job (and its Pod) would read as failed on every single
+                # non-empty run, and a real crash would look identical.
+                - --ignore-exit-code-3
               resources:
                 requests: {cpu: 250m, memory: 512Mi}
                 # Still generous margin above the 2-region scan's actual
