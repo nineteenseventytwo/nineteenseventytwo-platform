@@ -248,11 +248,30 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       rejects a wrong/empty passphrase), `bootstrap/ssh/break-glass.pub`
       committed and matches console's live `authorized_keys` byte-for-byte,
       private key removed from the workstation
-- [ ] **Then** retire `ansible-console` and `ansible-workstation` from
-      `authorized_keys` — this is the step that makes Tier 3 real rather than
-      additive, and the secret inventory already marks both "retired at Phase D".
-      Tooling for this landed in PR #47 (`hardening_ssh_retire_legacy_keys`),
-      defaulted off; flipping it is the one step left
+- [x] **Retire `ansible-console` and `ansible-workstation` from
+      `authorized_keys`** — done 2026-08-28. `hardening_ssh_retire_legacy_keys:
+      true`, `make deploy-nodes` run for real: `master`/`worker-1`/`worker-2`
+      now have empty `authorized_keys`, `console` has `break-glass` as its
+      only static entry. Verified with all four `sign.sh` targets connecting
+      cleanly post-cutover, not just the ansible run reporting success.
+      `wait_for_connection`'s own post-task failed with `Permission denied` on
+      all four — expected, not a fault: it authenticates with
+      `ansible-workstation`, the key the same run had just retired, so of
+      course a fresh connection with it fails now
+- [ ] **Found immediately after, running the cutover itself**: nothing signs
+      a certificate over `ansible-workstation`'s keypair the way
+      `sign-ci.sh` does for `ansible-console`'s. The Makefile's default
+      `SSH_KEY` (`ansible-workstation`) is a static key with no path to
+      authenticate anywhere anymore — `make deploy-nodes`/`deploy-cicd` run
+      from a workstation now has no working default. Works today only by
+      hand: `VAULT_SSH_KEY=~/.ssh/ansible-workstation bootstrap/ssh/sign.sh`
+      first (writes `ansible-workstation-cert.pub`, which the Makefile's
+      existing `SSH_CERT` wildcard mount already picks up with no further
+      changes — the mechanism generalizes, it just isn't wired up as a
+      default or documented as a required step yet). `mark-workstation`
+      itself is not the fix: it's passphrase-protected, correctly, and a
+      passphrase prompt inside a non-interactive container is exactly the
+      problem `ansible-workstation` existed to avoid in the first place
 - [ ] **Found while testing sign.sh, and again while testing sign-ci.sh**:
       none of `argocd.`/`vault.`/`grafana.eightbitsaxlounge.com` resolve
       from either VLAN 10 or `1972-console-1`, despite
