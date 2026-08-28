@@ -69,6 +69,8 @@ apiServer:
       value: "3"
     - name: audit-log-maxsize
       value: "50"
+    - name: audit-policy-file
+      value: {{ kube_control_plane_audit_policy_path }}
   extraVolumes:
     - name: encryption-config
       hostPath: /etc/kubernetes/enc
@@ -78,6 +80,11 @@ apiServer:
     - name: admission-config
       hostPath: /etc/kubernetes/admission
       mountPath: /etc/kubernetes/admission
+      readOnly: true
+      pathType: DirectoryOrCreate
+    - name: audit-policy
+      hostPath: /etc/kubernetes/audit
+      mountPath: /etc/kubernetes/audit
       readOnly: true
       pathType: DirectoryOrCreate
     - name: audit-log

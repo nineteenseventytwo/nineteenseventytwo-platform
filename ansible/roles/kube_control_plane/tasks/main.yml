@@ -33,6 +33,7 @@
   loop:
     - /etc/kubernetes/enc
     - /etc/kubernetes/admission
+    - /etc/kubernetes/audit
   become: true
 
 - name: Generate an etcd encryption key
@@ -62,6 +63,15 @@
   ansible.builtin.template:
     src: admission-config.yaml.j2
     dest: "{{ kube_control_plane_admission_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+
+- name: Write the audit policy
+  ansible.builtin.template:
+    src: audit-policy.yaml.j2
+    dest: "{{ kube_control_plane_audit_policy_path }}"
     owner: root
     group: root
     mode: "0600"
