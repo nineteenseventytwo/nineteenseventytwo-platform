@@ -111,7 +111,16 @@ spec:
 # Alertmanager (notifications_total{integration="slack"}=1, 0 failures
 # recorded) but never reached Slack. `wget https://hooks.slack.com` from the
 # pod itself timed out at connect, not at DNS resolution - allow-dns-egress
-# above was already sufficient; only the TCP:443 path was missing.
+# above was already sufficient for the DNS *packets* to flow.
+#
+# What toFQDNs alone (first attempt, this PR's earlier revision) missed:
+# Cilium only learns an FQDN's IP by snooping DNS traffic through its own
+# embedded proxy, which only activates for DNS covered by a rule with an
+# explicit `rules.dns` block inside a CiliumNetworkPolicy. The plain
+# Kubernetes allow-dns-egress rule lets the packets through but Cilium never
+# inspects them for the mapping, so toFQDNs had no IP to allow - confirmed
+# live by the same connect timeout persisting even after that rule merged.
+# The toEndpoints/toPorts block below is what actually populates the cache.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -122,6 +131,17 @@ spec:
     matchLabels:
       app.kubernetes.io/name: alertmanager
   egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s-app: kube-dns
+            k8s:io.kubernetes.pod.namespace: kube-system
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
     - toFQDNs:
         - matchName: hooks.slack.com
       toPorts:
