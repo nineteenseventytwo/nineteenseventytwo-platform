@@ -164,3 +164,148 @@ spec:
         - {protocol: TCP, port: 53}
     - to:
         - podSelector: {}
+---
+# CI-scoped credential for the operations docs/05-migration.md keeps in the
+# app repo rather than moving to GitOps - chat-set-environment,
+# midi-data-*, midi-request-* - "data/runtime operations against a running
+# deployment, not cluster config". Routine deploys are Argo CD's own
+# reconciliation of apps/eightbitsaxlounge/, not this ServiceAccount:
+# Deployments/Services/Ingresses are deliberately read-only below so this
+# credential can't fight that reconciliation loop. Restarting a workload from
+# here means deleting its Pod (the "pods: delete" verb) and letting the
+# Deployment's own controller recreate it - not patching the Deployment
+# directly.
+#
+# The exact verb set is a reasonable baseline, not a transcript of the actual
+# app-repo scripts, which live in eightbitsaxlounge/server and weren't
+# available to check against while 8bsl's own migration is on hold. Revisit
+# when that migration resumes and the real scripts can be checked against it.
+#
+# generate-kubeconfig.sh in this same directory turns this ServiceAccount
+# into the kubeconfig the app repo's pipeline actually reads - see that
+# script for how it gets from here into Vault.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eightbitsaxlounge-ci
+  namespace: eightbitsaxlounge-dev
+---
+# Kubernetes 1.24+ no longer auto-creates a long-lived token Secret for a
+# ServiceAccount - this is the explicit opt-in, needed because a CI
+# credential has to outlive the ~1h TokenRequest tokens kubectl/client-go
+# mint by default for everything else.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: eightbitsaxlounge-ci-token
+  namespace: eightbitsaxlounge-dev
+  annotations:
+    kubernetes.io/service-account.name: eightbitsaxlounge-ci
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenant-ci
+  namespace: eightbitsaxlounge-dev
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    # Read-only: this credential consumes ExternalSecret-materialised
+    # Secrets, it never mints its own. Values still pass through Vault.
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenant-ci
+  namespace: eightbitsaxlounge-dev
+subjects:
+  - kind: ServiceAccount
+    name: eightbitsaxlounge-ci
+    namespace: eightbitsaxlounge-dev
+roleRef:
+  kind: Role
+  name: tenant-ci
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eightbitsaxlounge-ci
+  namespace: eightbitsaxlounge-prod
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: eightbitsaxlounge-ci-token
+  namespace: eightbitsaxlounge-prod
+  annotations:
+    kubernetes.io/service-account.name: eightbitsaxlounge-ci
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenant-ci
+  namespace: eightbitsaxlounge-prod
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenant-ci
+  namespace: eightbitsaxlounge-prod
+subjects:
+  - kind: ServiceAccount
+    name: eightbitsaxlounge-ci
+    namespace: eightbitsaxlounge-prod
+roleRef:
+  kind: Role
+  name: tenant-ci
+  apiGroup: rbac.authorization.k8s.io

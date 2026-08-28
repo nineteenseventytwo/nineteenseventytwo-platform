@@ -26,7 +26,8 @@ CNI swap — see [ADR-0003](../docs/decisions/ADR-0003-cni-cilium-no-mesh.md).
 `platform` creates the namespace, quota and RBAC. The app repo gets a
 kubeconfig for a ServiceAccount that can act **only** in its own namespace, and
 its pipeline uses that. It cannot create namespaces, cannot touch cluster-scoped
-resources, and cannot exceed its quota.
+resources, and cannot exceed its quota. `bootstrap/tenant-kubeconfig/generate.sh`
+turns the ServiceAccount into that kubeconfig and publishes it to Vault.
 
 ResourceQuota matters more than it sounds on 2 GB nodes: one runaway Deployment
 should not be able to evict Prometheus.
