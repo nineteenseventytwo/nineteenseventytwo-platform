@@ -1015,3 +1015,49 @@ spec:
   endpointSelector: {}
   egress:
     - toEntities: [kube-apiserver]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Prowler has to reach whatever it's auditing - dozens of regional AWS API
+# endpoints (EC2, IAM, S3, KMS, GuardDuty, and everything else SecurityAudit/
+# ViewOnlyAccess cover) plus S3 itself for the findings upload. A toFQDNs
+# allowlist per service isn't practical the way it was for Alertmanager's one
+# Slack webhook (see allow-alertmanager-slack-egress in this same file), so
+# this is the same shape as allow-arc-runners above: broad 443 egress with the
+# private ranges excluded, scoped to this namespace, which carries nothing
+# but the prowler CronJob.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-security-prowler
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}

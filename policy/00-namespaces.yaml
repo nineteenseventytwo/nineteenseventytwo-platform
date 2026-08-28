@@ -137,3 +137,17 @@ metadata:
     # scheduled, on any node, from first sync.
     pod-security.kubernetes.io/enforce: privileged
     platform.nineteenseventytwo/tier: infra
+---
+# Prowler's scan pod runs unprivileged (see policy/30-prowler.yaml) - no host
+# access, no special capabilities, just outbound HTTPS to AWS's APIs and S3.
+# Already scoped into pod-identity-webhook's namespaceSelector alongside
+# argocd/vault/longhorn-system - see ADR-0014.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
