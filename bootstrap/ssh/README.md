@@ -38,6 +38,23 @@ vault read -field=public_key ssh-client-signer/config/ca > bootstrap/ssh/ca.pub
 ./bootstrap/ssh/sign.sh 192.168.20.202
 ```
 
+The cutover this enables is done (2026-08-28,
+[docs/plan/05-provisioning-completion-plan.md](../../docs/plan/05-provisioning-completion-plan.md)
+WP-3.1): a certificate is the only way onto `1972-master-1`, `1972-worker-1`
+and `1972-worker-2` now, and onto `1972-console-1` alongside break-glass.
+`make ssh-ws HOST=<ip>` wraps the two exports `sign.sh` needs (`VAULT_ADDR`,
+and a `VAULT_TOKEN` prompt if your shell doesn't already have one) so you
+don't retype them every session — same script underneath, nothing new to
+learn if you'd rather call it directly.
+
+CI has its own, non-interactive equivalent
+(`bootstrap/ssh/sign-ci.sh`, AppRole instead of a typed token) — see
+[docs/02-cicd.md](../../docs/02-cicd.md). Running `make deploy-nodes` or
+similar Ansible targets *from a workstation* rather than as a human `ssh`
+session is a third case, still open: nothing signs a certificate over
+`ansible-workstation`'s keypair yet, so that path needs its own fix, not
+this one.
+
 Keep one break-glass static key on `1972-console-1`, offline, for when Vault is
 the thing that is down. It is the only `authorized_keys` entry that survives the
 CA cutover.

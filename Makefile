@@ -249,6 +249,40 @@ bootstrap-render-all: ## Render cloud-init for every host in the inventory
 known-hosts: ## Regenerate ansible/files/known_hosts from the live lab nodes
 	bootstrap/ssh/scan-known-hosts.sh
 
+# Post-cutover (docs/plan/05-provisioning-completion-plan.md WP-3.1),
+# sign.sh is the only way onto a node interactively — this just removes the
+# two things you'd otherwise type by hand every time. VAULT_ADDR defaults the
+# same way every other target that talks to Vault does; VAULT_TOKEN is only
+# prompted for if your shell doesn't already have one exported, so a session
+# where you've already logged in once pays no extra cost. The prompt uses
+# `read -s`, not `read`, so the token never lands in your shell history or
+# this terminal's scrollback.
+.PHONY: ssh-ws
+ssh-ws: ## Sign a fresh cert and SSH to a node as yourself. Usage: make ssh-ws HOST=192.168.20.202
+	@test -n "$(HOST)" || { echo "usage: make ssh-ws HOST=<ip>" >&2; exit 1; }
+	@VAULT_ADDR="$${VAULT_ADDR:-https://vault.eightbitsaxlounge.com}"; \
+	if [ -z "$$VAULT_TOKEN" ]; then \
+	  read -r -s -p "Vault token: " VAULT_TOKEN; echo >&2; \
+	fi; \
+	VAULT_ADDR="$$VAULT_ADDR" VAULT_TOKEN="$$VAULT_TOKEN" bootstrap/ssh/sign.sh "$(HOST)"
+
+# For deploy-nodes/deploy-cluster run *from a workstation*, not CI: sign_ci.sh
+# covers ansible-console for CI's own containerized runs (AppRole, no human
+# in the loop); this is the same gap for ansible-workstation, closed the same
+# shape — sign, don't connect — but authenticated the way a human at a
+# terminal actually can be, a typed Vault token, not a second AppRole
+# credential sitting on a laptop for no real benefit over just asking. No
+# HOST target: sign.sh with none signs and exits, which is exactly what a
+# file waiting to be mounted into a container needs, not a shell.
+.PHONY: sign-ws
+sign-ws: ## Sign a fresh cert for ansible-workstation, for a workstation-run deploy-nodes/deploy-cluster
+	@VAULT_ADDR="$${VAULT_ADDR:-https://vault.eightbitsaxlounge.com}"; \
+	if [ -z "$$VAULT_TOKEN" ]; then \
+	  read -r -s -p "Vault token: " VAULT_TOKEN; echo >&2; \
+	fi; \
+	VAULT_ADDR="$$VAULT_ADDR" VAULT_TOKEN="$$VAULT_TOKEN" \
+	  VAULT_SSH_KEY="$(HOME)/.ssh/ansible-workstation" bootstrap/ssh/sign.sh
+
 .PHONY: test-network
 test-network: ## Run the VLAN 20 validation matrix (docs/01-network-validation.md)
 	tests/network-check.sh

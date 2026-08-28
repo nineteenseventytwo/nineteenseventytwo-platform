@@ -3,12 +3,20 @@
 #
 #   bootstrap/ssh/sign.sh <host> [user]
 #
+# HOST is optional: with none, signs the cert and exits without connecting
+# anywhere — `make sign-ws` uses exactly this to put a fresh
+# ansible-workstation-cert.pub in place before a workstation-run
+# `make deploy-nodes`/`deploy-cluster`, which need a *file* to mount into
+# their container, not an interactive session. Same signing path either way,
+# so there's one place this logic lives rather than two scripts to keep in
+# sync.
+#
 # Phase D only — this fails cleanly until Vault's ssh-client-signer engine
 # exists. The certificate TTL is 5 minutes by design: it expires before you have
 # finished making tea, which is the entire point.
 set -euo pipefail
 
-HOST="${1:?usage: sign.sh <host> [user]}"
+HOST="${1:-}"
 USER_NAME="${2:-${VAULT_SSH_USER:-mchellmer}}"
 ROLE="${VAULT_SSH_ROLE:-admin}"
 KEY="${VAULT_SSH_KEY:-$HOME/.ssh/mark-workstation}"
@@ -29,10 +37,27 @@ if [[ ! -f "${KEY}.pub" ]]; then
 fi
 
 CERT="${KEY}-cert.pub"
+# Sign into a temp file, not $CERT directly: `>` truncates its target before
+# vault write ever runs, so a failed sign — bad token, CIDR rejection,
+# whatever — left a real, 0-byte $CERT behind despite `set -e` catching the
+# failure immediately after. That file is exactly what the Makefile's
+# SSH_CERT wildcard mount looks for, and sign-only mode (no HOST) exists
+# specifically so this file outlives the script for something else to use
+# later — an empty one sitting there is a landmine, not a mistake that fails
+# loudly next time.
+TMP_CERT="$(mktemp "${CERT}.XXXXXX")"
+trap 'rm -f "$TMP_CERT"' EXIT
 vault write -field=signed_key "ssh-client-signer/sign/${ROLE}" \
   public_key="@${KEY}.pub" \
-  valid_principals="${USER_NAME}" > "$CERT"
-chmod 600 "$CERT"
+  valid_principals="${USER_NAME}" > "$TMP_CERT"
+chmod 600 "$TMP_CERT"
+mv "$TMP_CERT" "$CERT"
+trap - EXIT
 
 echo "certificate written to ${CERT} (expires in ~5m)"
+
+if [[ -z "$HOST" ]]; then
+  exit 0
+fi
+
 exec ssh -i "$CERT" -i "$KEY" "${USER_NAME}@${HOST}"
