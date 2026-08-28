@@ -74,6 +74,14 @@ jobs:
           output_file_path: checkov.sarif
 
       - name: Trivy filesystem scan - secrets and vulnerable pins
+        # advisory until the backlog is triaged, same stance as Checkov's
+        # soft_fail above. Unlike Checkov, trivy-action has no soft_fail
+        # input - continue-on-error is what keeps a HIGH/CRITICAL misconfig
+        # finding (there are ~100 already open against main, none related
+        # to any one PR) from turning this step, and the SARIF-driven
+        # "Trivy" check GitHub derives from it, red on every future PR that
+        # happens to touch a file carrying one.
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
