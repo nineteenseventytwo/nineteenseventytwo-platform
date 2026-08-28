@@ -126,5 +126,6 @@ what it can reach, rotation cadence, blast radius — is
 | [03-cluster.md](docs/03-cluster.md) | kubeadm, Cilium, addons, Argo CD |
 | [04-secrets.md](docs/04-secrets.md) | Secret inventory and rotation |
 | [06-aws-federation.md](docs/06-aws-federation.md) | IRSA on kubeadm: the OIDC issuer, the JWKS bucket, Cloudflare, and the rollout order |
+| [07-runbooks.md](docs/07-runbooks.md) | Documented fixes for recurring incidents, starting with what an unclean reboot leaves behind |
 | [decisions/](docs/decisions/) | ADRs |
 | [plan/](docs/plan/) | The originating plan this repo was built from |
