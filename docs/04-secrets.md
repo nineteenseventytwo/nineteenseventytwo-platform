@@ -143,7 +143,7 @@ minutes to maintain.
 | `ansible-workstation` SSH key | Workstations only, alongside `mark-workstation`; never in GitHub or git | Nothing anymore as a static entry — **retired from every node's `authorized_keys` 2026-08-28**. Unlike `ansible-console`, nothing currently signs a certificate over this keypair — see the open follow-up below | Moot until something re-adopts this keypair for cert signing; the file itself can be deleted once that's decided either way | No longer root-equivalent on its own, same as `ansible-console` above. |
 | Node host keys (`known_hosts`) | Committed at `ansible/files/known_hosts`, regenerated with `make known-hosts` | — | On node reimage | None — these are public keys. Committed rather than held as an Actions secret so `host_key_checking` stays meaningfully on without a credential to distribute. |
 | `KUBECONFIG` | Org Actions secret | `deploy-cluster.yml`'s Argo CD nudge-and-wait | On cluster rebuild | Whatever RBAC the embedded credential carries — scope it, don't hand it cluster-admin. Retire once ESO/in-cluster auth makes a static kubeconfig unnecessary. |
-| etcd encryption key | `/etc/kubernetes/enc/` on `1972-master-1`, mode 0600 | Every Secret in the cluster at rest | Manual rekey (rewrites every Secret) | Reads every cluster Secret from an etcd snapshot or a stolen SSD. **Back it up with the etcd snapshot, not instead of it — losing it makes every Secret unreadable.** |
+| etcd encryption key | `/etc/kubernetes/enc/` on `1972-master-1`, mode 0600 | Every Secret and ConfigMap in the cluster at rest | Manual rekey (rewrites every Secret and ConfigMap) — see [below](#etcd-encryption-key-backup-and-rotation) | Reads every cluster Secret from an etcd snapshot or a stolen SSD. **Back it up with the etcd snapshot, not instead of it — losing it makes every Secret unreadable.** |
 | Vault recovery keys | Password manager, split across two entries | `generate-root`, rekey | On personnel change | Full Vault takeover via root token generation. Not unseal keys — auto-unseal is KMS. |
 | AWS KMS keys (`sops`, `vault-unseal`) | AWS only. **No credential in the cluster** — pods assume a role via the cluster OIDC issuer ([06-aws-federation.md](06-aws-federation.md)) | Vault's seal; Argo CD's SOPS decryption | Key never; nothing else to rotate | Vault cannot unseal if the role is revoked. There is no long-lived key to leak — that is the point, and `DenyIAMUsersAndKeys` makes creating one impossible. |
 | Cloudflare API token | Vault `kv/platform/cloudflare` | `Zone:DNS:Edit` on one zone | Semi-annual | DNS records for one zone — enough to mis-issue certificates for it. Scope to the single zone, never account-wide. |
@@ -158,3 +158,104 @@ minutes to maintain.
    waits on a human.
 3. Vault is populated from the SOPS values, **once**, by hand.
 4. Everything else reads from Vault via `ExternalSecret`.
+
+### etcd encryption key backup and rotation
+
+`ansible/roles/kube_control_plane/tasks/main.yml` generates this key with
+`lookup('password', ...)` and writes it once — the `stat` check that guards
+the write means the *file* is never overwritten by a later playbook run, but
+the Ansible *variable* itself is never persisted anywhere (not SOPS, not a
+group_var). The only copy of the key that has ever existed lives in
+`/etc/kubernetes/enc/encryption-config.yaml` on `1972-master-1`, and nowhere
+else. That is the real gap this section closes — rotation is the secondary
+concern, backup is the primary one: there is currently nothing to roll back
+to if that file is lost, rotation or not.
+
+#### Back up the current key now, before anything else
+
+```bash
+ssh 1972-master-1 "sudo cat /etc/kubernetes/enc/encryption-config.yaml" \
+  | grep -A2 aescbc
+```
+
+Store the `secret:` value alongside the etcd snapshot backup and the Vault
+recovery keys — same handling as those, per the table above. Do this even if
+you have no plan to rotate; it is the single point of failure the header
+comment on that file already warns about.
+
+#### Rotating it
+
+Adds a second key ahead of the current one, forces every Secret and
+ConfigMap to be rewritten under it, then removes the old key — the standard
+[Kubernetes encryption-at-rest rotation procedure](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#rotating-a-decryption-key),
+adapted for the two things specific to this cluster: `configmaps` are in
+scope here, not just `secrets` (see `encryption-config.yaml.j2`), and
+kubelet does not hot-reload this file — editing it alone does nothing until
+the apiserver actually restarts.
+
+1. **Take an etcd snapshot first.** If a step below goes wrong partway
+   through, this is the actual rollback, not the key backup above (that
+   recovers the *key*; this recovers the *state* the key decrypts).
+
+2. **Generate the new key** and add it *first*, old key second, in
+   `/etc/kubernetes/enc/encryption-config.yaml` on `1972-master-1`:
+
+   ```bash
+   NEW_KEY=$(openssl rand -base64 32)
+   ```
+
+   ```yaml
+   apiVersion: apiserver.config.k8s.io/v1
+   kind: EncryptionConfiguration
+   resources:
+     - resources:
+         - secrets
+         - configmaps
+       providers:
+         - aescbc:
+             keys:
+               - name: key2
+                 secret: <NEW_KEY>
+               - name: key1
+                 secret: <the key you just backed up>
+         - identity: {}
+   ```
+
+3. **Restart the apiserver so it re-reads the file.** Same mechanic as the
+   [control-plane static pod runbook](07-runbooks.md#control-plane-static-pods-stuck-after-a-node-reboot) —
+   cycling the manifest, not `systemctl restart kubelet`, is what actually
+   forces a fresh read:
+
+   ```bash
+   sudo mv /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/
+   sleep 5
+   sudo mv /tmp/kube-apiserver.yaml /etc/kubernetes/manifests/
+   ```
+
+   Confirm it came back before continuing: `kubectl get --raw /healthz`.
+
+4. **Force every Secret and ConfigMap to be rewritten** — a no-op update
+   through the apiserver is what actually re-encrypts them under whichever
+   key is now first in the list:
+
+   ```bash
+   kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+   kubectl get configmaps --all-namespaces -o json | kubectl replace -f -
+   ```
+
+5. **Remove the old key** from the file (only `key2` remains), and cycle the
+   apiserver manifest again, the same way as step 3.
+
+6. **Back up the new key** the same way as the first step above, and update
+   whatever secure storage held the old one. The live file is still the only
+   copy that matters day to day; this is what makes it recoverable if it
+   is not.
+
+Consider, separately from any single rotation, whether the current key
+should also be added to the SOPS-encrypted group_vars as an explicit
+override for `kube_control_plane_etcd_encryption_key` — as written, a full
+control-plane rebuild generates a *new* random key that cannot decrypt an
+existing etcd snapshot, which is a real risk to disaster-recovery even
+outside of a deliberate rotation. That is a deliberate design tradeoff (key
+material off git entirely, even encrypted) rather than an oversight, so
+worth a conscious decision rather than a silent fix.
