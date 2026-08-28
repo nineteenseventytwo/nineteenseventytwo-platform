@@ -63,6 +63,13 @@ alertmanager:
       group_interval: 5m
       repeat_interval: 4h
     receivers:
+      # The chart's default route.routes (untouched above, since we only set
+      # route's top-level keys) still ships a Watchdog -> "null" sub-route.
+      # Helm replaces receivers wholesale rather than merging list items, so
+      # overriding this list without keeping "null" left that sub-route
+      # pointing at a receiver that no longer existed — confirmed live via
+      # the operator's "undefined receiver \"null\" used in route" error.
+      - name: "null"
       - name: slack-alerts
         slack_configs:
           - api_url_file: /etc/alertmanager/secrets/slack-alerts/webhook-url
