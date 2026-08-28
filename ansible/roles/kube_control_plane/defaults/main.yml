@@ -2,6 +2,7 @@
 kube_control_plane_kubeconfig: /etc/kubernetes/admin.conf
 kube_control_plane_encryption_key_path: /etc/kubernetes/enc/encryption-config.yaml
 kube_control_plane_admission_config_path: /etc/kubernetes/admission/admission-config.yaml
+kube_control_plane_audit_policy_path: /etc/kubernetes/audit/audit-policy.yaml
 
 # 30-cluster.yml's kubernetes.core.helm_repository/helm tasks (Cilium) run on
 # hosts: control_plane and shell out to a real `helm` binary on the target —

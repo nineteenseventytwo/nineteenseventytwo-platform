@@ -1,0 +1,61 @@
+# Managed by ansible/roles/kube_control_plane. Do not edit on the host.
+#
+# --audit-log-path has been set since this cluster's first build, and did
+# nothing: without a policy file the apiserver has no policy to log against,
+# confirmed live by a total absence of anything audit-related in its own
+# logs. This is the missing half.
+#
+# Deliberately not RequestResponse-everything — the log rotation this pairs
+# with (audit-log-maxsize/maxbackup in kubeadm-config.yaml.j2) is 50MB * 3
+# backups, sized for a lab, not an exhaustive trail. Rules are ordered
+# most-specific-first; the apiserver stops at the first match.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages:
+  - RequestReceived
+rules:
+  # Secrets/ConfigMaps: log that one was touched and by whom, never the
+  # payload. Request/RequestResponse here would put every value ESO
+  # materialises from Vault straight into a plaintext file on disk — exactly
+  # what Vault and SOPS+age both exist to avoid.
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+
+  # RBAC changes are the highest-value thing to have a trail for at all —
+  # who granted what, to whom, and when.
+  - level: RequestResponse
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+
+  # A shell in a pod, or an attach/port-forward onto one, is the single most
+  # security-relevant action short of an RBAC change.
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["pods/exec", "pods/attach", "pods/portforward"]
+
+  # Routine, high-volume, near-zero-value: component health polling and node
+  # heartbeats. Dropping these is what keeps the 50MB/14-day rotation
+  # actually covering something instead of filling with kubelet noise.
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+  - level: None
+    userGroups: ["system:nodes"]
+    verbs: ["get"]
+    resources:
+      - group: ""
+        resources: ["nodes", "nodes/status"]
+  - level: None
+    nonResourceURLs:
+      - "/healthz*"
+      - "/livez*"
+      - "/readyz*"
+      - "/metrics"
+
+  # Everything else: enough to reconstruct who did what against which
+  # object, without the request/response bodies.
+  - level: Metadata
