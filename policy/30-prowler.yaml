@@ -90,11 +90,25 @@ spec:
                 - --region
                 - eu-west-2
                 - us-east-1
-                # findings/ matches the bucket policy's write scope exactly
-                # (s3:PutObject on <bucket>/findings/*) - Prowler mirrors this
-                # local directory name into the uploaded key.
+                # A bare relative name, not /home/prowler/output/findings -
+                # Prowler's S3 key-mapping (get_object_path in
+                # providers/aws/lib/s3/s3.py) strips everything up to and
+                # including the first literal "prowler/" substring in
+                # --output-directory before using the rest as the S3 key
+                # prefix. Every path under this image's own home directory
+                # contains that substring, so the original absolute path
+                # silently uploaded to <bucket>/output/findings/* instead of
+                # <bucket>/findings/* - a full prefix mismatch against the
+                # bucket policy's exact-match IAM condition, which produced a
+                # bare AccessDenied that send_to_bucket's own try/except only
+                # ever sends to Prowler's logger, never stdout. Confirmed by
+                # reading that method directly inside this pinned image and
+                # separately confirming empirically the bucket stayed empty.
+                # Relative "findings" avoids the substring entirely and
+                # resolves under the WorkingDir (/home/prowler), which the
+                # volumeMount below places the same emptyDir at.
                 - --output-directory
-                - /home/prowler/output/findings
+                - findings
                 # --output-bucket's own --help is explicit that it "requires
                 # -M <mode>" - confirmed live the hard way: without this,
                 # local files were written (Prowler's own default formats)
@@ -124,7 +138,7 @@ spec:
                   drop: [ALL]
               volumeMounts:
                 - name: output
-                  mountPath: /home/prowler/output
+                  mountPath: /home/prowler/findings
           volumes:
             - name: output
               emptyDir:
