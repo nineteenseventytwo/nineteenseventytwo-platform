@@ -1,0 +1,104 @@
+---
+# Scheduled Prowler scan (ADR-0005 in nineteenseventytwo-cloud) - reads the
+# whole account (SecurityAudit + ViewOnlyAccess, attached in the cloud repo's
+# platform-prod stack) and writes JSON findings to the security account's S3
+# bucket. Read-everything, write-one-prefix: a posture scanner that can
+# change posture is a posture problem, so the role's only write permission is
+# s3:PutObject under <bucket>/findings/*.
+#
+# Sits in its own namespace (policy/00-namespaces.yaml) rather than an
+# existing one specifically so the broad 443 egress in
+# 10-default-deny.yaml's allow-security-prowler rule is contained to exactly
+# this workload and nothing else.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prowler
+  namespace: security
+  annotations:
+    # Picked up by pod-identity-webhook (cluster/pod-identity-webhook/), which
+    # is already scoped to this namespace - see ADR-0014. Role and its
+    # SecurityAudit/ViewOnlyAccess attachments: nineteenseventytwo-cloud
+    # live/aws/platform-prod/cluster-federation.tf.
+    eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-prowler"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: prowler-scan
+  namespace: security
+  annotations:
+    # prowlercloud/prowler hardcodes uid 1000 and chmods /home/prowler 700 -
+    # confirmed empirically: `podman run --user 10000:10000` on this same
+    # image fails to even exec the entrypoint with "Permission denied" before
+    # prowler's own code runs at all, because nothing but uid 1000 can
+    # traverse into its home directory. A high, host-conflict-avoiding UID
+    # is not available without maintaining a derivative image, which is a
+    # bigger investment than a third-party scanner CronJob warrants here.
+    checkov.io/skip1: "CKV_K8S_40=image hardcodes uid 1000, confirmed empirically no other uid can exec it"
+spec:
+  # Once a day is the whole trade-off ADR-0005 makes explicit: a scheduled
+  # scan has a detection window as wide as its interval. Off-peak UTC hour,
+  # arbitrary otherwise.
+  schedule: "0 5 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # A full unrestricted-checks scan against a small account should finish
+      # in minutes, not hours - this bounds a hung run rather than tuning for
+      # the common case.
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 259200
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: prowler
+        spec:
+          serviceAccountName: prowler
+          restartPolicy: Never
+          # This pod only ever talks to AWS (via the pod-identity-webhook's
+          # own injected, separately-audienced token, added regardless of
+          # this setting) - the aws provider makes no Kubernetes API calls,
+          # so the default API server token has nothing to do here.
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: prowler
+              # Pinned to the arm64 image the manifest list resolves to on
+              # this cluster's own nodes (ADR-0011) - confirmed against the
+              # registry, not assumed from a locally cached pull.
+              # docker.io/prowlercloud/prowler:stable, 2026-08-28.
+              image: docker.io/prowlercloud/prowler@sha256:8ecf84790981d0ef29b015c20ee0de6561437a20b91a60ecb101238b543f867f
+              imagePullPolicy: Always
+              args:
+                - aws
+                # findings/ matches the bucket policy's write scope exactly
+                # (s3:PutObject on <bucket>/findings/*) - Prowler mirrors this
+                # local directory name into the uploaded key.
+                - --output-directory
+                - /home/prowler/output/findings
+                - --output-bucket
+                - nineteenseventytwo-prowler-517148962038
+              resources:
+                requests: {cpu: 250m, memory: 384Mi}
+                limits: {cpu: "1", memory: 1Gi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: output
+                  mountPath: /home/prowler/output
+          volumes:
+            - name: output
+              emptyDir:
+                sizeLimit: 512Mi
