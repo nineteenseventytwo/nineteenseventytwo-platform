@@ -258,20 +258,23 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       all four — expected, not a fault: it authenticates with
       `ansible-workstation`, the key the same run had just retired, so of
       course a fresh connection with it fails now
-- [ ] **Found immediately after, running the cutover itself**: nothing signs
-      a certificate over `ansible-workstation`'s keypair the way
-      `sign-ci.sh` does for `ansible-console`'s. The Makefile's default
-      `SSH_KEY` (`ansible-workstation`) is a static key with no path to
-      authenticate anywhere anymore — `make deploy-nodes`/`deploy-cicd` run
-      from a workstation now has no working default. Works today only by
-      hand: `VAULT_SSH_KEY=~/.ssh/ansible-workstation bootstrap/ssh/sign.sh`
-      first (writes `ansible-workstation-cert.pub`, which the Makefile's
-      existing `SSH_CERT` wildcard mount already picks up with no further
-      changes — the mechanism generalizes, it just isn't wired up as a
-      default or documented as a required step yet). `mark-workstation`
-      itself is not the fix: it's passphrase-protected, correctly, and a
-      passphrase prompt inside a non-interactive container is exactly the
-      problem `ansible-workstation` existed to avoid in the first place
+- [x] **Found immediately after, running the cutover itself; closed same
+      day**: nothing signed a certificate over `ansible-workstation`'s
+      keypair the way `sign-ci.sh` does for `ansible-console`'s, so
+      `make deploy-nodes`/`deploy-cicd` run from a workstation had no
+      working default `SSH_KEY`. Closed without a third script:
+      `bootstrap/ssh/sign.sh`'s `HOST` argument is now optional — with
+      none, it signs and exits rather than connecting — and `make sign-ws`
+      wraps that against `ansible-workstation`, prompting for a Vault token
+      the same way `make ssh-ws` already does. `make sign-ws` then
+      `make deploy-nodes` works with no further changes, since the
+      Makefile's `SSH_CERT` wildcard mount already existed. Also fixed in
+      the same pass: `sign.sh`'s `> "$CERT"` truncated its target before
+      `vault write` ran, so a failed sign left a real 0-byte cert file
+      behind — harmless when the script's only failure mode was "fail
+      loudly in front of you," a live landmine once sign-only mode meant
+      the file was meant to outlive the script. Fixed with mktemp + trap +
+      mv; confirmed live that a second failed attempt leaves nothing behind.
 - [ ] **Found while testing sign.sh, and again while testing sign-ci.sh**:
       none of `argocd.`/`vault.`/`grafana.eightbitsaxlounge.com` resolve
       from either VLAN 10 or `1972-console-1`, despite
@@ -286,8 +289,11 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
 
 ### 3.2 TLS (Tier 4) — follows WP-1.2
 
-- [ ] Staging issues cleanly → production for all three hosts
-- [ ] Confirm the `internal-ca` ClusterIssuer path still works (it is `True` now)
+- [x] Staging issues cleanly → production for all three hosts — done in PR
+      #44. Confirmed live: all three (`argocd`/`vault`/`grafana`) show
+      `Ready: True` with `issuer=O=Let's Encrypt, CN=YR1` — real
+      production, not staging
+- [x] Confirm the `internal-ca` ClusterIssuer path still works — `Ready: True`
 
 ### 3.3 The remaining secret-hygiene items
 

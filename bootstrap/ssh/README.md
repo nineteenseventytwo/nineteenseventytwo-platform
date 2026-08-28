@@ -51,9 +51,11 @@ CI has its own, non-interactive equivalent
 (`bootstrap/ssh/sign-ci.sh`, AppRole instead of a typed token) — see
 [docs/02-cicd.md](../../docs/02-cicd.md). Running `make deploy-nodes` or
 similar Ansible targets *from a workstation* rather than as a human `ssh`
-session is a third case, still open: nothing signs a certificate over
-`ansible-workstation`'s keypair yet, so that path needs its own fix, not
-this one.
+session is a third case, closed the same shape rather than with a third
+script: `sign.sh`'s `HOST` argument is optional, and `make sign-ws` uses
+that to sign `ansible-workstation-cert.pub` and exit without connecting
+anywhere — the Makefile's own mount for it already exists, so
+`make deploy-nodes` picks it up with no further changes once signed.
 
 Keep one break-glass static key on `1972-console-1`, offline, for when Vault is
 the thing that is down. It is the only `authorized_keys` entry that survives the
