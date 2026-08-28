@@ -27,6 +27,15 @@ kind: CronJob
 metadata:
   name: prowler-scan
   namespace: security
+  annotations:
+    # prowlercloud/prowler hardcodes uid 1000 and chmods /home/prowler 700 -
+    # confirmed empirically: `podman run --user 10000:10000` on this same
+    # image fails to even exec the entrypoint with "Permission denied" before
+    # prowler's own code runs at all, because nothing but uid 1000 can
+    # traverse into its home directory. A high, host-conflict-avoiding UID
+    # is not available without maintaining a derivative image, which is a
+    # bigger investment than a third-party scanner CronJob warrants here.
+    checkov.io/skip1: "CKV_K8S_40=image hardcodes uid 1000, confirmed empirically no other uid can exec it"
 spec:
   # Once a day is the whole trade-off ADR-0005 makes explicit: a scheduled
   # scan has a detection window as wide as its interval. Off-peak UTC hour,
@@ -50,6 +59,11 @@ spec:
         spec:
           serviceAccountName: prowler
           restartPolicy: Never
+          # This pod only ever talks to AWS (via the pod-identity-webhook's
+          # own injected, separately-audienced token, added regardless of
+          # this setting) - the aws provider makes no Kubernetes API calls,
+          # so the default API server token has nothing to do here.
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -58,7 +72,12 @@ spec:
               type: RuntimeDefault
           containers:
             - name: prowler
-              image: docker.io/prowlercloud/prowler:stable
+              # Pinned to the arm64 image the manifest list resolves to on
+              # this cluster's own nodes (ADR-0011) - confirmed against the
+              # registry, not assumed from a locally cached pull.
+              # docker.io/prowlercloud/prowler:stable, 2026-08-28.
+              image: docker.io/prowlercloud/prowler@sha256:8ecf84790981d0ef29b015c20ee0de6561437a20b91a60ecb101238b543f867f
+              imagePullPolicy: Always
               args:
                 - aws
                 # findings/ matches the bucket policy's write scope exactly
@@ -70,9 +89,10 @@ spec:
                 - nineteenseventytwo-prowler-517148962038
               resources:
                 requests: {cpu: 250m, memory: 384Mi}
-                limits: {memory: 1Gi}
+                limits: {cpu: "1", memory: 1Gi}
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: [ALL]
               volumeMounts:
