@@ -47,6 +47,16 @@ ENGINE           ?= $(if $(GITHUB_ACTIONS),docker,$(if $(shell command -v podman
 # A passphrase on an automation key would have to be typed into a container
 # with no TTY, which is why the agent-forwarding contortion this replaced
 # existed at all. See bootstrap/ssh/README.md.
+#
+# Stale as of the SSH CA cutover (2026-08-28, docs/plan/05-provisioning-
+# completion-plan.md WP-3.1): this default no longer authenticates anywhere
+# on its own. authorized_keys is retired everywhere; only a Vault-signed
+# certificate works now, and nothing signs one over this keypair the way
+# bootstrap/ssh/sign-ci.sh does for ansible-console's. Until that's built,
+# a workstation-run target needs `VAULT_SSH_KEY=$(HOME)/.ssh/ansible-workstation
+# bootstrap/ssh/sign.sh <host>` run by hand first — it writes
+# ansible-workstation-cert.pub, which SSH_CERT_MOUNT below already picks up
+# with no further changes.
 SSH_KEY          ?= $(HOME)/.ssh/ansible-workstation
 KNOWN_HOSTS      ?= $(PWD)/ansible/files/known_hosts
 SOPS_AGE_DIR     ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/age,$(HOME)/.config/sops/age)

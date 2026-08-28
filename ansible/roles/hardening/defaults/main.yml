@@ -10,21 +10,30 @@ hardening_ssh_ca_key_path: /etc/ssh/ca.pub
 # disabled by this — see bootstrap/ssh/sign.sh and cluster/vault/README.md.
 hardening_ssh_trust_ca: true
 
-# Phase D cutover, final step — false until a break-glass key exists,
-# `bootstrap/ssh/sign.sh` has been exercised for real against every node, and
-# the break-glass key itself has been confirmed to log in. There is no
-# automated check for any of that; flipping this early on a host you cannot
-# physically reach is how a cluster gets bricked. See
-# docs/04-secrets.md#secret-inventory and cluster/vault/README.md#break-glass.
+# Phase D cutover, final step — flipped true 2026-08-28
+# (docs/plan/05-provisioning-completion-plan.md WP-3.1), after the
+# break-glass key existed, `sign.sh` had been exercised for real against
+# every node, and CI had its own certificate-signing path
+# (bootstrap/ssh/sign-ci.sh) so retiring ansible-console wouldn't strand it.
+# See docs/04-secrets.md#secret-inventory and
+# cluster/vault/README.md#break-glass.
 #
-# When true: every node's authorized_keys is reconciled to *exactly*
+# Every node's authorized_keys is now reconciled to *exactly*
 # hardening_ssh_authorized_keys, removing anything not listed — including
 # mark-workstation, ansible-workstation and ansible-console, all three, on
-# every node. SSH CA certificates become the only way in. console_group_vars
-# overrides this to carry the one offline break-glass key that survives; every
-# other host keeps the empty default below and ends up with authorized_keys
-# fully emptied.
-hardening_ssh_retire_legacy_keys: false
+# every node. SSH CA certificates are the only way in. console's group_vars
+# overrides this to carry the one offline break-glass key that survives;
+# every other host keeps the empty default below and has authorized_keys
+# fully emptied. Verified live: all four nodes reachable via a freshly
+# signed sign.sh certificate post-cutover, static-key SSH confirmed refused
+# on the cluster nodes.
+#
+# Leave this true. Flipping it back to false does not restore the old
+# keys — hardening_ssh_authorized_keys still governs what state gets
+# reconciled to, and the retired keypairs are no longer distributed to any
+# node's authorized_keys template. It would just stop enforcing the current
+# (correct) state, letting it drift.
+hardening_ssh_retire_legacy_keys: true
 hardening_ssh_authorized_keys: []
 
 # ufw. The firewall between VLANs is OPNsense's job; this is defence in depth
