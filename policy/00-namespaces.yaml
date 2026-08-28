@@ -151,3 +151,19 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
     platform.nineteenseventytwo/tier: infra
+---
+# Upstream's own install docs default this into kube-system - deliberately
+# not followed here, matching this file's own pattern of a dedicated,
+# properly-labelled namespace per controller rather than accreting workloads
+# into kube-system (the one namespace this repo treats as too critical to
+# touch with policy at all, see 10-default-deny.yaml's own header comment).
+# The chart's default securityContext is already restricted-PSS-clean.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubelet-csr-approver
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra

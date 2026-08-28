@@ -1061,3 +1061,56 @@ spec:
               - 172.16.0.0/12
       ports:
         - {protocol: TCP, port: 443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kubelet-csr-approver
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Only ever watches/approves CSR objects against the API server -
+# bypassDnsResolution: true in cluster/kubelet-csr-approver/values.yaml
+# means it skips its own DNS-based validation of each CSR (node hostnames
+# don't resolve on this network at all, see that file's own comment), but
+# DNS egress is still needed for the controller's own in-cluster service
+# resolution.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kubelet-csr-approver-egress
+  namespace: kubelet-csr-approver
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Prometheus scrapes the metrics port (serviceMonitor in values.yaml).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kubelet-csr-approver-apiserver
+  namespace: kubelet-csr-approver
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities: [kube-apiserver]

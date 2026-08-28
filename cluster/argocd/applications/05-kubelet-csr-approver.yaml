@@ -1,0 +1,38 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubelet-csr-approver
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubelet-csr-approver
+  sources:
+    - repoURL: https://postfinance.github.io/kubelet-csr-approver
+      chart: kubelet-csr-approver
+      targetRevision: 1.2.14
+      helm:
+        releaseName: kubelet-csr-approver
+        valueFiles:
+          - $values/cluster/kubelet-csr-approver/values.yaml
+    - repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      # policy/00-namespaces.yaml owns this namespace and its PSS labels, and
+      # 30-cluster.yml applies policy/ before Argo CD ever runs. This is the
+      # same belt-and-braces every other Application here uses, for the case
+      # where it did not.
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
