@@ -328,7 +328,7 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       plugin actually shows up
 - [ ] Confirm the only remaining GitHub secrets are `SOPS_AGE_KEY` and the
       GitHub App key — blocked on the `KUBECONFIG` item above actually retiring it
-- [ ] **Write a scoped Vault policy for SSH signing.** Found 2026-08-23,
+- [x] **Write a scoped Vault policy for SSH signing.** Found 2026-08-23,
       confirming `bootstrap/ssh/sign.sh` for real: `vault policy list` shows
       only `default`, `external-secrets`, and `root` — no policy was ever
       created for the human's day-to-day `ssh-client-signer/sign/admin`
@@ -337,7 +337,11 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       SSH in" defeats some of the point of Vault-issued certs. Add something
       like `path "ssh-client-signer/sign/admin" { capabilities = ["create",
       "update"] }`, attached to a real auth method (Vault's `userpass`, not
-      another static token) rather than a second token to manage
+      another static token) rather than a second token to manage —
+      `userpass` + `ssh-human-signer` policy added
+      (`cluster/vault/README.md` §7), `mchellmer` user created, confirmed
+      live: `vault login -method=userpass` followed by a real
+      `bootstrap/ssh/sign.sh` succeeded without the root token
 
 ---
 
