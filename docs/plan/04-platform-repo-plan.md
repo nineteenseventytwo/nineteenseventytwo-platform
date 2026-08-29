@@ -386,39 +386,53 @@ Cut over in this order; don't delete anything until the replacement rebuilds a n
 
 ## 8. Security hardening backlog
 
-Found during a live security review (2026-08-22) against the real lab cluster,
-not a design read-through — each of these is a confirmed gap, not a
-hypothetical one. None are blocking; all are worth a PR before this stops
-being a lab.
+Found during a live security review (2026-08-22) against the real lab
+cluster, not a design read-through — each of these was a confirmed gap, not
+a hypothetical one. All seven have since closed; left in place (rather than
+deleted) as the record of what the gap actually was and why it mattered,
+since that context doesn't live anywhere else once the fix lands.
 
-1. **Kubelet-serving CSR auto-approval.** kubeadm clusters don't auto-approve
-   `kubernetes.io/kubelet-serving` CSRs by default — only the client CSR used
-   for apiserver→kubelet auth gets that. A backlog of `Pending` ones was
-   cleared by hand this session to unblock `kubectl logs`/`exec`, but nothing
-   approves the *next* rotation. Recurs silently until something like
-   `postfinance/kubelet-csr-approver` is installed.
-2. **NetworkPolicy coverage gap.** `vault`, `cert-manager`, `external-secrets`,
-   `arc-systems`, `arc-runners` all carry a real PSS tier but no NetworkPolicy
-   — hardened at the pod-spec level, wide open at the network level.
-   `arc-runners` is the sharp edge: `privileged` PSS (dind, by necessity) *and*
-   unrestricted network reach.
-3. **No tenant-scoped RBAC.** §4.4 above already calls for a per-tenant
-   ServiceAccount + namespaced Role as something `platform` owns — it was
-   never built. The only custom RBAC in the cluster today is
-   `pod-identity-webhook`'s own permissions; a tenant's default ServiceAccount
-   and any CI-issued kubeconfig currently have no scoping below cluster-admin.
-4. **etcd encryption key never rotates.** Generated once at `kubeadm init`,
-   write-once by design (re-running the playbook won't touch it), no rotation
-   runbook wired into automation — just a comment saying it belongs on one.
-5. **No image scanning or signing** anywhere in the CI/deploy path. Nothing
-   verifies provenance before an image runs.
-6. **Kubescape and Prowler both still unrun.** Kubescape has been in the
-   build order (§4.2) since the plan was drafted; Prowler has a dormant
-   `enable_prowler_role` Terraform flag in `nineteenseventytwo-cloud`,
-   currently off. Neither has actually been pointed at this cluster/account.
-7. **No apiserver audit logging.** PSS's own `audit` mode logs *policy*
-   violations; there is no `--audit-log-path`/audit policy, so there's no
-   forensic trail of who did what against the API.
+1. ~~**Kubelet-serving CSR auto-approval.**~~ **Closed.** kubeadm clusters
+   don't auto-approve `kubernetes.io/kubelet-serving` CSRs by default — only
+   the client CSR used for apiserver→kubelet auth gets that. A backlog of
+   `Pending` ones was cleared by hand to unblock `kubectl logs`/`exec`, but
+   nothing approved the *next* rotation. `postfinance/kubelet-csr-approver`
+   installed cluster-side.
+2. ~~**NetworkPolicy coverage gap.**~~ **Closed.** `vault`, `cert-manager`,
+   `external-secrets`, `arc-systems`, `arc-runners` all carried a real PSS
+   tier but no NetworkPolicy — hardened at the pod-spec level, wide open at
+   the network level. All five now have default-deny plus scoped allow rules
+   in `policy/10-default-deny.yaml`.
+3. ~~**No tenant-scoped RBAC.**~~ **Closed.** §4.4 above called for a
+   per-tenant ServiceAccount + namespaced Role as something `platform` owns
+   — it was never built. `policy/tenants/eightbitsaxlounge.yaml` now has
+   both, per environment, scoped to exactly the operations
+   `docs/05-migration.md` keeps in the app repo, plus
+   `bootstrap/tenant-kubeconfig/generate.sh` to turn that ServiceAccount
+   into the kubeconfig the app repo's pipeline reads.
+4. ~~**etcd encryption key never rotates.**~~ **Closed** (as a documented
+   procedure — not itself rotated). Generated once at `kubeadm init`,
+   write-once by design, no rotation runbook wired into automation. Tracing
+   the actual generation logic turned up something more urgent than
+   rotation: the key was never backed up anywhere outside that one node's
+   disk either. `docs/04-secrets.md`'s "etcd encryption key backup and
+   rotation" section covers both.
+5. ~~**No image scanning or signing.**~~ **Closed.** Image scanning already
+   existed (Trivy against the built image in `_build-image.yml`) by the time
+   this was written; signing did not. `_build-image.yml` now signs every
+   built image with cosign, keyless via GitHub's own OIDC token — no key to
+   generate, store, or rotate. Admission-time enforcement (something in the
+   cluster actually verifying the signature before running a pod) is a
+   deliberately separate, larger piece of work, not yet started.
+6. ~~**Kubescape and Prowler both still unrun.**~~ **Closed.** Kubescape
+   scanned (post-install baseline, the pre-install window having already
+   closed — see `docs/03-cluster.md` step 5). Prowler's IAM role, managed
+   policy attachments, and cluster-side CronJob all built and verified live
+   end to end, including a real findings object landing in S3.
+7. ~~**No apiserver audit logging.**~~ **Closed.** PSS's own `audit` mode
+   logs *policy* violations; there was no `--audit-log-path`/audit policy,
+   so no forensic trail of who did what against the API. Both now
+   configured in `ansible/roles/kube_control_plane`.
 
 ## 9. Open questions
 
