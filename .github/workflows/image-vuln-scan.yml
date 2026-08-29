@@ -1,0 +1,132 @@
+---
+name: image-vuln-scan
+
+# Nothing in this repo re-scans a deployed image for newly-disclosed CVEs
+# after it's built — _build-image.yml only scans the two images this repo
+# builds itself, and only once, at build time. Every third-party chart's
+# image (Cilium, cert-manager, Longhorn, Vault, kube-prometheus-stack,
+# Argo CD, ingress-nginx, MetalLB, External Secrets, kubelet-csr-approver,
+# Prowler) has never been scanned for vulnerabilities by anything in this
+# pipeline, at any point. This is what actually closes that gap, on a
+# schedule, against whatever the cluster is genuinely running - not a
+# hand-maintained list of images that drifts the moment a chart is upgraded.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday, 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # The only step that needs the lab network at all: finding out what's
+  # actually running. The scan itself is `trivy image <ref>` against a
+  # public registry - it never talks to the cluster, so it doesn't need
+  # this runner or this credential. No `environment: lab` gate here,
+  # deliberately: this is a read-only list, not a deployment, and gating a
+  # weekly automated scan behind a human approval defeats the point of it
+  # being automated.
+  enumerate:
+    runs-on: [self-hosted, linux, arm64, lab-network]
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - name: Stage the read-only kubeconfig
+        run: |
+          install -d -m 700 "$RUNNER_TEMP/kube"
+          printf '%s' "${{ secrets.IMAGE_INVENTORY_KUBECONFIG }}" > "$RUNNER_TEMP/kube/config"
+          chmod 600 "$RUNNER_TEMP/kube/config"
+
+      # Every unique image reference actually running, cluster-wide. Not
+      # every image a Deployment/CronJob *could* run - a scaled-to-zero
+      # workload (lab-dind) contributes nothing here, which matches "what
+      # do I actually need to worry about right now" rather than "what
+      # exists in a manifest somewhere".
+      - name: List every running image, deduplicated
+        id: list
+        env:
+          KUBECONFIG: ${{ runner.temp }}/kube/config
+        run: |
+          set -euo pipefail
+          images=$(kubectl get pods -A -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' \
+            | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+
+      - name: Shred the staged credential
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/kube"
+
+  scan:
+    needs: enumerate
+    # Hosted, not self-hosted: trivy image pulls from each image's own
+    # public registry directly, the same as `docker pull` would - it never
+    # needs a path into VLAN 20, only the internet _build-image.yml's own
+    # image scan already assumes on this exact runner type.
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(needs.enumerate.outputs.images) }}
+    steps:
+      - name: Sanitise the image ref into a filesystem-safe name
+        id: name
+        run: |
+          safe=$(echo "${{ matrix.image }}" | tr -c 'A-Za-z0-9._-' '_')
+          echo "safe=$safe" >> "$GITHUB_OUTPUT"
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.image }}
+          format: sarif
+          output: "${{ steps.name.outputs.safe }}.sarif"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0" # report every image, don't let one stop the rest
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sarif-${{ steps.name.outputs.safe }}
+          path: "${{ steps.name.outputs.safe }}.sarif"
+          retention-days: 7
+
+  report:
+    needs: scan
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: sarif-*
+          path: sarif
+          merge-multiple: true
+
+      - name: Upload every image's findings to the Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif
+
+      # A count in Slack, not the findings themselves - the Security tab is
+      # the actual detail view. The point of this message is "something
+      # changed, go look", not a second place to read CVE descriptions.
+      - name: Summarise and notify Slack
+        run: |
+          set -euo pipefail
+          total=0
+          for f in sarif/*.sarif; do
+            n=$(jq '[.runs[].results[]] | length' "$f")
+            total=$((total + n))
+          done
+          count=$(ls sarif/*.sarif | wc -l | tr -d ' ')
+          link="https://github.com/${{ github.repository }}/security/code-scanning"
+          if [ "$total" -gt 0 ]; then
+            text="Weekly image vulnerability scan: ${total} HIGH/CRITICAL, fixed-available findings across ${count} images. Detail: ${link}"
+          else
+            text="Weekly image vulnerability scan: clean. Zero HIGH/CRITICAL, fixed-available findings across ${count} images."
+          fi
+          curl -sf -X POST -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg text "$text" '{text: $text}')" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
