@@ -220,6 +220,51 @@ same way the age key gets rotated: annually, or immediately on suspicion
 `vault write auth/approle/role/ci-ssh-signer/secret-id-accessor/destroy
 secret_id_accessor=<accessor>` kills the old one independently).
 
+```bash
+# 7. userpass auth for the human's own day-to-day SSH signing. Found live
+# 2026-08-23, confirming bootstrap/ssh/sign.sh for real: `vault policy list`
+# showed only `default`, `external-secrets` and `root` — nothing scoped had
+# ever been created for exactly this, so the initial root token was the
+# *only* credential that could run sign.sh at all. Works for testing, but
+# "use root to SSH in" defeats a chunk of the point of Vault-issued certs.
+vault auth enable userpass
+
+vault policy write ssh-human-signer - <<'POLICY'
+path "ssh-client-signer/sign/admin" { capabilities = ["create", "update"] }
+POLICY
+
+# 1h/8h mirrors the AWS SSO session shape already used elsewhere in this
+# repo (docs/04-secrets.md's secret inventory: "1h role, 8h session") rather
+# than inventing a new convention for the same kind of thing.
+vault write auth/userpass/users/mchellmer \
+  policies="ssh-human-signer" \
+  token_ttl=1h \
+  token_max_ttl=8h \
+  password=-
+```
+
+That last line's value ("-") tells `vault write` to read just that one field
+from stdin — type the password and Ctrl-D, and it never touches shell
+history or a process listing. Log in with it once per session, instead of
+the root token:
+
+```bash
+vault login -method=userpass username=mchellmer
+```
+
+`bootstrap/ssh/sign.sh` needed no code change for this — it has never
+handled authentication itself, only signing; it just uses whatever
+`VAULT_TOKEN` or `~/.vault-token` a prior `vault login` already left behind.
+The gap was entirely on the Vault-config side: there was nothing scoped to
+actually log in *as*, so root was the only option by omission, not by
+design.
+
+The root token still works after this — Vault policies are additive, not
+exclusive — but should stop being the thing reached for day to day now that
+a properly scoped alternative exists. Keep it for what it's actually for:
+`generate-root`, rekey, and emergencies, per the recovery-keys row in
+[docs/04-secrets.md](../../docs/04-secrets.md#secret-inventory).
+
 ## Break-glass
 
 Keep one static SSH key on `1972-console-1`, offline, for when Vault is the thing
