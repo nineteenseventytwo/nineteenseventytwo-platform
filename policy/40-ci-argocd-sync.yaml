@@ -1,0 +1,51 @@
+---
+# The KUBECONFIG org Actions secret deploy-cluster.yml stages for `make
+# argocd-sync-wait` predates this - docs/04-secrets.md flagged it as
+# carrying unscoped RBAC, to retire "once ESO/in-cluster auth makes a
+# static kubeconfig unnecessary." console sits deliberately outside the
+# cluster (ADR-0007), so some credential is unavoidable; what was missing
+# was ever actually scoping it. `argocd-sync-wait`'s own Makefile target is
+# exactly two operations - patch and get on the platform Application, plus
+# a get across the namespace for its own timeout-debug fallback - nothing
+# else it has ever needed.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-argocd-sync
+  namespace: argocd
+---
+# Same reasoning as policy/tenants/eightbitsaxlounge.yaml's *-ci-token: a CI
+# credential has to outlive the ~1h TokenRequest tokens everything else
+# gets, and 1.24+ no longer creates one of these automatically.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-argocd-sync-token
+  namespace: argocd
+  annotations:
+    kubernetes.io/service-account.name: ci-argocd-sync
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-argocd-sync
+  namespace: argocd
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-argocd-sync
+  namespace: argocd
+subjects:
+  - kind: ServiceAccount
+    name: ci-argocd-sync
+    namespace: argocd
+roleRef:
+  kind: Role
+  name: ci-argocd-sync
+  apiGroup: rbac.authorization.k8s.io
