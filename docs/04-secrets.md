@@ -142,7 +142,7 @@ minutes to maintain.
 | Vault AppRole `secret_id` (`ci-ssh-signer`) | `1972-console-1` only — `/opt/github-runner/vault-ci/secret-id`, `github-runner:github-runner mode:0444` (world-readable inside a single-tenant container; the directory's own `0751` blocks listing), never in GitHub or git | `ssh-client-signer/sign/admin` — nothing else | Annual, or immediately on suspicion (`vault write -f auth/approle/role/ci-ssh-signer/secret-id`, then destroy the old accessor) | `secret_id_bound_cidrs` is the cluster's pod network (`10.244.0.0/16`), not console specifically — console has no path to Vault that preserves its own IP through the ingress hop, confirmed live. The real boundary is the attached policy: a leaked `secret_id`, even from inside the cluster, can only ever request a 5-minute SSH cert for `mchellmer`, nothing broader. |
 | `ansible-workstation` SSH key | Workstations only, alongside `mark-workstation`; never in GitHub or git | Nothing anymore as a static entry — **retired from every node's `authorized_keys` 2026-08-28**. Unlike `ansible-console`, nothing currently signs a certificate over this keypair — see the open follow-up below | Moot until something re-adopts this keypair for cert signing; the file itself can be deleted once that's decided either way | No longer root-equivalent on its own, same as `ansible-console` above. |
 | Node host keys (`known_hosts`) | Committed at `ansible/files/known_hosts`, regenerated with `make known-hosts` | — | On node reimage | None — these are public keys. Committed rather than held as an Actions secret so `host_key_checking` stays meaningfully on without a credential to distribute. |
-| `KUBECONFIG` | Org Actions secret | `deploy-cluster.yml`'s Argo CD nudge-and-wait | On cluster rebuild | Whatever RBAC the embedded credential carries — scope it, don't hand it cluster-admin. Retire once ESO/in-cluster auth makes a static kubeconfig unnecessary. |
+| `KUBECONFIG` | Org Actions secret | `deploy-cluster.yml`'s Argo CD nudge-and-wait | On cluster rebuild, or immediately on suspicion — see [below](#replacing-the-kubeconfig-secret) | `ci-argocd-sync`'s Role: `get`/`list`/`patch` on `applications.argoproj.io` in the `argocd` namespace only. Not cluster-admin, and never was meant to be — `policy/40-ci-argocd-sync.yaml` is what actually enforces that now. |
 | etcd encryption key | `/etc/kubernetes/enc/` on `1972-master-1`, mode 0600 | Every Secret and ConfigMap in the cluster at rest | Manual rekey (rewrites every Secret and ConfigMap) — see [below](#etcd-encryption-key-backup-and-rotation) | Reads every cluster Secret from an etcd snapshot or a stolen SSD. **Back it up with the etcd snapshot, not instead of it — losing it makes every Secret unreadable.** |
 | Vault recovery keys | Password manager, split across two entries | `generate-root`, rekey | On personnel change | Full Vault takeover via root token generation. Not unseal keys — auto-unseal is KMS. |
 | AWS KMS keys (`sops`, `vault-unseal`) | AWS only. **No credential in the cluster** — pods assume a role via the cluster OIDC issuer ([06-aws-federation.md](06-aws-federation.md)) | Vault's seal; Argo CD's SOPS decryption | Key never; nothing else to rotate | Vault cannot unseal if the role is revoked. There is no long-lived key to leak — that is the point, and `DenyIAMUsersAndKeys` makes creating one impossible. |
@@ -259,3 +259,60 @@ existing etcd snapshot, which is a real risk to disaster-recovery even
 outside of a deliberate rotation. That is a deliberate design tradeoff (key
 material off git entirely, even encrypted) rather than an oversight, so
 worth a conscious decision rather than a silent fix.
+
+### Replacing the KUBECONFIG secret
+
+`policy/40-ci-argocd-sync.yaml` gives `deploy-cluster.yml` a properly scoped
+identity (`get`/`list`/`patch` on `applications.argoproj.io` in `argocd`
+only) instead of whatever RBAC the org secret happened to carry before. To
+actually swap it in:
+
+1. Confirm the manifest is applied and the token Secret populated:
+
+   ```bash
+   kubectl get serviceaccount ci-argocd-sync -n argocd
+   kubectl get secret ci-argocd-sync-token -n argocd -o jsonpath='{.data.token}' | base64 -d | wc -c
+   ```
+
+   (a non-zero byte count is enough — no need to look at the token itself)
+
+2. Build the kubeconfig — same shape as
+   `bootstrap/tenant-kubeconfig/generate.sh`, but the destination here is a
+   GitHub org secret, not Vault, so it's a one-off rather than a repeatable
+   script:
+
+   ```bash
+   TOKEN=$(kubectl get secret ci-argocd-sync-token -n argocd -o jsonpath='{.data.token}' | base64 -d)
+   CA_CERT=$(kubectl get secret ci-argocd-sync-token -n argocd -o jsonpath='{.data.ca\.crt}')
+   API_SERVER=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
+
+   cat > /tmp/ci-argocd-sync.kubeconfig <<EOF
+   apiVersion: v1
+   kind: Config
+   clusters:
+     - name: nineteenseventytwo
+       cluster:
+         server: ${API_SERVER}
+         certificate-authority-data: ${CA_CERT}
+   contexts:
+     - name: ci-argocd-sync
+       context:
+         cluster: nineteenseventytwo
+         namespace: argocd
+         user: ci-argocd-sync
+   current-context: ci-argocd-sync
+   users:
+     - name: ci-argocd-sync
+       user:
+         token: ${TOKEN}
+   EOF
+   ```
+
+3. Set the org secret from the file, never by pasting the value into a
+   terminal that echoes it, and confirm `make argocd-sync-wait` still
+   succeeds on the next `deploy-cluster.yml` run before deleting anything:
+
+   ```bash
+   gh secret set KUBECONFIG --org nineteenseventytwo --body "$(cat /tmp/ci-argocd-sync.kubeconfig)"
+   rm /tmp/ci-argocd-sync.kubeconfig
+   ```
