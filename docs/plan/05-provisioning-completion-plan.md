@@ -60,13 +60,13 @@ exist, and GHCR answers 403 rather than 404 for anonymous callers.
 ARC is also the only OCI source in `cluster/argocd/applications/` — every other
 chart is a plain `https://` Helm repo, and every other one is Synced.
 
-- [ ] In `80-arc-controller.yaml`, `81-arc-lab-deploy.yaml`, `82-arc-lab-dind.yaml`:
+- [x] In `80-arc-controller.yaml`, `81-arc-lab-deploy.yaml`, `82-arc-lab-dind.yaml`:
       drop the `oci://` scheme (`repoURL: ghcr.io/actions/actions-runner-controller-charts`),
       which is the form Argo CD 3.x expects for a first-class OCI repo
-- [ ] If that still 403s, fold the chart into the path
+- [x] If that still 403s, fold the chart into the path
       (`repoURL: oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller`,
       no `chart:` key) and confirm against the constructed URL in the error, not the docs
-- [ ] Re-check: `kubectl -n argocd get app | grep arc` → all three `Synced/Healthy`
+- [x] Re-check: `kubectl -n argocd get app | grep arc` → all three `Synced/Healthy`
 
 ### 1.2 Cloudflare API token is malformed → three certs stuck on LE **prod**
 
@@ -123,17 +123,18 @@ stacked:
   `cluster/longhorn/values.yaml:53` sets it to `""` with a comment saying the
   webhook handles it. That assumption is wrong for Longhorn specifically.
 
-- [ ] `kubectl -n longhorn-system rollout restart daemonset/longhorn-manager` and
+- [x] `kubectl -n longhorn-system rollout restart daemonset/longhorn-manager` and
       confirm `AWS_ROLE_ARN` appears — that isolates which of the two is load-bearing
-- [ ] Create the credential Secret carrying `AWS_IAM_ROLE_ARN` and point
+- [x] Create the credential Secret carrying `AWS_IAM_ROLE_ARN` and point
       `backupTargetCredentialSecret` at it; verify against the Longhorn version
       actually deployed (1.12.1), not a blog post
-- [ ] `longhorn-system` has six per-component NetworkPolicies but **no egress rule
+- [x] `longhorn-system` has six per-component NetworkPolicies but **no egress rule
       to S3** — and no default-deny either (WP-2), which is currently the only
       reason this is not a third failure mode. Add the S3 egress rule *before*
       WP-2 lands default-deny here, or backups break the moment it does
-- [ ] Done when `kubectl -n longhorn-system get backuptargets` shows `AVAILABLE=true`
-      and one volume backup completes end to end
+- [x] Done when `kubectl -n longhorn-system get backuptargets` shows `AVAILABLE=true`
+      and one volume backup completes end to end — confirmed live 2026-08-29,
+      `AVAILABLE=true`, syncing on schedule
 
 ### 1.4 `platform` app drift — trivial
 
@@ -141,7 +142,7 @@ The app-of-apps is `OutOfSync` on one field: git has
 `spec.source.directory.recurse: false` on the `pod-identity-webhook`
 Application; the live object does not (Argo prunes the default).
 
-- [ ] Remove the `directory:` block from `35-pod-identity-webhook.yaml`, or sync
+- [x] Remove the `directory:` block from `35-pod-identity-webhook.yaml`, or sync
       and let it settle. Either way, get `platform` back to `Synced` so it is a
       real signal again
 
@@ -151,7 +152,7 @@ Application; the live object does not (Argo prunes the default).
 `env[?(@.name=="AWS_ROLE_ARN")]` form does not work under the shell quoting;
 replaced with a `grep`).
 
-- [ ] Commit it. An uncommitted fix to a verification target is how a green
+- [x] Commit it. An uncommitted fix to a verification target is how a green
       `make verify-irsa` stops meaning anything
 
 ---
@@ -190,41 +191,46 @@ live `cilium monitor --type policy-verdict` evidence, that:
 
 Assume every namespace below needs all three, and derive the rest empirically.
 
-- [ ] **Recommended exemptions, documented rather than silent** — add them to
+- [x] **Recommended exemptions, documented rather than silent** — add them to
       `policy/10-default-deny.yaml` as comments explaining *why*, the same way
       `00-namespaces.yaml` handles the PSS exemptions:
       `kube-system` (CoreDNS, kube-proxy, and the CNI itself — a mistake here
       takes the cluster down and Argo CD with it), `cilium-secrets`,
       `kube-node-lease`, `kube-public` (no workloads, no pods to select)
-- [ ] **`default`** — lock it fully closed. Nothing should ever run there, so a
+- [x] **`default`** — lock it fully closed. Nothing should ever run there, so a
       bare `default-deny-all` with no allow-pair is both correct and free
-- [ ] **`vault`** — highest value. Needs: DNS, apiserver (`toEntities`), STS/KMS
+- [x] **`vault`** — highest value. Needs: DNS, apiserver (`toEntities`), STS/KMS
       egress to the internet on 443, ingress from `ingress-nginx` and `monitoring`,
       ingress from `external-secrets`
-- [ ] **`external-secrets`** — DNS, apiserver, egress to `vault`
-- [ ] **`cert-manager`** — DNS, apiserver, egress to the internet on 443
+- [x] **`external-secrets`** — DNS, apiserver, egress to `vault`
+- [x] **`cert-manager`** — DNS, apiserver, egress to the internet on 443
       (ACME + the Cloudflare API), ingress from `monitoring`
-- [ ] **`ingress-nginx`** — ingress from the LAN (`192.168.20.0/24`) and
+- [x] **`ingress-nginx`** — ingress from the LAN (`192.168.20.0/24`) and
       `metallb-system`, egress to every namespace it fronts, DNS, apiserver
-- [ ] **`longhorn-system`** — see WP-1.3; needs the S3 egress rule **first**
-- [ ] **`metallb-system`** — speaker is `hostNetwork`; verify a NetworkPolicy is
+- [x] **`longhorn-system`** — see WP-1.3; needs the S3 egress rule **first**
+- [x] **`metallb-system`** — speaker is `hostNetwork`; verify a NetworkPolicy is
       even meaningful for it before writing one, and say so in the file if not
-- [ ] **`arc-systems`** / **`arc-runners`** — do these last, after WP-1.1. Runners
+- [x] **`arc-systems`** / **`arc-runners`** — do these last, after WP-1.1. Runners
       need broad egress by nature; write the policy against what the runners
       actually do rather than guessing
-- [ ] **`node-exporter-system`** — `hostNetwork` + `hostPort`, same caveat as
-      metallb; ingress from `monitoring` on 9100 if it applies at all
+- [x] **`node-exporter-system`** — `hostNetwork` + `hostPort`, same caveat as
+      metallb; ingress from `monitoring` on 9100 if it applies at all — verdict:
+      not meaningful, same as metallb; documented as an exemption instead
 
 ### Make it a test, not an inspection
 
 The reason this gap existed is that "every namespace has default-deny" was a
 sentence in a README rather than an assertion anything ran.
 
-- [ ] Add a check to `tests/` that enumerates namespaces and fails on any
-      without a `default-deny-all`, minus an explicit exemption list
-- [ ] Wire it into the lint/verify path so a new namespace cannot land uncovered
-- [ ] Update `policy/README.md` so the claim matches the file
-- [ ] Re-run the `03-cluster.md` verify block; `kubectl get networkpolicy -A`
+- [x] Add a check to `tests/` that enumerates namespaces and fails on any
+      without a `default-deny-all`, minus an explicit exemption list —
+      `tests/verify-default-deny.sh`
+- [x] Wire it into the lint/verify path so a new namespace cannot land uncovered
+      — `make verify-default-deny`
+- [x] Update `policy/README.md` so the claim matches the file
+- [x] Re-run the `03-cluster.md` verify block; `kubectl get networkpolicy -A` —
+      confirmed live 2026-08-29, `tests/verify-default-deny.sh` passes with
+      zero failures across every namespace on the cluster
       should now show `default-deny-all` in every non-exempt namespace
 
 ---
@@ -297,19 +303,25 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
 
 ### 3.3 The remaining secret-hygiene items
 
-- [ ] `sops updatekeys` on `ansible/inventory/lab/group_vars/all/secrets.sops.yml`
+- [x] `sops updatekeys` on `ansible/inventory/lab/group_vars/all/secrets.sops.yml`
       and every other encrypted file — adding the KMS recipient to `.sops.yaml`
       did **not** rewrite them, so the cluster cannot decrypt anything encrypted
-      before that change
+      before that change — PR #72
 - [ ] **Retire the `KUBECONFIG` org secret.** Both `04-secrets.md`'s verify block
-      and the inventory call for this. It is the last broadly-scoped static
-      credential in GitHub
+      and the inventory call for this. **Partially addressed, not closed**: PR
+      #73 gives `deploy-cluster.yml` a properly scoped ServiceAccount
+      (`get`/`list`/`patch` on `applications.argoproj.io` in `argocd` only,
+      `policy/40-ci-argocd-sync.yaml`) instead of whatever RBAC the secret
+      carried before — the secret itself still exists and still needs to,
+      since console is deliberately outside the cluster (ADR-0007). Swapping
+      the org secret's actual value is a separate, deliberate step documented
+      in `04-secrets.md`, not yet done
 - [ ] **Decide the Argo CD SOPS plugin question.** `cluster-argocd-sops` and the
       `repoServer` annotation exist, nothing in `cluster/` is SOPS-encrypted, and
       no plugin is configured. Either land the plugin and use it, or delete the
       role — a role with no consumer is a standing grant that nothing tests
 - [ ] Confirm the only remaining GitHub secrets are `SOPS_AGE_KEY` and the
-      GitHub App key
+      GitHub App key — blocked on the `KUBECONFIG` item above actually retiring it
 - [ ] **Write a scoped Vault policy for SSH signing.** Found 2026-08-23,
       confirming `bootstrap/ssh/sign.sh` for real: `vault policy list` shows
       only `default`, `external-secrets`, and `root` — no policy was ever
@@ -325,22 +337,29 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
 
 ## WP-4 — AWS / cloud repo
 
-- [ ] **Prowler** — create the `security` namespace and the CronJob, then flip
+- [x] **Prowler** — create the `security` namespace and the CronJob, then flip
       `enable_prowler_role = true`. It is gated separately from
       `publish_cluster_oidc` precisely so it can go last. Note the webhook's
       `namespaceSelector` already lists `security`, so the namespace name is fixed
+      — built, and verified live end to end (IAM role assumed via
+      pod-identity-webhook, real findings object landed in S3 under `findings/`)
 - [ ] **Widen the staged SCPs.** `DenyRegionsOutsideAllowlist` and
       `DenyExpensiveResources` are attached to the sandbox account only. Follow
       `policies/README.md`'s own rollout order: sandbox account → OU → root, with
       a week of CloudTrail between steps watching for unexpected `AccessDenied`
-- [ ] **Strike the stale TODO in `nineteenseventytwo-cloud/README.md`.** It says
+      — **sandbox → Sandbox OU done 2026-08-29** (11 days quiet, checked via
+      `cloudtrail lookup-events`, not assumed); root is the one step left,
+      gated on the same check at this wider blast radius
+- [x] **Strike the stale TODO in `nineteenseventytwo-cloud/README.md`.** It says
       `cluster/vault/values.yaml` "passes `AWS_ACCESS_KEY_ID` to Vault". It does
       not — that Secret is gone and the SA annotation replaced it. Leaving a
       resolved item in a TODO list is how the list stops being read
-- [ ] Re-run `make output STACK=platform-prod` and cross-check `cluster_role_arns`
+- [x] Re-run `make output STACK=platform-prod` and cross-check `cluster_role_arns`
       against `aws_cluster_role_arns` in the inventory and the annotations in
       `cluster/*/values.yaml` — [06 §5](../06-aws-federation.md) asks for this and
-      it has not obviously been done since the roles landed
+      it has not obviously been done since the roles landed — done 2026-08-29,
+      all four ARNs (`argocd_sops`, `vault_unseal`, `longhorn_backup`, `prowler`)
+      match exactly across all three sources
 
 ---
 
@@ -350,10 +369,11 @@ This is the largest remaining block and it has not started. `apps/` contains a
 README and nothing else, so the `100-apps` ApplicationSet is reconciling an empty
 set — the tenant namespaces, quotas and LimitRanges exist and hold nothing.
 
-- [ ] **Record ADR-0010 as closed.** `05-migration.md` says "confirm closed, don't
-      assume it from this doc" — confirmed: no `eightbitsaxlounge` workflow has a
-      `pull_request` trigger at all. Write that into the doc with today's date so
-      nobody re-audits it
+- [x] **Record ADR-0010 as closed.** `05-migration.md` says "confirm closed, don't
+      assume it from this doc" — confirmed independently 2026-08-29 (not just
+      trusting this doc's own earlier claim): audited all 14 workflow files in
+      the actual repo directly via the GitHub API, zero `pull_request` triggers.
+      Written into ADR-0010 with today's date
 - [ ] Verify every remaining chart pin before its next apply
       (`helm search repo <chart> --versions`) — WP-1.1 is the first casualty of
       this item and probably not the last
@@ -388,9 +408,9 @@ set — the tenant namespaces, quotas and LimitRanges exist and hold nothing.
       `deploy-cluster` → `bootstrap-argocd`. Nothing else in this plan proves the
       README's central claim, and WP-1 is four pieces of evidence that first
       contact finds things review does not
-- [ ] Add the JWKS republish step to the rotation checklist next to the SSH CA —
+- [x] Add the JWKS republish step to the rotation checklist next to the SSH CA —
       rotating the SA signing key without `make publish-oidc` invalidates every
-      projected token in the cluster instantly
+      projected token in the cluster instantly — `docs/06-aws-federation.md`
 
 ---
 

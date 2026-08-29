@@ -112,11 +112,13 @@ rate limits, and how mTLS gets bootstrapped if a mesh ever arrives.
 
 ## Verify
 
-- [ ] `.sops.yaml` recipients are real, not placeholders, before the first
+- [x] `.sops.yaml` recipients are real, not placeholders, before the first
       encrypt
-- [ ] KMS key ID is set in `cluster/vault/values.yaml`
+- [x] KMS key ID is set in `cluster/vault/values.yaml`
 - [ ] Once Vault is live: the only secrets left in GitHub are the age key and
-      the GitHub App key — `KUBECONFIG` should be retired too
+      the GitHub App key — `KUBECONFIG` should be retired too. Its RBAC is
+      properly scoped now (`policy/40-ci-argocd-sync.yaml`), but the secret
+      itself still exists — see `#replacing-the-kubeconfig-secret` below
 
 ## Definition of done
 
