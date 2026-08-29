@@ -1,20 +1,22 @@
 ---
 # SOPS encrypts *values*, not files, so `git diff` on an encrypted file still
-# shows which key changed. Two recipients: your workstation age key, and a CI
-# key held as the AGE_KEY GitHub Actions secret.
+# shows which key changed.
 #
 # Generate a key:      age-keygen -o ~/.config/sops/age/keys.txt
 # Encrypt a new file:  sops --encrypt --in-place path/to/secrets.sops.yml
 # Edit in place:       sops path/to/secrets.sops.yml
 #
-# Three recipients now, and any ONE of them can decrypt:
+# Three recipients, and any ONE of them can decrypt:
 #
 #   workstation age key   you, at a terminal
 #   CI age key            GitHub Actions, as the AGE_KEY secret
-#   KMS via IRSA          argocd-repo-server, holding no key at all
-#
-# The KMS recipient is the reason cluster-argocd-sops exists. It means the
-# cluster can decrypt without the age private key ever being mounted into it.
+#   KMS                   redundancy against losing both age keys at once -
+#                         no consumer holds this via IRSA today (the
+#                         cluster-argocd-sops role this was built for was
+#                         removed as unused infrastructure; nothing in
+#                         cluster/ is SOPS-encrypted). Revisit if that
+#                         changes, rather than treating the recipient itself
+#                         as dead weight to strip out too.
 #
 # Two consequences worth knowing before the first confused five minutes:
 #

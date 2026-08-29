@@ -49,19 +49,6 @@ repoServer:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 384Mi}
-  # IRSA, so the repo-server can decrypt SOPS-with-KMS values during
-  # reconciliation without holding a key. The role grants kms:Decrypt on the
-  # sops CMK and nothing else.
-  #
-  # NOTE: this annotation is necessary but not sufficient. Argo CD has no SOPS
-  # decryption plugin configured yet, so nothing in cluster/ is encrypted for
-  # it to decrypt today — see docs/06-aws-federation.md, "Still outstanding".
-  # The annotation is here now because Argo CD is installed by hand before the
-  # webhook exists, and adding it later means another restart.
-  serviceAccount:
-    create: true
-    annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-argocd-sops"
 
 server:
   replicas: 1
