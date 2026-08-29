@@ -45,7 +45,7 @@ it restarts the very runner stack a CI job would be executing on, so no
 workflow can perform this step. It is a deliberate human action:
 
 1. Bump `version.txt`, open a PR. `image-gha-runner-build.yml` builds,
-   scans and smoke-tests it from the branch.
+   signs (cosign, keyless), scans and smoke-tests it from the branch.
 2. Merge. `image-gha-runner-promote.yml` retags the tested digest.
 3. **`make deploy-cicd` from a workstation.** Until this runs, console is
    still running the previous image — the promote step publishes a tag, it

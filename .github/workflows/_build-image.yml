@@ -26,6 +26,11 @@ on:
 permissions:
   contents: read
   packages: write
+  # Keyless cosign signing: id-token lets GitHub mint the short-lived OIDC
+  # token cosign presents to Fulcio in place of a private key. Nothing to
+  # generate, store, or rotate - the identity is this workflow run itself,
+  # and Rekor's transparency log is the audit trail.
+  id-token: write
 
 jobs:
   build:
@@ -86,6 +91,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: images/${{ inputs.image }}
@@ -99,6 +105,21 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}:buildcache,mode=max
           provenance: true
           sbom: true
+
+      - uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: "v3.1.3"
+
+      # Signs the digest, not any tag - :latest and (after promotion)
+      # :stable both point at this exact digest, so one signature covers
+      # every tag that will ever alias it. --yes skips cosign's interactive
+      # Fulcio-certificate confirmation prompt, which has no TTY to answer it
+      # here anyway.
+      - name: Sign the image (keyless)
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}"
+          cosign sign --yes "${IMAGE}@${{ steps.build.outputs.digest }}"
 
       - name: Trivy scan the built image
         uses: aquasecurity/trivy-action@v0.36.0
