@@ -44,6 +44,15 @@ This is not a future-phase item. Until the routing is in place,
 its existing workflows for `runs-on: self-hosted` on any `pull_request` trigger
 before anything else in the migration.
 
+**Closed, confirmed 2026-08-29.** Audited all 14 workflow files in the actual
+repo (`mchellmer/nineteenseventytwo-eightbitsaxlounge`, pre-org-migration)
+directly via the GitHub API — zero `pull_request` triggers anywhere. The
+exposure this ADR describes does not currently exist. Re-audit if a new
+workflow is added before the org migration completes; the convention this
+ADR relies on has no automated enforcement (see "must be enforced... forever"
+above), so this confirmation is a point-in-time fact, not a standing
+guarantee.
+
 ## Alternatives considered
 
 **Make `eightbitsaxlounge` private.** Strongest mitigation — the path stops
