@@ -65,7 +65,6 @@ aws_account_platform_prod: "972034964468"
 # These are ARNs, not secrets — they go on ServiceAccount annotations in
 # cluster/*/values.yaml, and the trust policy on the far side is what decides.
 aws_cluster_role_arns:
-  argocd_sops: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-argocd-sops"
   vault_unseal: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-vault-unseal"
   longhorn_backup: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-longhorn-backup"
   prowler: "arn:aws:iam::{{ aws_account_platform_prod }}:role/cluster/cluster-prowler"

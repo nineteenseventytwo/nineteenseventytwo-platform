@@ -316,10 +316,16 @@ Further along than the docs suggest: `hardening_ssh_trust_ca` already defaults t
       since console is deliberately outside the cluster (ADR-0007). Swapping
       the org secret's actual value is a separate, deliberate step documented
       in `04-secrets.md`, not yet done
-- [ ] **Decide the Argo CD SOPS plugin question.** `cluster-argocd-sops` and the
+- [x] **Decide the Argo CD SOPS plugin question.** `cluster-argocd-sops` and the
       `repoServer` annotation exist, nothing in `cluster/` is SOPS-encrypted, and
       no plugin is configured. Either land the plugin and use it, or delete the
-      role — a role with no consumer is a standing grant that nothing tests
+      role — a role with no consumer is a standing grant that nothing tests.
+      **Decided: delete the role rather than invent a use case for it.** Removed
+      from both repos — `cluster-argocd-sops` (cloud), the `repoServer`
+      annotation (`cluster/argocd/values.yaml`), and every stray reference.
+      The KMS recipient in `.sops.yaml` stays, as general decrypt redundancy
+      independent of any one consumer — revisit if a real use case for the
+      plugin actually shows up
 - [ ] Confirm the only remaining GitHub secrets are `SOPS_AGE_KEY` and the
       GitHub App key — blocked on the `KUBECONFIG` item above actually retiring it
 - [ ] **Write a scoped Vault policy for SSH signing.** Found 2026-08-23,

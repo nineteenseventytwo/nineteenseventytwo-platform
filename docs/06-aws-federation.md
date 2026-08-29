@@ -254,34 +254,6 @@ kubectl -n vault exec -it vault-0 -- sh -c \
 
 ---
 
-## Still outstanding
-
-Written down rather than left to be discovered:
-
-- **Argo CD has no SOPS decryption plugin.** `cluster-argocd-sops` and the
-  `repoServer` annotation are in place, and `.sops.yaml` now lists the KMS key
-  as a recipient, but nothing in `cluster/` is SOPS-encrypted and Argo CD has
-  no plugin configured to decrypt it if it were. The role has no consumer until
-  that lands.
-- **Existing encrypted files predate the KMS recipient.** Adding a recipient to
-  `.sops.yaml` does not rewrite existing files. Run `sops updatekeys` on each
-  and commit, or the cluster cannot decrypt anything encrypted before the
-  change:
-  ```bash
-  sops updatekeys ansible/inventory/lab/group_vars/all/secrets.sops.yml
-  ```
-  Note also that **encrypting** now needs an `aws sso login` session, because
-  sops encrypts the data key to every recipient. Decrypting still needs only
-  one, so `make deploy-nodes` from a laptop with just the age key is unaffected.
-- **Prowler is not deployed.** `enable_prowler_role` stays off until the
-  CronJob and its `security` namespace exist.
-- **The manifests in `cluster/pod-identity-webhook/` are lint-clean but have
-  never been applied**, because there is no cluster yet. Expect to iterate on
-  first contact — most likely on the NetworkPolicy, which is the piece most
-  easily wrong in a way that fails silently.
-
----
-
 ## Operational notes
 
 ### Rotation discipline
@@ -347,7 +319,6 @@ almost always one of four things, in this order of likelihood:
 |---|---|---|---|
 | Vault | `vault:vault` | `cluster-vault-unseal` | Encrypt/Decrypt on the unseal CMK |
 | Longhorn | `longhorn-system:longhorn-service-account` | `cluster-longhorn-backup` | R/W on the backup bucket + its key |
-| Argo CD | `argocd:argocd-repo-server` | `cluster-argocd-sops` | Decrypt on the SOPS CMK |
 | Prowler | `security:prowler` | `cluster-prowler` | Write findings to the security account |
 
 One role per workload, never one shared "cluster" role. The point of
