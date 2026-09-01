@@ -42,14 +42,18 @@ jobs:
       # workload (lab-dind) contributes nothing here, which matches "what
       # do I actually need to worry about right now" rather than "what
       # exists in a manifest somewhere".
+      # This runner has no kubectl of its own - list-running-images shells
+      # out to a sibling ansible-runner container for it, same reasoning as
+      # deploy-cluster.yml's own argocd-sync-wait step just below it in that
+      # file. Confirmed live: a raw `kubectl` call here fails with "command
+      # not found" before ever reaching the cluster.
       - name: List every running image, deduplicated
         id: list
         env:
-          KUBECONFIG: ${{ runner.temp }}/kube/config
+          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
         run: |
           set -euo pipefail
-          images=$(kubectl get pods -A -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' \
-            | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          images=$(make list-running-images | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "images=$images" >> "$GITHUB_OUTPUT"
 
       - name: Shred the staged credential
