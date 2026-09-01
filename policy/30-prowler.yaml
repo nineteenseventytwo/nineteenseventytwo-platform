@@ -74,9 +74,9 @@ spec:
             - name: prowler
               # Pinned to the arm64 image the manifest list resolves to on
               # this cluster's own nodes (ADR-0011) - confirmed against the
-              # registry, not assumed from a locally cached pull.
-              # docker.io/prowlercloud/prowler:stable, 2026-08-28.
-              image: docker.io/prowlercloud/prowler@sha256:8ecf84790981d0ef29b015c20ee0de6561437a20b91a60ecb101238b543f867f
+              # registry and a real pull, not assumed from a locally cached
+              # one. docker.io/prowlercloud/prowler:stable, 2026-09-01.
+              image: docker.io/prowlercloud/prowler@sha256:70a5166d19dcce8a0e6d37b8056412b804863dbd6a24e938fb8c8c7168510598
               imagePullPolicy: Always
               args:
                 - aws
