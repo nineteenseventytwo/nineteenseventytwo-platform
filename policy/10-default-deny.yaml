@@ -425,6 +425,27 @@ spec:
       ports:
         - {protocol: TCP, port: 443}
 ---
+# Vault's Gateway API cutover source, same reserved-entity mechanism Grafana
+# needed (allow-grafana-gateway-ingress above, #100) - Cilium's own Gateway
+# data plane identifies itself as the reserved `ingress` entity, which only
+# CiliumNetworkPolicy's fromEntities can match. Known pattern this time, not
+# rediscovered: no Hubble round-trip needed to find it.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-vault-gateway-ingress
+  namespace: vault
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - port: "8200"
+              protocol: TCP
+---
 # Reserved-identity apiserver egress — same pattern and same caveats as
 # allow-argocd-apiserver in this file: toEntities, unscoped by port. Vault's
 # Kubernetes auth backend calls TokenReview against the apiserver whenever
