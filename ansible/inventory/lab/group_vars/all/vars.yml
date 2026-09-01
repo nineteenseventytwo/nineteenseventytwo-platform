@@ -92,10 +92,15 @@ kubernetes_apiserver_extra_sans:
   - "kubernetes.{{ lab_domain }}"
   - "1972-master-1.{{ lab_domain }}"
 
-# Cilium kube-proxy replacement needs these because the API server cannot be
-# reached through a Service that does not exist yet. Ship standard mode first
-# if the cluster build is fighting you; the migration is supported. §4.3.
-cilium_kube_proxy_replacement: false
+# Migrated 2026-09-01 (docs/03-cluster.md's "flip it later" path). This var
+# alone does nothing for an already-running cluster - it only affects a
+# fresh kubeadm init (kube_control_plane role) and the ansible-orchestrated
+# Helm install task's one-time values (both dead code paths once Argo CD
+# exists and owns the cilium release). The value that actually drives the
+# live cluster is cluster/cilium/values.yaml's own kubeProxyReplacement key.
+# Kept in sync here so a from-scratch rebuild starts in the same mode
+# instead of needing this migration re-run on a brand new cluster.
+cilium_kube_proxy_replacement: true
 
 # ---------------------------------------------------------------------------
 # Egress proxy. Not enforced yet, but written down so Phase B does not fight it

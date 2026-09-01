@@ -349,6 +349,10 @@ kubeconfig: ## Fetch the admin kubeconfig from the control plane to ./build/kube
 	@mkdir -p $(BUILD_DIR)
 	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags kubeconfig
 
+.PHONY: remove-kube-proxy
+remove-kube-proxy: ## One-time kube-proxy-replacement migration - see 30-cluster.yml's own comment before running this
+	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags kube-proxy-removal
+
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm

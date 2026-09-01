@@ -124,7 +124,15 @@
 
 - name: Run kubeadm init
   ansible.builtin.command:
-    cmd: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
+    # A fresh rebuild with cilium_kube_proxy_replacement already true skips
+    # installing kube-proxy at all - Cilium's eBPF replacement is the only
+    # Service-routing path from the start, and there's nothing to migrate
+    # away from later. On an existing cluster this flag does nothing (this
+    # task only ever runs once, at first init); that migration is
+    # ansible/playbooks/30-cluster.yml's kube-proxy-removal play instead.
+    cmd: >-
+      kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --upload-certs
+      {{ '--skip-phases=addon/kube-proxy' if cilium_kube_proxy_replacement else '' }}
   become: true
   when: not kube_control_plane_admin_conf_stat.stat.exists
   register: kube_control_plane_kubeadm_init
