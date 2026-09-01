@@ -167,3 +167,16 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
     platform.nineteenseventytwo/tier: infra
+---
+# Holds the shared Gateway resource and its Certificates/Secrets only -
+# ingress-nginx's replacement. No pods run here: the actual proxying happens
+# in cilium-envoy (kube-system), the same as every other Cilium component.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra

@@ -16,6 +16,16 @@ cainjector:
   resources:
     requests: {cpu: 25m, memory: 96Mi}
     limits: {memory: 256Mi}
+# Lets a Gateway resource carry a cert-manager.io/cluster-issuer annotation
+# the same way an Ingress does - without this, that annotation is silently
+# inert. Separate from featureGates.gatewayAPI.ExperimentalGatewayAPISupport
+# (already default-on in this chart version), which only gates the ACME
+# HTTP-01 solver's own use of Gateway API - a different, narrower feature
+# this cluster doesn't use anyway (DNS-01 only, see dns01RecursiveNameservers
+# below).
+config:
+  gatewayAPI:
+    enabled: true
 # DNS-01 solving needs to see the *public* resolvers, not Unbound, or it will
 # check the challenge record against a view that has not propagated yet.
 dns01RecursiveNameservers: "1.1.1.1:53,9.9.9.9:53"

@@ -1,0 +1,71 @@
+---
+# ingress-nginx's replacement - the shared entry point every app attaches an
+# HTTPRoute to, the same way every app previously shared the one ingress-nginx
+# controller. One Gateway, one LoadBalancer IP, not one per app: matches the
+# topology this cluster already had, rather than introducing per-app IPs that
+# would each need their own OPNsense DNS override.
+#
+# cert-manager.io/cluster-issuer works on a Gateway exactly like it does on an
+# Ingress (cert-manager 1.15+, config.gatewayAPI.enabled: true -
+# cluster/cert-manager/values.yaml) - one Certificate gets created per unique
+# certificateRefs name below, DNS names taken from each listener's own
+# hostname field.
+#
+# Cilium's own secret-sync (cluster/cilium/values.yaml's default
+# secretsNamespace.sync: true) mirrors each issued Secret into cilium-secrets
+# for the Envoy proxy to actually read from - nothing here does that by hand.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: gateway
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: cilium
+  listeners:
+    # Redirects to HTTPS - see 10-http-redirect.yaml. No hostname filter: it
+    # has to match whatever Host header shows up, the same as ingress-nginx's
+    # own default force-ssl-redirect behaviour did.
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    # One listener per hostname, same port (443) - standard Gateway API SNI
+    # listener merging, the same way ingress-nginx served every host off one
+    # shared IP:port. Each app's own HTTPRoute (cluster/argocd,
+    # cluster/monitoring, cluster/vault values.yaml) attaches via hostname
+    # match alone; no sectionName needed since the hostnames don't overlap.
+    - name: argocd-https
+      port: 443
+      protocol: HTTPS
+      hostname: "argocd.eightbitsaxlounge.com" # tracks lab_domain
+      tls:
+        certificateRefs:
+          - name: argocd-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: grafana-https
+      port: 443
+      protocol: HTTPS
+      hostname: "grafana.eightbitsaxlounge.com" # tracks lab_domain
+      tls:
+        certificateRefs:
+          - name: grafana-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: vault-https
+      port: 443
+      protocol: HTTPS
+      hostname: "vault.eightbitsaxlounge.com" # tracks lab_domain
+      tls:
+        certificateRefs:
+          - name: vault-tls
+      allowedRoutes:
+        namespaces:
+          from: All
