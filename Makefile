@@ -385,6 +385,15 @@ argocd-sync-wait: ## Nudge Argo CD and block until the platform app is Synced/He
 	  kubectl -n argocd get applications -o wide >&2; \
 	  exit 1'
 
+# The gha-runner image this runs from has no kubectl of its own - it shells
+# out to a *sibling* ansible-runner container for anything that does, same
+# reasoning as argocd-sync-wait just above. Every unique image reference
+# across every running Pod, cluster-wide, one per line - image-vuln-scan.yml
+# is the only current caller.
+.PHONY: list-running-images
+list-running-images: ## Print every unique container image reference running in the cluster, one per line
+	@$(KUBECTL) get pods -A -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' | sort -u
+
 # Runs on the workstation, not through the ansible-runner image: it needs an
 # `aws sso login` session from ~/.aws, and mounting that into a container to
 # avoid writing three lines of Makefile would be the wrong trade. Same reasoning
