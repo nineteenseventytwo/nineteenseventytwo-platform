@@ -11,6 +11,10 @@ ignore: |
   # keep honest.
   *.sops.yml
   *.sops.yaml
+  # Vendored verbatim from upstream (kubernetes-sigs/gateway-api releases).
+  # Nothing here is hand-edited, so there is nothing for a linter to keep
+  # honest - same reasoning as the sops-owned files above.
+  cluster/gateway-api-crds/
 
 rules:
   # Helm values and k8s manifests routinely exceed 80 columns.
