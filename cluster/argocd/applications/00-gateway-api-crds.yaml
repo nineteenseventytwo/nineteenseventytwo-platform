@@ -1,0 +1,35 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-api-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/gateway-api-crds
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      # Client-side apply's last-applied-configuration annotation has a
+      # 262144-byte cap; Gateway API's CRDs (their OpenAPI schemas alone) blow
+      # past that. Server-side apply is the documented fix, and cilium's own
+      # Application already uses it for the same reason.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
+  # Sync-wave -30, before cilium's -20: Cilium's own gatewayAPI.enabled flag
+  # (cluster/cilium/values.yaml) requires these CRDs to already exist at
+  # agent startup, or the controller fails to come up. Pinned to the release
+  # Cilium 1.20 itself requires (v1.6.1 minimum, for its v1 TLSRoute
+  # support) rather than tracking upstream's own "latest".
