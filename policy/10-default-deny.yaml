@@ -694,6 +694,16 @@ spec:
 # ingress-nginx-controller to monitoring-grafana.monitoring.svc, neither of
 # which is explained by anything added today. Pre-existing gap, independent
 # of this change; fixed here because it blocked verifying the rule above.
+# cilium-envoy source added 2026-09-01: Grafana's Gateway API cutover
+# (ingress.enabled -> route.main.enabled) moved its traffic source from
+# ingress-nginx-controller pods to cilium-envoy pods in kube-system - a
+# different pod set this default-deny never allow-listed. Confirmed live: a
+# real request through the Gateway got "upstream connect error... connection
+# timeout" from Envoy, a silent-drop signature, until this was added.
+# namespaceSelector + podSelector together (not two separate from: entries)
+# scopes this to cilium-envoy specifically, not all of kube-system.
+# ingress-nginx kept alongside it, not replaced - still serving Grafana in
+# parallel until every app is cut over and it's actually removed.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -709,6 +719,12 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: cilium-envoy
       ports:
         - {protocol: TCP, port: 3000}
 ---
