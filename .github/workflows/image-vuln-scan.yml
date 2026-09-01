@@ -31,6 +31,8 @@ jobs:
     outputs:
       images: ${{ steps.list.outputs.images }}
     steps:
+      - uses: actions/checkout@v7
+
       - name: Stage the read-only kubeconfig
         run: |
           install -d -m 700 "$RUNNER_TEMP/kube"
