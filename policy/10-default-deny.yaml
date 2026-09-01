@@ -694,16 +694,6 @@ spec:
 # ingress-nginx-controller to monitoring-grafana.monitoring.svc, neither of
 # which is explained by anything added today. Pre-existing gap, independent
 # of this change; fixed here because it blocked verifying the rule above.
-# cilium-envoy source added 2026-09-01: Grafana's Gateway API cutover
-# (ingress.enabled -> route.main.enabled) moved its traffic source from
-# ingress-nginx-controller pods to cilium-envoy pods in kube-system - a
-# different pod set this default-deny never allow-listed. Confirmed live: a
-# real request through the Gateway got "upstream connect error... connection
-# timeout" from Envoy, a silent-drop signature, until this was added.
-# namespaceSelector + podSelector together (not two separate from: entries)
-# scopes this to cilium-envoy specifically, not all of kube-system.
-# ingress-nginx kept alongside it, not replaced - still serving Grafana in
-# parallel until every app is cut over and it's actually removed.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -719,14 +709,39 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: cilium-envoy
       ports:
         - {protocol: TCP, port: 3000}
+---
+# Second attempt at the Gateway cutover source, and the actually-correct one.
+# The first attempt (2026-09-01, since reverted) added a podSelector for
+# cilium-envoy's own pod labels to the plain NetworkPolicy above, on the
+# theory that Gateway traffic comes from those pods. It didn't work - still
+# "upstream connect error... connection timeout" after merging - and Hubble
+# proved why: `hubble observe --namespace monitoring` during a live request
+# showed the source as literally `(ingress)`, not a cilium-envoy pod identity
+# at all. cilium-envoy runs hostNetwork: true (confirmed:
+# `kubectl get daemonset cilium-envoy -o jsonpath='{.spec.template.spec.hostNetwork}'`
+# -> true), and Cilium's own Gateway API / Ingress data plane traffic gets
+# its own reserved `ingress` entity for exactly this reason - a plain
+# Kubernetes NetworkPolicy has no vocabulary for that at all, only
+# CiliumNetworkPolicy's fromEntities does (same reserved-entity mechanism
+# already used by allow-monitoring-apiserver and
+# allow-alertmanager-slack-egress below).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-grafana-gateway-ingress
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
