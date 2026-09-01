@@ -59,6 +59,17 @@ hubble:
 l2announcements:
   enabled: false
 
+# ingress-nginx's replacement (retired/archived upstream, 2026-03-24 - no
+# more CVE patches). This is the CNI everything already runs on, and it
+# already ships the cilium-envoy DaemonSet this depends on - no new
+# component. Requires the Gateway API CRDs to exist before this agent starts
+# (cluster/argocd/applications/00-gateway-api-crds.yaml, sync-wave -30,
+# ahead of this Application's -20). gatewayClass.create defaults to "auto",
+# which creates the GatewayClass now that the CRDs are present - left as
+# the default rather than duplicating that logic here.
+gatewayAPI:
+  enabled: true
+
 bpf:
   masquerade: true
 
