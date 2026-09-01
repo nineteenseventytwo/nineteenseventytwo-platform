@@ -6,6 +6,12 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "60"
+    # Same fix as gateway-api-crds and gateway (00-gateway-api-crds.yaml,
+    # 22-gateway.yaml): the HTTPRoute this Application now owns
+    # (monitoring-grafana) carries server-populated status that trips Argo
+    # CD's client-side diff into perpetual OutOfSync even though sync itself
+    # succeeds and the live object matches. Confirmed live 2026-09-01.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
