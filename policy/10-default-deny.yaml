@@ -10,12 +10,16 @@
 # VLAN 20 is switch-local — OPNsense never sees it, so inter-workload isolation
 # is a NetworkPolicy problem and cannot be solved at the firewall.
 #
-# Five namespaces are deliberately not covered below, not missed:
+# Six namespaces are deliberately not covered below, not missed:
 #   - kube-system, cilium-secrets, kube-node-lease, kube-public: no workloads
 #     this cluster's threat model treats as tenant-adjacent, and kube-system
 #     specifically is where CoreDNS and the CNI itself live — a wrong rule
 #     here takes the cluster down and Argo CD with it before anything could
 #     fix it.
+#   - gateway: no pods ever run here — it holds the shared Gateway resource
+#     and its Certificates/Secrets only, the actual proxying happens in
+#     cilium-envoy (kube-system). A podSelector: {} policy with nothing to
+#     select is inert, not protective.
 #   - node-exporter-system: every pod is hostNetwork: true by construction.
 #     Confirmed live (2026-08-23): a deny-all ingress policy applied to this
 #     namespace left an already-working Prometheus scrape target completely

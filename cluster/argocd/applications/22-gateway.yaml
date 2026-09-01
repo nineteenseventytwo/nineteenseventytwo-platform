@@ -1,0 +1,35 @@
+---
+# Sync wave 22: after cert-manager (20), which the Gateway's
+# cert-manager.io/cluster-issuer annotation depends on to actually issue
+# anything, and before pod-identity-webhook (25) - no real ordering need
+# there, just keeps the numbering readable alongside it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gateway
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/gateway
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      # policy/00-namespaces.yaml owns this namespace and its PSS labels, and
+      # 30-cluster.yml applies policy/ before Argo CD ever runs. This is the
+      # same belt-and-braces every other Application here uses, for the case
+      # where it did not.
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
