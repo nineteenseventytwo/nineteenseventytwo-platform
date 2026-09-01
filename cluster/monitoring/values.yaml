@@ -91,15 +91,16 @@ grafana:
     enabled: true
     storageClassName: longhorn
     size: 2Gi
-  ingress:
-    enabled: true
-    ingressClassName: nginx
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-    hosts: ["grafana.eightbitsaxlounge.com"]   # tracks lab_domain
-    tls:
-      - secretName: grafana-tls
-        hosts: ["grafana.eightbitsaxlounge.com"]
+  # ingress-nginx's replacement. The Gateway itself already carries the
+  # cert-manager annotation and owns the grafana-tls Certificate
+  # (cluster/gateway/00-gateway.yaml) - nothing to duplicate here.
+  route:
+    main:
+      enabled: true
+      hostnames: ["grafana.eightbitsaxlounge.com"]   # tracks lab_domain
+      parentRefs:
+        - name: gateway
+          namespace: gateway
   admin:
     existingSecret: grafana-admin
     userKey: admin-user
@@ -140,6 +141,7 @@ kubeScheduler:
 kubeEtcd:
   enabled: true
 kubeProxy:
-  # Only meaningful when Cilium is NOT replacing kube-proxy. Flip with
-  # cilium_kube_proxy_replacement.
-  enabled: true
+  # kube-proxy was removed from this cluster 2026-09-01
+  # (docs/03-cluster.md's kube-proxy-replacement migration) - there is no
+  # longer a target for this ServiceMonitor to scrape.
+  enabled: false
