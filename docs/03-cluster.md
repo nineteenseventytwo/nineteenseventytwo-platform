@@ -136,12 +136,17 @@ this), Hubble flow observability, and transparent node-to-node WireGuard
 encryption. The trigger to revisit is concrete — **L7 policy, per-workload
 mTLS identity, or traffic shifting** — not before.
 
-**kube-proxy replacement** is optional and has one gotcha: it needs
-`k8sServiceHost`/`k8sServicePort` in the Helm values, because the API server
-can't be reached through a Service that doesn't exist yet. `30-cluster.yml`
-injects both from the inventory. If the build is fighting you, ship standard
-mode (`cilium_kube_proxy_replacement: false`, the default here) and flip it
-later — it's a supported migration.
+**kube-proxy replacement** has one gotcha: it needs `k8sServiceHost`/
+`k8sServicePort` in the Helm values, because the API server can't be reached
+through a Service that doesn't exist yet. `30-cluster.yml` injects both from
+the inventory. A fresh build can ship standard mode first
+(`cilium_kube_proxy_replacement: false`) and flip it later if the build is
+fighting you — it's a supported migration, and this cluster is that migration:
+`make remove-kube-proxy` (one-time, `30-cluster.yml`'s own comment has the
+full sequence) plus flipping `kubeProxyReplacement` in
+`cluster/cilium/values.yaml`, the value that actually drives the live
+cluster once Argo CD exists. `cilium_kube_proxy_replacement` in inventory
+now only matters for a from-scratch rebuild starting in the same mode.
 
 ### Argo CD sync waves
 

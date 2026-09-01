@@ -204,3 +204,66 @@
         src: "/tmp/policy/tenants/{{ item | basename }}"
       loop: "{{ query('fileglob', playbook_dir + '/../../policy/tenants/*.yaml') | sort }}"
       become: true
+
+# One-time migration for an EXISTING cluster still running kube-proxy
+# (docs/03-cluster.md's "flip it later" path). A from-scratch rebuild never
+# needs this: with cilium_kube_proxy_replacement already true, kubeadm init
+# skips installing kube-proxy in the first place (kube_control_plane role).
+#
+# `never` alongside the custom tag, deliberately: deploy-cluster runs this
+# whole playbook with no --tags filter, and Ansible runs every task that
+# isn't `never`-tagged in that case. Without it this would delete kube-proxy
+# on every single ordinary deploy-cluster run. Invoke explicitly and only
+# once: `make remove-kube-proxy`.
+#
+# Cilium's own documented order (docs.cilium.io - Kubernetes Without
+# kube-proxy): remove kube-proxy and its iptables rules FIRST, then flip
+# cluster/cilium/values.yaml's kubeProxyReplacement and let Argo CD roll
+# Cilium with the replacement active. The two mechanisms track Service
+# routing independently (separate conntrack/NAT state) - this is a genuine
+# hard cutover, not a gradual one. Expect a brief window with no Service
+# routing at all between this running and Cilium's replacement coming up;
+# minimise it by having the values.yaml change merged and ready to
+# force-sync immediately after this completes, not sequenced days apart.
+- name: Remove kube-proxy (kube-proxy-replacement migration)
+  hosts: control_plane
+  gather_facts: false
+  tags: [kube-proxy-removal, never]
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Delete the kube-proxy DaemonSet
+      kubernetes.core.k8s:
+        api_version: apps/v1
+        kind: DaemonSet
+        name: kube-proxy
+        namespace: kube-system
+        state: absent
+      become: true
+
+    # Deleting the ConfigMap too, not just the DaemonSet, is what stops
+    # kubeadm reinstalling kube-proxy on a future `kubeadm upgrade` (k8s
+    # 1.19+, per Cilium's own migration guide).
+    - name: Delete the kube-proxy ConfigMap
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: ConfigMap
+        name: kube-proxy
+        namespace: kube-system
+        state: absent
+      become: true
+
+- name: Clean up kube-proxy's iptables rules on every node
+  hosts: cluster
+  gather_facts: false
+  tags: [kube-proxy-removal, never]
+  tasks:
+    # Idempotent: on a node with no KUBE- chains left, this restores the
+    # same ruleset unchanged. Safe to re-run if a node was missed the first
+    # time.
+    - name: Strip KUBE- iptables chains
+      ansible.builtin.shell:
+        cmd: set -o pipefail && iptables-save | grep -v KUBE | iptables-restore
+        executable: /bin/bash
+      become: true
+      changed_when: true
