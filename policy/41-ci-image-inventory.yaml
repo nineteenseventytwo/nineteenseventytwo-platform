@@ -1,0 +1,56 @@
+---
+# Read-only credential for the scheduled image vulnerability scan
+# (.github/workflows/image-vuln-scan.yml). The scan itself runs against
+# images by reference, not by talking to the cluster at all -
+# `trivy image <ref>` just pulls from the registry. The only thing that
+# actually needs cluster access is finding out what's running, which is
+# exactly one read: list every Pod's container images, cluster-wide.
+#
+# Deliberately not trivy's own `trivy k8s` mode: that needs a meaningfully
+# broader ClusterRole by default (create/delete Jobs, create Namespaces, for
+# its node-collector sub-scan) to get findings this workflow doesn't need -
+# node-level misconfiguration is Kubescape's job, not this one's. Per-image
+# `trivy image` scanning also has native SARIF output; trivy k8s's own
+# `--format` does not support it at all (table/json/cyclonedx only,
+# confirmed against the real CLI, not assumed from docs).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-image-inventory
+  namespace: security
+---
+# Same reasoning as security/eightbitsaxlounge-ci and argocd/ci-argocd-sync:
+# a CI credential has to outlive the ~1h TokenRequest tokens everything else
+# gets, and 1.24+ no longer creates one of these automatically.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-image-inventory-token
+  namespace: security
+  annotations:
+    kubernetes.io/service-account.name: ci-image-inventory
+type: kubernetes.io/service-account-token
+---
+# ClusterRole, not Role: images run in every namespace, and the whole point
+# is not maintaining a list of which ones to check.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ci-image-inventory
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ci-image-inventory
+subjects:
+  - kind: ServiceAccount
+    name: ci-image-inventory
+    namespace: security
+roleRef:
+  kind: ClusterRole
+  name: ci-image-inventory
+  apiGroup: rbac.authorization.k8s.io

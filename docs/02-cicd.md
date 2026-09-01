@@ -190,6 +190,39 @@ parameterised by image name. `deploy-nodes.yml` / `deploy-cluster.yml` pin to
 the exact `:<version>`, never `:stable` — `:stable` is for a future consumer
 that wants "whatever's currently blessed."
 
+### The scheduled scan the build workflows can't cover
+
+`_build-image.yml`'s own Trivy step only ever looks at the two images this
+repo builds itself, and only once, at build time. Every third-party chart's
+image — Cilium, cert-manager, Longhorn, Vault, the whole
+kube-prometheus-stack, Argo CD, ingress-nginx, MetalLB, External Secrets,
+kubelet-csr-approver, Prowler — was never scanned for vulnerabilities by
+anything in this pipeline, at any point, and a CVE disclosed the day after a
+build doesn't get caught by a scan that only runs once.
+
+`image-vuln-scan.yml` closes that on a weekly schedule, against whatever the
+cluster is genuinely running rather than a hand-maintained list:
+
+1. **Enumerate** (self-hosted, `lab-network` — the only step that needs a
+   path into VLAN 20): lists every unique image reference across every
+   running Pod, using `ci-image-inventory`
+   ([`policy/41-ci-image-inventory.yaml`](../policy/41-ci-image-inventory.yaml)) —
+   a ClusterRole scoped to exactly `pods: get, list`, nothing else. Not
+   `trivy k8s`: that mode needs a meaningfully broader ClusterRole by
+   default (create/delete Jobs, create Namespaces, for its node-collector
+   sub-scan) to produce node-level misconfiguration findings this workflow
+   doesn't want — that's Kubescape's job, not this one's.
+2. **Scan** (hosted, one per image via a matrix): `trivy image` against each
+   reference directly from its own public registry — the same network path
+   `_build-image.yml`'s own image scan already assumes, no lab access
+   needed. `HIGH,CRITICAL` severity, `--ignore-unfixed` (a CVE with no
+   available patch yet isn't actionable, and would be pure noise repeated
+   weekly).
+3. **Report**: every image's SARIF goes to the Security tab, and a one-line
+   count goes to Slack — the Security tab is the actual detail view; Slack
+   is "something changed, go look", not a second place to read CVE
+   descriptions.
+
 ### Two topologies
 
 **Interim — compose on `1972-console-1`.** Before the cluster exists.
