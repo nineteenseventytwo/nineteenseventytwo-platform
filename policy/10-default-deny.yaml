@@ -216,6 +216,27 @@ spec:
       ports:
         - {protocol: TCP, port: 443}
 ---
+# Argo CD server's Gateway API cutover source, same reserved-entity mechanism
+# Grafana and Vault needed (allow-grafana-gateway-ingress, PR #100;
+# allow-vault-gateway-ingress, PR #101) - Cilium's own Gateway data plane
+# identifies itself as the reserved `ingress` entity, which only
+# CiliumNetworkPolicy's fromEntities can match.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-argocd-gateway-ingress
+  namespace: argocd
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
 # Cilium resolves both the apiserver's real IP (192.168.20.202:6443) and its
 # ClusterIP (10.96.0.1:443, what every pod's own KUBERNETES_SERVICE_HOST/PORT
 # point at - the standard client-go in-cluster path, which is what Argo CD's

@@ -55,13 +55,20 @@ server:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
-  ingress:
+  # ingress-nginx's replacement. The Gateway itself already carries the
+  # cert-manager annotation and owns the argocd-tls Certificate
+  # (cluster/gateway/00-gateway.yaml) - nothing to duplicate here. Argo CD's
+  # web UI talks grpc-web (HTTP/1.1-compatible), not native HTTP/2 gRPC - the
+  # `argocd` CLI is never used against this hostname anywhere in this repo
+  # (every Makefile target drives Argo CD through kubectl against the
+  # Application CRD directly), so there's no ALPN/HTTP-2 concern to carry
+  # over from ingress-nginx.
+  httproute:
     enabled: true
-    ingressClassName: nginx
-    hostname: "argocd.eightbitsaxlounge.com"   # tracks lab_domain
-    tls: true
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hostnames: ["argocd.eightbitsaxlounge.com"]   # tracks lab_domain
+    parentRefs:
+      - name: gateway
+        namespace: gateway
 
 applicationSet:
   replicas: 1
