@@ -11,6 +11,13 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-30"
+    # Gateway API's CRD schemas are among the largest in the ecosystem.
+    # Confirmed live: without this, Argo CD's own client-side diff logic
+    # perpetually flags 5 of the 10 CRDs OutOfSync even though the applied
+    # object and desired manifest are identical - a known Argo CD gotcha
+    # with schemas this size, independent of ServerSideApply already being
+    # used to sync. This makes drift *detection* server-side too.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
