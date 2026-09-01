@@ -69,6 +69,9 @@ jobs:
     # needs a path into VLAN 20, only the internet _build-image.yml's own
     # image scan already assumes on this exact runner type.
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +94,18 @@ jobs:
           ignore-unfixed: true
           exit-code: "0" # report every image, don't let one stop the rest
 
+      # One upload per image, not a single merged upload in `report`: GitHub
+      # stopped allowing multiple SARIF runs under the same category in one
+      # upload (confirmed against the real failure - "does not support
+      # uploading multiple SARIF runs with the same category" - since Trivy
+      # gives every run the same default category). Each image's own
+      # sanitised ref as its category keeps them distinct.
+      - name: Upload this image's findings to the Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: "${{ steps.name.outputs.safe }}.sarif"
+          category: ${{ steps.name.outputs.safe }}
+
       - uses: actions/upload-artifact@v7
         with:
           name: sarif-${{ steps.name.outputs.safe }}
@@ -102,18 +117,12 @@ jobs:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/download-artifact@v8
         with:
           pattern: sarif-*
           path: sarif
           merge-multiple: true
-
-      - name: Upload every image's findings to the Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: sarif
 
       # A count in Slack, not the findings themselves - the Security tab is
       # the actual detail view. The point of this message is "something
