@@ -10,6 +10,12 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "22"
+    # Same fix as gateway-api-crds (00-gateway-api-crds.yaml): Gateway/
+    # HTTPRoute carry a lot of server-populated status (addresses, listener
+    # conditions), and Argo CD's client-side diff perpetually flags them
+    # OutOfSync even though sync itself succeeds and the live objects match.
+    # Confirmed live 2026-09-01 - same symptom, same fix.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
