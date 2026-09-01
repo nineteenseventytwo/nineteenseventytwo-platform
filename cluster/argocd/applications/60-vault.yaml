@@ -6,6 +6,14 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "50"
+    # Pre-empting the same fix gateway-api-crds, gateway and monitoring all
+    # needed (00-gateway-api-crds.yaml, 22-gateway.yaml, 70-monitoring.yaml):
+    # once this Application owns an HTTPRoute too (the ingress-nginx ->
+    # Gateway cutover, not yet done here), its server-populated status trips
+    # Argo CD's client-side diff into perpetual OutOfSync even though sync
+    # itself succeeds - confirmed live for the other three, same mechanism
+    # applies here. Added now rather than rediscovering it a fourth time.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
