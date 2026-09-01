@@ -1,5 +1,5 @@
 ---
-# chart: 10.3.3
+# chart: 10.5.0
 # repo:  https://argoproj.github.io/argo-helm
 #
 # Argo CD on 2 GB nodes. The defaults assume a cluster with room to spare, so
