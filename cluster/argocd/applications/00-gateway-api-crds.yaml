@@ -1,4 +1,9 @@
 ---
+# Sync-wave -30, before cilium's -20: Cilium's own gatewayAPI.enabled flag
+# (cluster/cilium/values.yaml) requires these CRDs to already exist at agent
+# startup, or the controller fails to come up. Pinned to the release Cilium
+# 1.20 itself requires (v1.6.1 minimum, for its v1 TLSRoute support) rather
+# than tracking upstream's own "latest".
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,8 +33,3 @@ spec:
     retry:
       limit: 5
       backoff: {duration: 30s, factor: 2, maxDuration: 10m}
-  # Sync-wave -30, before cilium's -20: Cilium's own gatewayAPI.enabled flag
-  # (cluster/cilium/values.yaml) requires these CRDs to already exist at
-  # agent startup, or the controller fails to come up. Pinned to the release
-  # Cilium 1.20 itself requires (v1.6.1 minimum, for its v1 TLSRoute
-  # support) rather than tracking upstream's own "latest".
