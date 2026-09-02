@@ -1,0 +1,19 @@
+# KSV-0039 (LimitRange) and KSV-0040 (ResourceQuota) fire per-file, not
+# per-namespace: `trivy fs` scans each YAML file in isolation with no
+# visibility into sibling files, so it flags every namespaced resource in
+# every file that doesn't *also* contain its own ResourceQuota+LimitRange
+# pair - including policy/21-resource-quotas.yaml and
+# policy/20-limitrange-default.yaml themselves, and dozens of files that
+# create no pods at all (Argo CD Applications, ClusterIssuers, CRD installs).
+# Confirmed reproducible locally: 266 findings across ~40 files with these
+# two checks alone, dropping to 0 with this ignore and nothing else changed
+# (verified diff was exactly 266 misconfig findings, before vs after).
+#
+# The actual guardrail is real and live - see policy/21-resource-quotas.yaml
+# and policy/20-limitrange-default.yaml, applied to every namespace in
+# policy/10-default-deny.yaml except kube-system (deliberately excluded,
+# see that file's own header comment) - verified against the live cluster
+# with `kubectl get resourcequota,limitrange -A`. This ignore just stops a
+# scanner that structurally cannot see that fix from re-flagging it forever.
+KSV-0039
+KSV-0040
