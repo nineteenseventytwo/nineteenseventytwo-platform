@@ -3,13 +3,9 @@
 # repo:  https://helm.cilium.io/
 #
 # Cilium is the CNI and, for now, the only network layer.
-#
-# k8sServiceHost / k8sServicePort / ipam are injected by
-# ansible/playbooks/30-cluster.yml from the inventory - kubeProxyReplacement
-# used to be too, back when standard mode (kube-proxy alongside Cilium) was
-# the running config. It's set explicitly below now that this cluster has
-# migrated (docs/03-cluster.md) - the inventory var only matters for a
-# from-scratch rebuild starting in the same mode.
+# k8sServiceHost / k8sServicePort / ipam are injected from the inventory by
+# ansible/playbooks/30-cluster.yml and are deliberately not in this file.
+# Findings: ../README.md#cilium
 
 # 3 nodes, 2 GB each.
 operator:
@@ -63,25 +59,13 @@ hubble:
 l2announcements:
   enabled: false
 
-# ingress-nginx's replacement (retired/archived upstream, 2026-03-24 - no
-# more CVE patches). This is the CNI everything already runs on, and it
-# already ships the cilium-envoy DaemonSet this depends on - no new
-# component. Requires the Gateway API CRDs to exist before this agent starts
-# (cluster/argocd/applications/00-gateway-api-crds.yaml, sync-wave -30,
-# ahead of this Application's -20). gatewayClass.create defaults to "auto",
-# which creates the GatewayClass now that the CRDs are present - left as
-# the default rather than duplicating that logic here.
+# ingress-nginx's replacement (ADR-0015). Needs the Gateway API CRDs a sync
+# wave earlier. See ../README.md#gateway-api-needs-its-crds-a-wave-earlier
 gatewayAPI:
   enabled: true
 
-# Migrated from standard mode (kube-proxy alongside Cilium) 2026-09-01.
-# Also what unblocks Gateway API: Cilium's controller refuses to start
-# without this (confirmed live via PR #92 - the GatewayClass sat in
-# Unknown/"Waiting for controller" forever, and the operator logged "Gateway
-# API support requires kube-proxy-replacement enabled"). The ansible-injected
-# k8sServiceHost/k8sServicePort (not in this file - see the header comment)
-# are what let the agent reach the API server directly instead of through a
-# Service that doesn't exist yet.
+# Required for Gateway API, not just a performance choice.
+# See ../README.md#kube-proxy-replacement-is-what-unblocks-gateway-api
 kubeProxyReplacement: true
 
 bpf:

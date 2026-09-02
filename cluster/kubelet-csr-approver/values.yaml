@@ -2,30 +2,18 @@
 # chart: postfinance/kubelet-csr-approver 1.2.14
 # repo:  https://postfinance.github.io/kubelet-csr-approver
 #
-# kubeadm auto-approves the kubelet *client* CSR used for apiserver->kubelet
-# auth, but not kubernetes.io/kubelet-serving - the cert kubelet's own HTTPS
-# endpoint presents to `kubectl logs`/`exec`/`attach` and to anything
-# scraping kubelet metrics over TLS. serverTLSBootstrap: true
-# (ansible/roles/kube_control_plane) means kubelet requests one, but with
-# nothing to approve it a Pending CSR just sits there - which is exactly what
-# a backlog of them did before this was installed, cleared by hand once as a
-# stopgap. This closes the gap so the *next* rotation (kubeadm's certs are
-# valid 1 year) doesn't repeat it silently.
+# Approves kubernetes.io/kubelet-serving CSRs, which kubeadm does not.
+# Findings: ../README.md#kubelet-csr-approver
 namespace: kubelet-csr-approver
 
-# Matches this cluster's actual node names (1972-master-1, 1972-worker-1,
-# 1972-worker-2) and nothing else - console isn't a kubelet, so it never
-# presents a CSR here in the first place (ADR-0007).
+# This cluster's node names and nothing else — console isn't a kubelet (ADR-0007).
 providerRegex: "^1972-(master|worker)-[0-9]+$"
 
 providerIpPrefixes:
   - 192.168.20.0/24
 
-# Confirmed live: bare node hostnames (`1972-master-1`, etc.) don't resolve
-# anywhere on this network - only specific service FQDNs have OPNsense
-# Unbound overrides (docs/01-network-validation.md), never the nodes
-# themselves. With this left false the approver's own DNS-resolution check
-# would fail every single CSR, defeating the point of installing it.
+# Node hostnames don't resolve on this network; left false every CSR fails.
+# See ../README.md#bypassdnsresolution-must-be-true-here
 bypassDnsResolution: true
 
 metrics:

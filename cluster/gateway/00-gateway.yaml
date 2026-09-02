@@ -1,19 +1,7 @@
 ---
-# ingress-nginx's replacement - the shared entry point every app attaches an
-# HTTPRoute to, the same way every app previously shared the one ingress-nginx
-# controller. One Gateway, one LoadBalancer IP, not one per app: matches the
-# topology this cluster already had, rather than introducing per-app IPs that
-# would each need their own OPNsense DNS override.
-#
-# cert-manager.io/cluster-issuer works on a Gateway exactly like it does on an
-# Ingress (cert-manager 1.15+, config.gatewayAPI.enabled: true -
-# cluster/cert-manager/values.yaml) - one Certificate gets created per unique
-# certificateRefs name below, DNS names taken from each listener's own
-# hostname field.
-#
-# Cilium's own secret-sync (cluster/cilium/values.yaml's default
-# secretsNamespace.sync: true) mirrors each issued Secret into cilium-secrets
-# for the Envoy proxy to actually read from - nothing here does that by hand.
+# The shared entry point every app attaches an HTTPRoute to — ingress-nginx's
+# replacement (ADR-0015). One Gateway, one LoadBalancer IP, SNI-separated
+# listeners. Findings: ../README.md#the-shared-gateway
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -23,24 +11,15 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   gatewayClassName: cilium
-  # Pins the LoadBalancer IP the same way ingress-nginx's own
-  # controller.service.loadBalancerIP did, and for the identical reason: so
-  # the Unbound host overrides on OPNsense (docs/01-network-validation.md)
-  # don't need updating every time this Service is recreated. Cilium's own
-  # spec.addresses field needs LB-IPAM, which this cluster doesn't use
-  # (MetalLB does the actual allocation - cluster/cilium/values.yaml's
-  # l2announcements.enabled: false is deliberate, see that file's own
-  # comment) - infrastructure.annotations is what actually reaches the
-  # Service MetalLB is watching. Already the address this Gateway was
-  # allocated on first sync; this just stops it from ever being anything
-  # else.
+  # Pins the LB IP so the OPNsense Unbound overrides stay valid. Goes through
+  # an annotation, not spec.addresses — see
+  # ../README.md#pinning-the-loadbalancer-ip-goes-through-an-annotation-not-specaddresses
   infrastructure:
     annotations:
       metallb.io/loadBalancerIPs: "192.168.20.241"
   listeners:
-    # Redirects to HTTPS - see 10-http-redirect.yaml. No hostname filter: it
-    # has to match whatever Host header shows up, the same as ingress-nginx's
-    # own default force-ssl-redirect behaviour did.
+    # Redirects to HTTPS (10-http-redirect.yaml). No hostname filter — it has
+    # to match whatever Host header shows up.
     - name: http
       port: 80
       protocol: HTTP
@@ -48,11 +27,8 @@ spec:
         namespaces:
           from: All
 
-    # One listener per hostname, same port (443) - standard Gateway API SNI
-    # listener merging, the same way ingress-nginx served every host off one
-    # shared IP:port. Each app's own HTTPRoute (cluster/argocd,
-    # cluster/monitoring, cluster/vault values.yaml) attaches via hostname
-    # match alone; no sectionName needed since the hostnames don't overlap.
+    # One listener per hostname on 443, separated by SNI. Each app's HTTPRoute
+    # attaches by hostname match alone. See ../README.md#one-gateway-one-ip
     - name: argocd-https
       port: 443
       protocol: HTTPS
