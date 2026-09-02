@@ -79,20 +79,31 @@ aws_longhorn_bucket: "nineteenseventytwo-longhorn-backups-{{ aws_account_platfor
 # ---------------------------------------------------------------------------
 # Versions. Pinned so replaying an old commit does what it did then.
 # ---------------------------------------------------------------------------
-# Matches what eightbitsaxlounge/server runs today; bump deliberately.
-kubernetes_version: "1.36"
-# Patch pin, separate from kubernetes_version (which stays minor-only for the
-# apt repo URL). Bumped 2026-09-02 for the crypto/x509 chain-validation/DNS-SAN
-# and HTTP/2 malformed-SETTINGS Go stdlib CVEs fixed between v1.36.0 and
-# v1.36.4 - confirmed via a local Trivy scan of the v1.36.4 image, not just
-# the changelog.
-kubernetes_version_patch: "4"
-# Not part of kubeadm's version map by default at this minor; pinned
-# explicitly so the control plane runs the same fixes verified locally.
-# Bumped alongside kubernetes_version_patch above, same CVE family.
-etcd_version: "3.6.14-0"
+# Minor only - this is also the apt repo URL component.
+kubernetes_version: "1.37"
+# Patch pin, separate from kubernetes_version. Trivy-scan the image before
+# raising this: the previous pin (1.36.4) existed because the .0 shipped with
+# crypto/x509 chain-validation and HTTP/2 malformed-SETTINGS Go stdlib CVEs,
+# and 1.37.0 has had no patch release yet to have fixed its equivalents.
+# Build 0002 is deliberately testing the minor bump on a from-scratch build,
+# where a rollback is a re-image rather than a downgrade in place.
+kubernetes_version_patch: "0"
+# kubeadm 1.37's SupportedEtcdVersion map has no entry for minor 37 (it stops
+# at 36), so kubeadm falls back to DefaultEtcdVersion with a warning rather
+# than failing - pin explicitly so the version is a decision, not a fallback.
+# 3.7.1-0 rather than kubeadm's 3.7.0-0 default for the same reason the 1.36
+# build pinned 3.6.14-0 over 3.6.8-0: take the patch fixes.
+#
+# Note this is an etcd *minor* bump (3.6 -> 3.7) riding along with the k8s
+# one. Safe here only because a from-scratch build has no data to migrate.
+etcd_version: "3.7.1-0"
 containerd_version: "latest"
-cilium_version: "1.20.0"
+# Must match cluster/cilium/values.yaml's `# chart:` and
+# cluster/argocd/applications/00-cilium.yaml's targetRevision. This one is
+# what 30-cluster.yml installs pre-Argo; the other two are what Argo adopts.
+# All three, or the build installs one version and upgrades the CNI to
+# another on first sync.
+cilium_version: "1.20.1"
 
 # Cilium replaces Flannel, so pick a pod CIDR that does not collide with the
 # lab subnet or with Cilium's default cluster-pool.
