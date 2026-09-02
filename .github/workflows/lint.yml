@@ -89,6 +89,12 @@ jobs:
           format: sarif
           output: trivy.sarif
           severity: HIGH,CRITICAL
+          # `severity` above only filters the vuln scanner - misconfig checks
+          # carry their own fixed severity and ignore it, which is how
+          # LOW-severity KSV-0039/KSV-0040 kept reaching the Security tab
+          # despite this filter. See .trivyignore for why those two specific
+          # checks are excluded outright rather than just severity-filtered.
+          trivyignores: .trivyignore
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4
