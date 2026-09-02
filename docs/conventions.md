@@ -40,7 +40,7 @@ Move the finding to the directory README under a **Findings** heading, and leave
 a one-line pointer:
 
 ```yaml
-# Argo CD runs this hook on a first sync; see ../README.md#longhorn-preupgradechecker
+# Argo CD runs this hook on a first sync; see ../README.md#preupgradechecker
 preUpgradeChecker:
   jobEnabled: false
 ```
