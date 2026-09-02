@@ -21,7 +21,6 @@ command -v helm >/dev/null 2>&1 || {
 add() { helm repo add "$1" "$2" >/dev/null; }
 add cilium               https://helm.cilium.io/
 add metallb              https://metallb.github.io/metallb
-add ingress-nginx        https://kubernetes.github.io/ingress-nginx
 add jetstack             https://charts.jetstack.io
 add longhorn             https://charts.longhorn.io
 add external-secrets     https://charts.external-secrets.io
@@ -45,7 +44,6 @@ check() { # chart, values path
 
 check cilium/cilium                              cluster/cilium/values.yaml
 check metallb/metallb                            cluster/metallb/values.yaml
-check ingress-nginx/ingress-nginx                cluster/ingress-nginx/values.yaml
 check jetstack/cert-manager                      cluster/cert-manager/values.yaml
 check longhorn/longhorn                          cluster/longhorn/values.yaml
 check external-secrets/external-secrets          cluster/external-secrets/values.yaml
