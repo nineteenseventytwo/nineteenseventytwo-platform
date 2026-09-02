@@ -152,8 +152,11 @@ now only matters for a from-scratch rebuild starting in the same mode.
 
 | Wave | What |
 |---|---|
+| −30 | Gateway API CRDs |
 | −20 | Cilium (adopted; installed pre-Argo by the playbook) |
-| 0–20 | MetalLB → ingress-nginx → cert-manager |
+| 0 | MetalLB |
+| 20 | cert-manager |
+| 22 | The shared Gateway ([ADR-0015](decisions/ADR-0015-cilium-gateway-api.md)) |
 | 25 | pod-identity-webhook — before anything that federates to AWS |
 | 30 | Longhorn |
 | 40–50 | External Secrets → Vault |

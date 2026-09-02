@@ -18,10 +18,11 @@ OTHER_VLAN_HOST="${OTHER_VLAN_HOST:-192.168.30.1}"
 # ansible/inventory/lab/group_vars/all/vars.yml's lab_domain — not read from
 # there directly, this script has no ansible dependency by design.
 LAB_DOMAIN="${LAB_DOMAIN:-eightbitsaxlounge.com}"
-# cluster/ingress-nginx/values.yaml's loadBalancerIP — same value, same
+# cluster/gateway/00-gateway.yaml's metallb.io/loadBalancerIPs annotation
+# (ingress-nginx's own loadBalancerIP until ADR-0015) — same value, same
 # "committed on both sides deliberately" reasoning as the role ARNs in
 # docs/06-aws-federation.md, now for a third place, not two.
-LAB_INGRESS_IP="${LAB_INGRESS_IP:-192.168.20.240}"
+LAB_INGRESS_IP="${LAB_INGRESS_IP:-192.168.20.241}"
 
 PASS=0
 FAIL=0

@@ -13,10 +13,11 @@ cluster reproducible rather than merely documented.
 ```
 cluster/argocd/bootstrap/app-of-apps.yaml
   └── watches cluster/argocd/applications/*.yaml
+        ├── gateway-api-crds     wave -30  (before Cilium's own Gateway API controller can start)
         ├── cilium               wave -20  (installed pre-Argo by 30-cluster.yml, adopted here)
         ├── metallb               wave 0
-        ├── ingress-nginx        wave 10
         ├── cert-manager         wave 20
+        ├── gateway              wave 22   (the shared Gateway — ADR-0015 — every app attaches an HTTPRoute to it)
         ├── longhorn             wave 30
         ├── external-secrets     wave 40
         ├── vault                wave 50

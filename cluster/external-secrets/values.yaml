@@ -1,5 +1,5 @@
 ---
-# chart: 2.9.0
+# chart: 2.10.0
 # repo:  https://charts.external-secrets.io
 #
 # ESO rather than the Vault CSI driver or the Agent injector: an ExternalSecret

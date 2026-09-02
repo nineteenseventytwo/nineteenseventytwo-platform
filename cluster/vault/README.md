@@ -150,12 +150,16 @@ then re-run the check above before continuing.
 # secret_id_bound_cidrs is the cluster's pod network, not console's own
 # address — corrected 2026-08-27 after live testing, not assumed. Console has
 # no network path to Vault that preserves its own IP: it can only reach Vault
-# through ingress-nginx (nothing else here has a LoadBalancer IP), and
-# nginx's reverse-proxy hop to the backend Service replaces the source
-# address with its own pod IP before vault-0 ever sees the request —
+# through whatever fronts the public hostname (ingress-nginx originally,
+# the shared Gateway since ADR-0015), and that reverse-proxy hop replaces the
+# source address with its own pod IP before vault-0 ever sees the request —
 # confirmed live as "source address 10.244.1.100 unauthorized by CIDR
 # restrictions" against the console-specific /32 this originally shipped
-# with. Binding to console specifically is not achievable over this network
+# with. Re-confirmed after the Gateway cutover (2026-09-02) via `hubble
+# observe --namespace vault`: the TCP-layer peer address Cilium's Gateway
+# data plane presents to vault-0 is also a 10.244.0.0/16 address
+# (10.244.1.96 at test time) - same pod-network range, no change needed
+# here. Binding to console specifically is not achievable over this network
 # path; the primary protection is the attached policy, scoped to exactly
 # ssh-client-signer/sign/admin and nothing else. A leaked secret_id, even
 # from inside the cluster's own pod network, can only ever request a

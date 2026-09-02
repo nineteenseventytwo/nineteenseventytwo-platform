@@ -20,6 +20,7 @@ inconvenient.
 | [0012](ADR-0012-platform-owns-app-workloads.md) | Platform repo owns application workloads, not just namespaces | Accepted |
 | [0013](ADR-0013-platform-repo-public.md) | The platform repo goes public | Accepted |
 | [0014](ADR-0014-pod-identity-webhook.md) | Deploy the EKS pod-identity-webhook for cluster→AWS federation | Accepted |
+| [0015](ADR-0015-cilium-gateway-api.md) | Cilium Gateway API replaces ingress-nginx | Accepted |
 
 ## Template
 

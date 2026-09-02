@@ -1,5 +1,5 @@
 ---
-# chart: 1.20.0
+# chart: 1.20.1
 # repo:  https://helm.cilium.io/
 #
 # Cilium is the CNI and, for now, the only network layer.

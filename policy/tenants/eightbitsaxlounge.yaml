@@ -104,10 +104,12 @@ spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
   ingress:
+    # ingress-nginx's own entry removed 2026-09-02 - the namespace no longer
+    # exists. Nothing here is onboarded to the Gateway yet either (WP-5, the
+    # apps/eightbitsaxlounge/ migration, is still deferred) - whichever
+    # ingress mechanism that work lands on should add its own entry here
+    # rather than assume this one still applies.
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
@@ -145,10 +147,12 @@ spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
   ingress:
+    # ingress-nginx's own entry removed 2026-09-02 - the namespace no longer
+    # exists. Nothing here is onboarded to the Gateway yet either (WP-5, the
+    # apps/eightbitsaxlounge/ migration, is still deferred) - whichever
+    # ingress mechanism that work lands on should add its own entry here
+    # rather than assume this one still applies.
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring

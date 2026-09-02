@@ -5,7 +5,7 @@ name: image-vuln-scan
 # after it's built — _build-image.yml only scans the two images this repo
 # builds itself, and only once, at build time. Every third-party chart's
 # image (Cilium, cert-manager, Longhorn, Vault, kube-prometheus-stack,
-# Argo CD, ingress-nginx, MetalLB, External Secrets, kubelet-csr-approver,
+# Argo CD, MetalLB, External Secrets, kubelet-csr-approver,
 # Prowler) has never been scanned for vulnerabilities by anything in this
 # pipeline, at any point. This is what actually closes that gap, on a
 # schedule, against whatever the cluster is genuinely running - not a
