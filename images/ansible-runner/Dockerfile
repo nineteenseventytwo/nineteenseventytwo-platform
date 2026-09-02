@@ -8,7 +8,7 @@ FROM python:3.14-slim-bookworm
 
 # Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
 ARG ANSIBLE_CORE_VERSION=2.21.3
-ARG KUBECTL_VERSION=v1.36.0
+ARG KUBECTL_VERSION=v1.36.4
 ARG HELM_VERSION=v4.2.3
 ARG SOPS_VERSION=v3.13.3
 ARG AGE_VERSION=v1.3.1
