@@ -82,6 +82,20 @@ jobs:
         run: |
           safe=$(echo "${{ matrix.image }}" | tr -c 'A-Za-z0-9._-' '_')
           echo "safe=$safe" >> "$GITHUB_OUTPUT"
+          # Category is the repository only - tag and/or @sha256 digest
+          # stripped - not the full sanitised ref above. Confirmed live
+          # (2026-09-02): using the full ref (including version) as the
+          # category meant every chart bump orphaned its old findings under
+          # a category nothing would ever scan again instead of closing
+          # them - 646 stale alerts had accumulated across 11 dead
+          # categories by the time this was caught, roughly a fifth of
+          # everything "open" in the Security tab. A stable per-repository
+          # category is what lets GitHub treat successive scans as the same
+          # analysis over time and auto-resolve findings that stop
+          # appearing, the same way it already does for _build-image.yml's
+          # own two images.
+          repo=$(echo "${{ matrix.image }}" | sed -E 's/@sha256:[a-f0-9]+//' | sed -E 's/:[^:/]+$//')
+          echo "category=$(echo "$repo" | tr -c 'A-Za-z0-9._-' '_')" >> "$GITHUB_OUTPUT"
 
       - name: Trivy scan
         uses: aquasecurity/trivy-action@v0.36.0
@@ -98,13 +112,12 @@ jobs:
       # stopped allowing multiple SARIF runs under the same category in one
       # upload (confirmed against the real failure - "does not support
       # uploading multiple SARIF runs with the same category" - since Trivy
-      # gives every run the same default category). Each image's own
-      # sanitised ref as its category keeps them distinct.
+      # gives every run the same default category).
       - name: Upload this image's findings to the Security tab
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "${{ steps.name.outputs.safe }}.sarif"
-          category: ${{ steps.name.outputs.safe }}
+          category: ${{ steps.name.outputs.category }}
 
       - uses: actions/upload-artifact@v7
         with:

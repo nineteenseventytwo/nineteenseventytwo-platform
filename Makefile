@@ -394,6 +394,16 @@ argocd-sync-wait: ## Nudge Argo CD and block until the platform app is Synced/He
 # reasoning as argocd-sync-wait just above. Every unique image reference
 # across every running Pod, cluster-wide, one per line - image-vuln-scan.yml
 # is the only current caller.
+#
+# Deliberately not filtered to --field-selector=status.phase=Running: tried
+# it (2026-09-02) to stop CronJob history (successfulJobsHistoryLimit: 3)
+# from contributing multiple retained completed pods across old image
+# digests, but Prowler's own pods are *never* observed Running by a
+# once-a-week enumeration - they run to completion in minutes, so the
+# filtered list dropped Prowler from vulnerability scanning entirely rather
+# than just deduplicating it. A scan blind spot is worse than the noise it
+# was meant to fix, and image-vuln-scan.yml's own category (not this list)
+# is what actually needed fixing for that noise - see its own commit.
 .PHONY: list-running-images
 list-running-images: ## Print every unique container image reference running in the cluster, one per line
 	@$(KUBECTL) get pods -A -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' | sort -u
