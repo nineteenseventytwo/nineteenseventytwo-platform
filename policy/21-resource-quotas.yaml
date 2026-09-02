@@ -1,0 +1,198 @@
+---
+# Aggregate resource caps per namespace, following the same pattern as
+# policy/tenants/eightbitsaxlounge.yaml's tenant-quota (requests.cpu,
+# requests.memory, limits.memory - deliberately no limits.cpu, CPU is
+# compressible and not a hard risk the way memory exhaustion on a 3-node,
+# ~3.4Gi-allocatable-per-node cluster is).
+#
+# Sized from live Running-phase pod usage
+# (`kubectl get pods -A --field-selector=status.phase=Running`), then given
+# roughly 1.5-2x headroom - generous margin, not tight-packed to today's
+# footprint, matching the tenant file's own stated philosophy. A
+# ResourceQuota only blocks *new* pod admission once `used` would exceed
+# `hard` - it does not touch already-running pods, so adding these cannot
+# evict or restart anything that's running today. If a future rollout or
+# CronJob run gets rejected, raise the number in a PR with the reason, the
+# same norm the tenant file documents - don't loosen it by editing the
+# cluster directly.
+#
+# kube-system is deliberately NOT covered here, matching
+# 10-default-deny.yaml's own header comment that kube-system is "too
+# critical to touch with policy at all" - a quota misconfiguration there
+# could block cilium-agent/CoreDNS pod recreation during a node reboot,
+# a cluster-wide-outage-class mistake for what KSV-0039/KSV-0040 flag as a
+# LOW-severity finding. Those specific alert instances are dismissed in
+# GitHub with this same rationale rather than addressed here.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: arc-systems
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 768Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: argocd
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.memory: 3Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: cert-manager
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 1Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: default
+spec:
+  hard:
+    requests.cpu: 100m
+    requests.memory: 128Mi
+    limits.memory: 256Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: external-secrets
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 1Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: kubelet-csr-approver
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 256Mi
+    limits.memory: 512Mi
+---
+# longhorn-system runs many CSI/webhook sidecar containers with no
+# requests/limits of their own today (24/28 live containers at time of
+# writing). Worst case if every one of those 24 restarts and picks up the
+# new 50m/64Mi LimitRange default at once: ~900m existing + 24*50m = ~2.1
+# CPU, ~256Mi existing + 24*64Mi = ~1.8Gi - requests.cpu is sized above that
+# worst case, not just today's ~900m actually requested, plus Longhorn's own
+# manager/engine/instance-manager DaemonSets, which are legitimately the
+# heaviest thing in this cluster.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: longhorn-system
+spec:
+  hard:
+    requests.cpu: "3"
+    requests.memory: 2Gi
+    limits.memory: 4Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: metallb-system
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 512Mi
+    limits.memory: 1Gi
+---
+# monitoring already has a LimitRange (see 20-limitrange-default.yaml); it
+# was just missing the ResourceQuota half of the pair.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1536Mi
+    limits.memory: 4Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: node-exporter-system
+spec:
+  hard:
+    requests.cpu: 250m
+    requests.memory: 256Mi
+    limits.memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: pod-identity-webhook
+spec:
+  hard:
+    requests.cpu: 250m
+    requests.memory: 128Mi
+    limits.memory: 256Mi
+---
+# Sized around Prowler's own CronJob spec (policy/30-prowler.yaml: 250m/512Mi
+# requests, 1 CPU/2Gi limits per scan) with headroom above the single
+# concurrent scan pod that actually runs - completed Job pods retained by
+# successfulJobsHistoryLimit don't count against quota `used`, only
+# Running/Pending ones do.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: security
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.memory: 3Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: vault
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 1Gi
+---
+# Scaled to zero today (see policy/00-namespaces.yaml's comment: "almost
+# nothing should use it") but its dind runners are privileged and can be
+# resource-hungry when a scale-set does activate - sized with real headroom
+# rather than the near-zero footprint it has at rest. Raise in a PR with the
+# reason if a real workload here needs more.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: arc-runners
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.memory: 4Gi

@@ -21,3 +21,168 @@ spec:
         memory: 64Mi
       max:
         memory: 1Gi
+---
+# Same rationale as monitoring's LimitRange above, extended to the rest of
+# policy/10-default-deny.yaml's namespaces (minus kube-system - see
+# 21-resource-quotas.yaml's header for why that one is deliberately excluded).
+# Sized per-namespace from live Running-pod usage
+# (`kubectl get pods -A --field-selector=status.phase=Running`), not copied
+# from monitoring's numbers - longhorn-system and metallb-system in particular
+# run several CSI/webhook sidecar containers with no requests/limits of their
+# own today, so their defaults need enough headroom that those containers'
+# next restart doesn't get an unrealistically small footprint.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: arc-systems
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 512Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: argocd
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 256Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 1Gi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: cert-manager
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 192Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 512Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: default
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 256Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: external-secrets
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 192Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 512Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: kubelet-csr-approver
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 256Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: longhorn-system
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 256Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 1Gi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: metallb-system
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 512Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: node-exporter-system
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 256Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: pod-identity-webhook
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 128Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 256Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: security
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 256Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 1Gi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: vault
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 192Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 512Mi}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: arc-runners
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 256Mi}
+      defaultRequest: {cpu: 50m, memory: 64Mi}
+      max: {memory: 1Gi}
