@@ -23,7 +23,7 @@ tests/network-check.sh
 | 9 | VLAN 10 → VLAN 20 SSH | connects | Run from the workstation |
 | 10 | VLAN 10 → VLAN 20 API | `nc -vz .202 6443` open | Run from the workstation, once the cluster exists |
 | 11 | Intra-VLAN 20 | Pi → Pi ping works | And note the firewall **never sees this traffic** |
-| 12 | Unbound overrides for lab tool hostnames | `dig argocd/vault/grafana.eightbitsaxlounge.com @192.168.20.1` → `192.168.20.240` | The overrides in the section below, actually checked. Skipped for months on the first build of this cluster — every one of Phase C/D's docs happened to reach these hostnames through a `curl --resolve` or `/etc/hosts` workaround instead, until CI's own certificate signing needed one and had none available (docs/plan/05-provisioning-completion-plan.md WP-3.1) |
+| 12 | Unbound overrides for lab tool hostnames | `dig argocd/vault/grafana.eightbitsaxlounge.com @192.168.20.1` → `192.168.20.241` | The overrides in the section below, actually checked. Skipped for months on the first build of this cluster — every one of Phase C/D's docs happened to reach these hostnames through a `curl --resolve` or `/etc/hosts` workaround instead, until CI's own certificate signing needed one and had none available (docs/plan/05-provisioning-completion-plan.md WP-3.1) |
 
 Tests 9 and 10 report as *skipped* on a Pi rather than silently passing —
 direction matters and a test that cannot run should say so.
@@ -42,7 +42,7 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   plus explicit `Trusted → Lab_Nodes` on 22, 6443, 443.
 - `Lab → !Internal_Networks` (internet only), protocol **any** — not TCP, or
   test 2 fails and you spend an evening on it.
-- Reserve `192.168.20.240–250` for MetalLB; keep the Kea pool (`.100–.199`) and
+- Reserve `192.168.20.241–250` for MetalLB; keep the Kea pool (`.100–.199`) and
   the node reservations (`.201–.204`) clear of it.
 - Unbound host overrides for `1972-console-1`, `1972-master-1`, `1972-worker-1`,
   `1972-worker-2` under `eightbitsaxlounge.com` (matches the fqdn cloud-init
@@ -52,13 +52,15 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   propagation.
 
   **Concretely, three overrides**, each a Host record pointing at the pinned
-  ingress LB address (`cluster/ingress-nginx/values.yaml`'s `loadBalancerIP`):
+  Gateway address (`cluster/gateway/00-gateway.yaml`'s
+  `metallb.io/loadBalancerIPs` — ingress-nginx's own equivalent
+  `loadBalancerIP` until the [Gateway API cutover](decisions/ADR-0015-cilium-gateway-api.md)):
 
   | Host | Domain | Type | IP |
   |---|---|---|---|
-  | `argocd` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
-  | `vault` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
-  | `grafana` | `eightbitsaxlounge.com` | A | `192.168.20.240` |
+  | `argocd` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
+  | `vault` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
+  | `grafana` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
 
   In the OPNsense web UI:
 
@@ -66,7 +68,7 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   2. Under **Host Overrides**, click **+** to add one.
   3. Fill in, per row of the table above: **Host** (`argocd`), **Domain**
      (`eightbitsaxlounge.com`), **Type** `A`, **IP address**
-     (`192.168.20.240`). Description is free text — `lab ingress` or similar
+     (`192.168.20.241`). Description is free text — `lab ingress` or similar
      is enough to explain it to a future you.
   4. **Save**, then repeat for `vault` and `grafana` — same domain, same IP,
      only **Host** changes.
@@ -75,7 +77,7 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
      row only stages it.
   6. Confirm with `tests/network-check.sh 12` from a Pi on VLAN 20, or
      `dig argocd.eightbitsaxlounge.com @192.168.20.1` by hand — both should
-     answer `192.168.20.240` within a few seconds. If a `dig` run just
+     answer `192.168.20.241` within a few seconds. If a `dig` run just
      before adding these already cached a different (or empty) answer for
      one of the three names, that cache can outlive the change briefly —
      re-run rather than trust a result from before step 5.

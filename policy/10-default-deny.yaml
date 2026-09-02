@@ -162,6 +162,9 @@ spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
 ---
+# ingress-nginx's own source clause removed 2026-09-02: the controller no
+# longer exists (replaced by the shared Gateway - allow-argocd-gateway-
+# ingress, a CiliumNetworkPolicy, covers that traffic now instead).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -172,9 +175,6 @@ spec:
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
@@ -411,10 +411,10 @@ spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
   ingress:
+    # ingress-nginx's own entry removed 2026-09-02 - the controller is gone,
+    # replaced by the shared Gateway (allow-vault-gateway-ingress, a
+    # CiliumNetworkPolicy, PR #101, covers that traffic now instead).
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
@@ -657,102 +657,18 @@ spec:
             - {port: "53", protocol: UDP}
             - {port: "53", protocol: TCP}
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-  namespace: ingress-nginx
-spec:
-  podSelector: {}
-  policyTypes: [Ingress, Egress]
----
-# Live-verified (2026-08-23): all three existing ingress routes (argocd,
-# grafana, vault) returned real HTTP responses through this rule, and the
-# ingress-nginx-controller-admission webhook accepted a throwaway Ingress.
-# Ingress on 80/443 is intentionally open — externalTrafficPolicy: Local means
-# no SNAT, so the source seen here is the real client (same-VLAN or
-# cross-VLAN-via-OPNsense); OPNsense is the actual access-control point for
-# this namespace, same reasoning as the internet-egress rules elsewhere in
-# this file. Egress uses the same unscoped namespaceSelector: {} shape as
-# allow-prometheus-scrape-egress in this file, and for the same reason: the
-# backend set changes every time an Ingress lands in a new namespace, most
-# concretely the apps/ migration this repo hasn't started yet.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-nginx
-  namespace: ingress-nginx
-spec:
-  podSelector: {}
-  policyTypes: [Ingress, Egress]
-  ingress:
-    - from: []
-      ports:
-        - {protocol: TCP, port: 80}
-        - {protocol: TCP, port: 443}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: monitoring
-      ports:
-        - {protocol: TCP, port: 10254}
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - {protocol: UDP, port: 53}
-        - {protocol: TCP, port: 53}
-    - to:
-        - namespaceSelector: {}
----
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-ingress-nginx-apiserver
-  namespace: ingress-nginx
-spec:
-  endpointSelector: {}
-  egress:
-    - toEntities: [kube-apiserver]
----
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-ingress-nginx-webhook-ingress
-  namespace: ingress-nginx
-spec:
-  endpointSelector: {}
-  ingress:
-    - fromEntities: [remote-node, host]
----
-# Found while live-verifying allow-ingress-nginx above: grafana has never had
-# an ingress-allow rule in this namespace's default-deny — confirmed via a
-# 504 from the ingress route and a direct connect-timeout from inside
-# ingress-nginx-controller to monitoring-grafana.monitoring.svc, neither of
-# which is explained by anything added today. Pre-existing gap, independent
-# of this change; fixed here because it blocked verifying the rule above.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-grafana-ingress
-  namespace: monitoring
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: grafana
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
-      ports:
-        - {protocol: TCP, port: 3000}
+# ingress-nginx's four policies (default-deny-all, allow-ingress-nginx,
+# allow-ingress-nginx-apiserver, allow-ingress-nginx-webhook-ingress) removed
+# 2026-09-02 along with the namespace itself - the controller is gone,
+# replaced by the shared Gateway (cluster/gateway/), which runs in
+# kube-system as part of Cilium rather than its own namespace.
+#
+# allow-grafana-ingress (this namespace's ingress-nginx-sourced NetworkPolicy,
+# originally added 2026-08-23 - grafana had never had an ingress-allow rule
+# at all until then) is removed for the same reason, its sole purpose gone
+# with the controller. allow-grafana-gateway-ingress (a CiliumNetworkPolicy,
+# PR #100) is its Gateway-API equivalent - already covers this traffic and
+# was left untouched.
 ---
 # Second attempt at the Gateway cutover source, and the actually-correct one.
 # The first attempt (2026-09-01, since reverted) added a podSelector for
@@ -817,12 +733,11 @@ spec:
   ingress:
     - from:
         - podSelector: {}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
-      ports:
-        - {protocol: TCP, port: 8000}
+    # ingress-nginx's own entry removed 2026-09-02 - the controller is gone.
+    # Not replaced with a Gateway equivalent: Longhorn's UI was never part of
+    # the Gateway cutover (cluster/longhorn/values.yaml's ingress.enabled:
+    # false predates it and is unchanged - port-forward only until a real
+    # auth story exists).
     - from:
         - namespaceSelector:
             matchLabels:

@@ -23,6 +23,20 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   gatewayClassName: cilium
+  # Pins the LoadBalancer IP the same way ingress-nginx's own
+  # controller.service.loadBalancerIP did, and for the identical reason: so
+  # the Unbound host overrides on OPNsense (docs/01-network-validation.md)
+  # don't need updating every time this Service is recreated. Cilium's own
+  # spec.addresses field needs LB-IPAM, which this cluster doesn't use
+  # (MetalLB does the actual allocation - cluster/cilium/values.yaml's
+  # l2announcements.enabled: false is deliberate, see that file's own
+  # comment) - infrastructure.annotations is what actually reaches the
+  # Service MetalLB is watching. Already the address this Gateway was
+  # allocated on first sync; this just stops it from ever being anything
+  # else.
+  infrastructure:
+    annotations:
+      metallb.io/loadBalancerIPs: "192.168.20.241"
   listeners:
     # Redirects to HTTPS - see 10-http-redirect.yaml. No hostname filter: it
     # has to match whatever Host header shows up, the same as ingress-nginx's

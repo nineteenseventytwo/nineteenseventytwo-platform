@@ -195,7 +195,7 @@ that wants "whatever's currently blessed."
 `_build-image.yml`'s own Trivy step only ever looks at the two images this
 repo builds itself, and only once, at build time. Every third-party chart's
 image — Cilium, cert-manager, Longhorn, Vault, the whole
-kube-prometheus-stack, Argo CD, ingress-nginx, MetalLB, External Secrets,
+kube-prometheus-stack, Argo CD, MetalLB, External Secrets,
 kubelet-csr-approver, Prowler — was never scanned for vulnerabilities by
 anything in this pipeline, at any point, and a CVE disclosed the day after a
 build doesn't get caught by a scan that only runs once.
