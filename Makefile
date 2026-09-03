@@ -355,6 +355,20 @@ remove-kube-proxy: ## One-time kube-proxy-replacement migration - see 30-cluster
 
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
+	# Same adopt-don't-wait pattern as Cilium (cluster/README.md): Argo CD's own
+	# chart needs the Gateway API HTTPRoute kind to exist the moment it installs
+	# (server.httproute.enabled in cluster/argocd/values.yaml), but that CRD is
+	# normally installed *by* Argo CD itself, at sync wave -30, via
+	# cluster/argocd/applications/00-gateway-api-crds.yaml — a cluster with no
+	# CRDs and no Argo CD yet can't get there. Confirmed live on a from-scratch
+	# cluster: `helm install argocd` fails outright, "no matches for kind
+	# HTTPRoute ... ensure CRDs are installed first". --server-side, not plain
+	# apply: these CRDs' schemas blow past the 262144-byte last-applied-
+	# configuration annotation cap that client-side apply relies on — the exact
+	# reason 00-gateway-api-crds.yaml's own Application already sets
+	# ServerSideApply=true for this same file. The Application adopts this
+	# release on its first sync, same as Cilium's.
+	$(KUBECTL) apply --server-side -f cluster/gateway-api-crds/standard-install.yaml
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm
 	$(HELM) repo update argo
 	$(HELM) upgrade --install argocd argo/argo-cd \
