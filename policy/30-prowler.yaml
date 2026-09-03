@@ -1,25 +1,15 @@
 ---
-# Scheduled Prowler scan (ADR-0005 in nineteenseventytwo-cloud) - reads the
-# whole account (SecurityAudit + ViewOnlyAccess, attached in the cloud repo's
-# platform-prod stack) and writes JSON findings to the security account's S3
-# bucket. Read-everything, write-one-prefix: a posture scanner that can
-# change posture is a posture problem, so the role's only write permission is
-# s3:PutObject under <bucket>/findings/*.
-#
-# Sits in its own namespace (policy/00-namespaces.yaml) rather than an
-# existing one specifically so the broad 443 egress in
-# 10-default-deny.yaml's allow-security-prowler rule is contained to exactly
-# this workload and nothing else.
+# Scheduled Prowler scan (ADR-0005 in nineteenseventytwo-cloud). Reads the whole
+# account, writes JSON findings to the security account's S3 bucket, and lives in
+# its own namespace so its broad 443 egress is contained to this workload alone.
+# Findings: README.md#prowler
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prowler
   namespace: security
   annotations:
-    # Picked up by pod-identity-webhook (cluster/pod-identity-webhook/), which
-    # is already scoped to this namespace - see ADR-0014. Role and its
-    # SecurityAudit/ViewOnlyAccess attachments: nineteenseventytwo-cloud
-    # live/aws/platform-prod/cluster-federation.tf.
+    # Picked up by pod-identity-webhook, scoped to this namespace (ADR-0014).
     eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-prowler"
 ---
 apiVersion: batch/v1
@@ -28,13 +18,7 @@ metadata:
   name: prowler-scan
   namespace: security
   annotations:
-    # prowlercloud/prowler hardcodes uid 1000 and chmods /home/prowler 700 -
-    # confirmed empirically: `podman run --user 10000:10000` on this same
-    # image fails to even exec the entrypoint with "Permission denied" before
-    # prowler's own code runs at all, because nothing but uid 1000 can
-    # traverse into its home directory. A high, host-conflict-avoiding UID
-    # is not available without maintaining a derivative image, which is a
-    # bigger investment than a third-party scanner CronJob warrants here.
+    # The image hardcodes uid 1000 — see README.md#uid-1000-is-not-negotiable
     checkov.io/skip1: "CKV_K8S_40=image hardcodes uid 1000, confirmed empirically no other uid can exec it"
 spec:
   # Once a day is the whole trade-off ADR-0005 makes explicit: a scheduled
@@ -80,56 +64,30 @@ spec:
               imagePullPolicy: Always
               args:
                 - aws
-                # Confirmed live (2026-08-28): with no region filter, Prowler
-                # scans every enabled AWS region by default (39 of them) and
-                # OOMKilled twice at a 1Gi limit before this was in place -
-                # the account only ever uses the two in config/aws.json's
-                # regions.allowed (nineteenseventytwo-cloud). Scanning regions
-                # this account never touches was pure waste, not a real
-                # safety margin.
+                # Without this Prowler scans all 39 enabled regions and
+                # OOMKills. See README.md#region-filter-or-it-oomkills
                 - --region
                 - eu-west-2
                 - us-east-1
-                # A bare relative name, not /home/prowler/output/findings -
-                # Prowler's S3 key-mapping (get_object_path in
-                # providers/aws/lib/s3/s3.py) strips everything up to and
-                # including the first literal "prowler/" substring in
-                # --output-directory before using the rest as the S3 key
-                # prefix. Every path under this image's own home directory
-                # contains that substring, so the original absolute path
-                # silently uploaded to <bucket>/output/findings/* instead of
-                # <bucket>/findings/* - a full prefix mismatch against the
-                # bucket policy's exact-match IAM condition, which produced a
-                # bare AccessDenied that send_to_bucket's own try/except only
-                # ever sends to Prowler's logger, never stdout. Confirmed by
-                # reading that method directly inside this pinned image and
-                # separately confirming empirically the bucket stayed empty.
-                # Relative "findings" avoids the substring entirely and
-                # resolves under the WorkingDir (/home/prowler), which the
-                # volumeMount below places the same emptyDir at.
+                # Must be a bare relative name, or the upload silently lands
+                # under the wrong S3 prefix. See
+                # README.md#--output-directory-must-be-a-bare-relative-name
                 - --output-directory
                 - findings
-                # --output-bucket's own --help is explicit that it "requires
-                # -M <mode>" - confirmed live the hard way: without this,
-                # local files were written (Prowler's own default formats)
-                # but nothing reached S3 at all, no error either.
+                # Required for --output-bucket to upload anything at all.
+                # See README.md#--output-bucket-needs---output-formats
                 - --output-formats
                 - csv
                 - json-ocsf
                 - html
                 - --output-bucket
                 - nineteenseventytwo-prowler-517148962038
-                # Prowler's own documented behaviour: exit 3 means "the scan
-                # ran fine and found FAIL results", not a crash - normal for
-                # basically every real account, every day. Findings are the
-                # output this Job exists to produce; without this flag the
-                # Job (and its Pod) would read as failed on every single
-                # non-empty run, and a real crash would look identical.
+                # exit 3 means "ran fine, found FAIL results".
+                # See README.md#exit-3-is-success
                 - --ignore-exit-code-3
               resources:
                 requests: {cpu: 250m, memory: 512Mi}
-                # Still generous margin above the 2-region scan's actual
-                # footprint, not sized to the 39-region OOM this replaced.
+                # Headroom over the 2-region scan, not the 39-region OOM.
                 limits: {cpu: "1", memory: 2Gi}
               securityContext:
                 allowPrivilegeEscalation: false
