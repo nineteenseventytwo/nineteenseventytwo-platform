@@ -95,8 +95,13 @@ default-deny work is worth more than either scan alone.
 > The pre-install window for this cluster's own baseline closed before this
 > step was actually run — the committed `docs/baseline-nsa.json` is a
 > **post-install** scan (captured 2026-08-28, against a loaded cluster), not
-> the before/after pair described above. Treat this section as the
-> procedure for the *next* rebuild, where that window is open again.
+> the before/after pair described above.
+>
+> This is the procedure; **the ordering lives in
+> [REBUILD.md step 3.5](REBUILD.md#35--capture-the-pre-install-baseline-),
+> where it is a gate.** It was skipped on build 0001 precisely because it only
+> existed here, inside a component doc, and nothing said when to run it —
+> see [builds/0001](builds/0001-initial-build.md).
 
 ## Verify
 

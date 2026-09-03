@@ -35,6 +35,13 @@ The x86 GPU PC is **not** in scope for this repo yet — see
 
 ## Rebuild from nothing
 
+> **Driving an actual build? Use [docs/REBUILD.md](docs/REBUILD.md), not this
+> section.** That page is the ordered sequence with the gates, the one-way
+> doors, and the pre-flight steps this summary leaves out — including the SSH
+> trust reset without which the first `make deploy-nodes` locks you out of
+> every cluster node. The summary below is the shape of the thing; the runbook
+> is the thing.
+
 Each step is a `make` target, and CI calls the same targets you do.
 
 ```bash
@@ -120,6 +127,9 @@ what it can reach, rotation cadence, blast radius — is
 
 | | |
 |---|---|
+| **[REBUILD.md](docs/REBUILD.md)** | **The master sequence. Drive a build from here.** |
+| [builds/](docs/builds/) | One log per cluster build — what it cost and what it taught |
+| [conventions.md](docs/conventions.md) | Where an explanation lives, and how long it may be |
 | [00-bootstrap.md](docs/00-bootstrap.md) | Imaging and first boot |
 | [01-network-validation.md](docs/01-network-validation.md) | VLAN 20 test matrix and the OPNsense rules it implies |
 | [02-cicd.md](docs/02-cicd.md) | Runners, images, workflows |
