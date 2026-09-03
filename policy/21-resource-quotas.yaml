@@ -34,6 +34,15 @@ spec:
     requests.memory: 512Mi
     limits.memory: 768Mi
 ---
+# Raised alongside cluster/argocd/values.yaml's controller.resources.limits
+# (1Gi -> 2Gi, its own comment has the full story: the fleet it compares in
+# one pass on a from-scratch sync outgrew the old 1Gi and it OOMKilled
+# repeatedly on build 0002, orphaning in-progress syncs on every restart).
+# Bumping that limit without this would just swap an OOMKill for
+# FailedCreate: exceeded quota - same mistake already made twice this build
+# for metallb-system and longhorn-system. 4Gi leaves ~1Gi headroom above the
+# other four argocd components' own limits (384+256+192+128Mi) plus the
+# controller's new 2Gi.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -42,8 +51,8 @@ metadata:
 spec:
   hard:
     requests.cpu: "1"
-    requests.memory: 1Gi
-    limits.memory: 3Gi
+    requests.memory: 1536Mi
+    limits.memory: 4Gi
 ---
 apiVersion: v1
 kind: ResourceQuota
