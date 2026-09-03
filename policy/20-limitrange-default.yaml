@@ -43,6 +43,20 @@ spec:
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 512Mi}
 ---
+# max.memory was 1Gi, a per-container ceiling separate from (and missed by)
+# PR #119's fix to controller.resources.limits.memory (1Gi -> 2Gi) and the
+# argocd infra-quota's own aggregate limits.memory (also raised in that PR).
+# Raising the quota and the component's own limit is not enough on its own -
+# a LimitRange's max caps any *single* container regardless of headroom
+# elsewhere, and this cap being lower than the controller's actual limit is
+# exactly as fatal as the two admission failures PR #119 itself was written
+# to explain: `pods "argocd-application-controller-0" is forbidden: maximum
+# memory usage per Container is 1Gi, but limit is 2Gi` - confirmed live,
+# found only because re-running bootstrap-argocd (needed since Argo CD's own
+# Helm release isn't GitOps-managed - a values.yaml change needs a manual
+# re-run to actually reach the cluster) surfaced it immediately. 2Gi matches
+# the controller's own new limit exactly; raise this again if that value
+# ever moves.
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -53,7 +67,7 @@ spec:
     - type: Container
       default: {cpu: 200m, memory: 256Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
-      max: {memory: 1Gi}
+      max: {memory: 2Gi}
 ---
 apiVersion: v1
 kind: LimitRange
