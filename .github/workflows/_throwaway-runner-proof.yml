@@ -10,6 +10,9 @@ name: throwaway-runner-proof
 on:
   workflow_dispatch:
 
+# Doesn't check out the repo or call the GitHub API — no scope needed at all.
+permissions: {}
+
 jobs:
   proof:
     runs-on: [self-hosted, linux, arm64, lab-network]
