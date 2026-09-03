@@ -19,12 +19,9 @@ lab_mtu: 1500
 lab_dhcp_pool: "192.168.20.100-192.168.20.199"
 lab_metallb_pool: "192.168.20.240-192.168.20.250"
 
-# Cloudflare-hosted zone used for both node names and internal-only lab
-# service hostnames (Argo CD, Vault, Grafana — none of these have an inbound
-# internet path; DNS-01 only needs the zone to be resolvable, not reachable).
-# Node fqdn is `{{ inventory_hostname }}.lab_domain`; internal tool hostnames
-# in cluster/*/values.yaml are hand-written as `<tool>.lab_domain` and are not
-# templated from this var, so a change here means updating both places.
+# Node fqdn is `{{ inventory_hostname }}.lab_domain`. The cluster's own tool
+# hostnames are hand-written, not templated from this — changing it means
+# editing both places. See ../../../../README.md#lab_domain-is-not-templated-into-the-cluster-values
 lab_domain: "eightbitsaxlounge.com"
 
 lab_timezone: "Europe/London"
@@ -44,16 +41,12 @@ ansible_runner_image: "{{ registry }}/ansible-runner"
 gha_runner_image: "{{ registry }}/gha-runner"
 
 # ---------------------------------------------------------------------------
-# AWS federation. Mirrors nineteenseventytwo-cloud/config/aws.json, which is
-# the source of truth — if these disagree, every AssumeRoleWithWebIdentity call
-# fails with a message that does not mention URLs. No credential appears here
-# or anywhere else in this repo: pods present a projected service-account token
-# and STS hands back an hour of access. docs/06-aws-federation.md.
+# AWS federation. Mirrors nineteenseventytwo-cloud/config/aws.json, the source
+# of truth. No credential appears here or anywhere in this repo.
 #
-# cluster_oidc_issuer is a ONE-WAY DOOR. It is baked into the API server at
-# `kubeadm init` and into every IAM role trust policy. Changing it means
-# rebuilding the control plane. No trailing slash — the issuer field in the
-# discovery document must match this character for character.
+# cluster_oidc_issuer is a ONE-WAY DOOR — baked into the API server at
+# `kubeadm init`. See ../../../../README.md#cluster_oidc_issuer-is-a-one-way-door
+# and docs/06-aws-federation.md.
 # ---------------------------------------------------------------------------
 cluster_oidc_issuer: "https://oidc.{{ lab_domain }}"
 cluster_oidc_audience: "sts.amazonaws.com"
@@ -79,20 +72,20 @@ aws_longhorn_bucket: "nineteenseventytwo-longhorn-backups-{{ aws_account_platfor
 # ---------------------------------------------------------------------------
 # Versions. Pinned so replaying an old commit does what it did then.
 # ---------------------------------------------------------------------------
-# Matches what eightbitsaxlounge/server runs today; bump deliberately.
-kubernetes_version: "1.36"
-# Patch pin, separate from kubernetes_version (which stays minor-only for the
-# apt repo URL). Bumped 2026-09-02 for the crypto/x509 chain-validation/DNS-SAN
-# and HTTP/2 malformed-SETTINGS Go stdlib CVEs fixed between v1.36.0 and
-# v1.36.4 - confirmed via a local Trivy scan of the v1.36.4 image, not just
-# the changelog.
-kubernetes_version_patch: "4"
-# Not part of kubeadm's version map by default at this minor; pinned
-# explicitly so the control plane runs the same fixes verified locally.
-# Bumped alongside kubernetes_version_patch above, same CVE family.
-etcd_version: "3.6.14-0"
+# Minor only — this is also the apt repo URL component.
+kubernetes_version: "1.37"
+# Trivy-scan the image before raising this. 1.37.0 has had no patch release yet;
+# the previous pin sat at 1.36.4 rather than .0 for Go stdlib CVEs.
+kubernetes_version_patch: "0"
+# Pinned rather than left to kubeadm's version map, which lags the release and
+# falls back with only a warning. One patch ahead of kubeadm's default.
+# See ../../../../README.md#etcd-is-pinned-because-kubeadms-version-map-lags-the-release
+etcd_version: "3.7.1-0"
 containerd_version: "latest"
-cilium_version: "1.20.0"
+# Must match cluster/cilium/values.yaml's `# chart:` and 00-cilium.yaml's
+# targetRevision. This one is what 30-cluster.yml installs pre-Argo.
+# See ../../../../README.md#ciliums-version-lives-in-three-places-and-they-must-agree
+cilium_version: "1.20.1"
 
 # Cilium replaces Flannel, so pick a pod CIDR that does not collide with the
 # lab subnet or with Cilium's default cluster-pool.
@@ -102,14 +95,8 @@ kubernetes_apiserver_extra_sans:
   - "kubernetes.{{ lab_domain }}"
   - "1972-master-1.{{ lab_domain }}"
 
-# Migrated 2026-09-01 (docs/03-cluster.md's "flip it later" path). This var
-# alone does nothing for an already-running cluster - it only affects a
-# fresh kubeadm init (kube_control_plane role) and the ansible-orchestrated
-# Helm install task's one-time values (both dead code paths once Argo CD
-# exists and owns the cilium release). The value that actually drives the
-# live cluster is cluster/cilium/values.yaml's own kubeProxyReplacement key.
-# Kept in sync here so a from-scratch rebuild starts in the same mode
-# instead of needing this migration re-run on a brand new cluster.
+# Only affects a from-scratch build; cluster/cilium/values.yaml is what drives
+# the live cluster. See ../../../../README.md#cilium_kube_proxy_replacement-only-matters-for-a-from-scratch-build
 cilium_kube_proxy_replacement: true
 
 # ---------------------------------------------------------------------------

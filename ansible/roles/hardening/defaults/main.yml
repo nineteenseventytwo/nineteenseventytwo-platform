@@ -5,34 +5,15 @@ hardening_ssh_port: 22
 hardening_ssh_allow_users:
   - "{{ admin_user }}"
 hardening_ssh_ca_key_path: /etc/ssh/ca.pub
-# Phase D: nodes trust certificates signed by Vault's ssh-client-signer CA
-# (bootstrap/ssh/ca.pub), in addition to authorized_keys, which is never
-# disabled by this — see bootstrap/ssh/sign.sh and cluster/vault/README.md.
+# Trust certificates signed by Vault's ssh-client-signer CA (bootstrap/ssh/ca.pub)
+# in addition to authorized_keys, which this never disables on its own.
 hardening_ssh_trust_ca: true
 
-# Phase D cutover, final step — flipped true 2026-08-28
-# (docs/plan/05-provisioning-completion-plan.md WP-3.1), after the
-# break-glass key existed, `sign.sh` had been exercised for real against
-# every node, and CI had its own certificate-signing path
-# (bootstrap/ssh/sign-ci.sh) so retiring ansible-console wouldn't strand it.
-# See docs/04-secrets.md#secret-inventory and
-# cluster/vault/README.md#break-glass.
-#
-# Every node's authorized_keys is now reconciled to *exactly*
-# hardening_ssh_authorized_keys, removing anything not listed — including
-# mark-workstation, ansible-workstation and ansible-console, all three, on
-# every node. SSH CA certificates are the only way in. console's group_vars
-# overrides this to carry the one offline break-glass key that survives;
-# every other host keeps the empty default below and has authorized_keys
-# fully emptied. Verified live: all four nodes reachable via a freshly
-# signed sign.sh certificate post-cutover, static-key SSH confirmed refused
-# on the cluster nodes.
-#
-# Leave this true. Flipping it back to false does not restore the old
-# keys — hardening_ssh_authorized_keys still governs what state gets
-# reconciled to, and the retired keypairs are no longer distributed to any
-# node's authorized_keys template. It would just stop enforcing the current
-# (correct) state, letting it drift.
+# Reconciles authorized_keys to exactly hardening_ssh_authorized_keys, so
+# certificates become the only way in. Flipping back to false does not restore
+# the old keys, and this is NOT the state a from-scratch build starts from —
+# see ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
+# and docs/REBUILD.md step 0.7 before running deploy-nodes on new hardware.
 hardening_ssh_retire_legacy_keys: true
 hardening_ssh_authorized_keys: []
 
@@ -61,27 +42,9 @@ hardening_ufw_cluster_rules:
   - { port: "7946", proto: tcp, comment: "metallb memberlist" }
   - { port: "7946", proto: udp, comment: "metallb memberlist" }
 
-# Sources allowed to reach the ports above. lab_subnet covers node-to-node.
-#
-# The pod CIDR is here for the same-node hairpin: a pod reaching a
-# hostNetwork-backed Service whose chosen backend is its *own* node. That
-# packet never leaves the box, so nothing masquerades it, and it arrives on
-# the veth still carrying the pod source IP — which lab_subnet does not match,
-# so ufw's default-deny ate it. Silently: Cilium has already handed off to the
-# kernel stack by that point, so `cilium monitor` shows a clean `-> stack` and
-# no drop event anywhere in the CNI.
-#
-# hubble-peer is internalTrafficPolicy: Local, so it hits this path on every
-# single connection; the apiserver hits it for any pod scheduled onto the
-# control plane (which is what had coredns wedged on `waiting for Kubernetes
-# API` until a restart happened to reschedule it onto a worker).
-#
-# This grants pods no reach they did not already have: cross-node, pod traffic
-# is masqueraded to its node IP and so already matches lab_subnet. Verified on
-# the lab — a pod reaches 10250 and 2379 on any *other* node today and is
-# refused only on its own. This makes that consistent rather than
-# scheduling-dependent. Node isolation that actually matters (sshd) is a
-# separate rule and is unaffected.
+# lab_subnet covers node-to-node. The pod CIDR is here for the same-node
+# hairpin, which ufw ate silently — see
+# ../../../README.md#why-the-pod-cidr-is-an-allowed-source-for-the-cluster-ports
 hardening_ufw_cluster_sources:
   - "{{ lab_subnet }}"
   - "{{ kubernetes_pod_cidr }}"
@@ -94,8 +57,7 @@ hardening_sysctls:
   net.ipv4.conf.all.accept_source_route: 0
   net.ipv4.conf.all.log_martians: 1
   net.ipv6.conf.all.accept_redirects: 0
-  # Carried over from /etc/ufw/sysctl.conf, which this role now disables (see
-  # "Stop ufw from managing sysctls") so that log_martians actually sticks.
+  # Carried over from /etc/ufw/sysctl.conf, which this role disables.
   net.ipv4.conf.default.accept_redirects: 0
   net.ipv6.conf.default.accept_redirects: 0
   net.ipv4.icmp_echo_ignore_broadcasts: 1
@@ -106,28 +68,10 @@ hardening_sysctls:
   fs.protected_hardlinks: 1
   fs.protected_symlinks: 1
 
-# rp_filter is split out of hardening_sysctls because the kernel uses
-# max(conf.all.rp_filter, conf.<iface>.rp_filter) rather than letting the more
-# specific value win. Cilium sets rp_filter=0 on the lxc veths and cilium_host
-# it manages, but a non-zero `all` silently promotes every one of them to
-# strict mode, and strict mode drops any packet whose route back to the source
-# does not leave via the interface it arrived on.
-#
-# Pod-to-node-IP traffic is exactly that shape: the packet lands on the pod's
-# veth, while the route back to the pod goes via cilium_host. The SYN is
-# discarded with no reply, no RST, and nothing logged in ufw or the CNI —
-# TcpExtIPReversePathFilter is the only counter that moves. Anything reaching
-# a hostNetwork-backed Service on its own node hits it: hubble-peer on every
-# connection (internalTrafficPolicy: Local), the apiserver for any pod
-# scheduled onto the control plane.
-#
-# Same conflict class as ip_forward above, and worse in one respect — it
-# regresses a running cluster, so `make deploy-nodes` against a healthy node
-# was enough to break pod networking on it.
-#
-# Cluster nodes get 0 on `all`, which removes the floor rather than disabling
-# the check: eth0 still inherits default=2 (loose mode), so the physical NIC
-# stays filtered while Cilium's own interfaces keep the 0 they require.
+# Split out because the kernel takes max(conf.all, conf.<iface>), so a non-zero
+# `all` silently promotes Cilium's own interfaces to strict mode and breaks pod
+# networking on a *running* cluster. Cluster nodes get 0 on `all`.
+# See ../../../README.md#rp_filter-has-to-be-split-out-and-cluster-nodes-need-0-on-all
 hardening_sysctls_rp_filter:
   net.ipv4.conf.all.rp_filter: 1
   net.ipv4.conf.default.rp_filter: 2

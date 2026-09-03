@@ -1,30 +1,14 @@
 ---
 runner_host_home: /opt/github-runner
 runner_host_image: "{{ gha_runner_image }}:{{ runner_host_image_tag }}"
-# The gha-runner image's own version, not the upstream actions-runner version
-# — see that image's README.
-#
-# Read from images/gha-runner/version.txt rather than repeated here. This was
-# a hardcoded "1.0.2" and drifted the moment version.txt went to 1.1.0 (the
-# vault CLI, added for bootstrap/ssh/sign-ci.sh): the image built, scanned and
-# promoted correctly, but the runner stack stayed pinned to a tag that
-# predated it, so deploy-nodes ran on an image with no vault binary and failed
-# with "vault CLI not found in this image". Nothing anywhere compared the two
-# numbers, and a floating tag is not the answer either — the pin is deliberate
-# (an unattended runner should not silently change underneath a job). One
-# source, still explicitly pinned.
-#
-# Deliberately not :stable, unlike ANSIBLE_RUNNER in the Makefile: that one is
-# pulled fresh per invocation by a short-lived container, while this is a
-# long-lived stack whose containers are only recreated by an explicit
-# `make deploy-cicd` from the workstation.
+# The gha-runner image's own version, read from images/gha-runner/version.txt
+# rather than repeated here — a hardcoded copy drifted and shipped a runner
+# with no vault CLI. Deliberately pinned, not :stable.
+# See ../../../README.md#the-runner-image-tag-is-read-from-versiontxt-not-repeated
 runner_host_image_tag: "{{ lookup('file', playbook_dir + '/../../images/gha-runner/version.txt') | trim }}"
-# Bind-mounted read-only into the runner container. Holds the AppRole
-# credentials bootstrap/ssh/sign-ci.sh authenticates with, plus a copy of
-# ansible-console's *public* key for it to sign. Deliberately not
-# /home/{{ admin_user }}/.ssh: that directory is not mounted into the runner
-# container and never should be — signing needs the public half only, so the
-# private key stays out of the runner's reach entirely.
+# AppRole credentials for sign-ci.sh, plus ansible-console's *public* key.
+# Deliberately not ~/.ssh — see
+# ../../../README.md#the-vault-ci-directory-is-not-ssh-on-purpose
 runner_host_vault_ci_dir: "{{ runner_host_home }}/vault-ci"
 runner_host_ephemeral: true
 runner_host_replicas: 2
