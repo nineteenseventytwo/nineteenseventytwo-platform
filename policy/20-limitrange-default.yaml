@@ -103,6 +103,27 @@ spec:
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 256Mi}
 ---
+# default.cpu was 200m; raised to 500m after a from-scratch build 0002 hit an
+# outright-invalid pod spec, not a quota rejection: Longhorn's own
+# defaultSettings.guaranteedInstanceManagerCPU (cluster/longhorn/values.yaml,
+# a percentage of node allocatable CPU) computes an explicit 400m CPU
+# *request* on every instance-manager pod, but instance-manager sets no CPU
+# *limit* of its own - so this default filled that in, and a request above
+# the limit is invalid at admission, full stop, no retry ever succeeds:
+#
+#   spec.containers[0].resources.requests: Invalid value: "400m": must be
+#   less than or equal to cpu limit of 200m
+#
+# Confirmed live: longhorn-manager's own InstanceManagerController logged
+# this and retried on a 2-minute backoff forever, with no instance-manager
+# pod ever created - which meant every volume stayed "detached" with
+# "un-schedulable replicas" and every dependent pod (vault-0, every
+# monitoring PVC-backed pod) sat stuck regardless of storage otherwise being
+# healthy. This existed before PR #106 too (guaranteedInstanceManagerCPU has
+# been 10 since early in build 0001) but had nothing to conflict with until
+# this LimitRange gave instance-manager's un-set limit a value for the first
+# time. 500m leaves real headroom above the 400m this setting computes at
+# this node size, not just enough to clear it exactly.
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -111,7 +132,7 @@ metadata:
 spec:
   limits:
     - type: Container
-      default: {cpu: 200m, memory: 256Mi}
+      default: {cpu: 500m, memory: 256Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 1Gi}
 ---
