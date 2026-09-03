@@ -39,6 +39,19 @@ spec:
   #
   # k8sServiceHost and the pod CIDR are set by the playbook, not here, so they
   # are excluded from diffing rather than being duplicated and drifting.
+  #
+  # hubble.tls.auto (default method: helm) generates cilium-ca and the two
+  # hubble-*-certs Secrets with genCA/genSignedCert at template-render time -
+  # fresh random bytes on every single render, lookup() notwithstanding.
+  # Confirmed live on a from-scratch build: the sync itself succeeds
+  # (server-side apply, all three secrets), and ~12 seconds later the next
+  # comparison finds a brand new diff against the newly-rendered random
+  # values and goes straight back to OutOfSync - selfHeal then re-syncs,
+  # forever, without ever settling. Never caught before because build 0001
+  # never bootstrapped Argo CD from an empty cluster; these secrets already
+  # existed by the time Cilium's Application was created. Ignored here for
+  # the same reason as the ConfigMap keys above: managed by their own
+  # lifecycle, not by git, and re-syncing them accomplishes nothing but heat.
   ignoreDifferences:
     - group: ""
       kind: ConfigMap
@@ -47,3 +60,15 @@ spec:
         - /data/k8s-service-host
         - /data/k8s-service-port
         - /data/cluster-pool-ipv4-cidr
+    - group: ""
+      kind: Secret
+      name: cilium-ca
+      jsonPointers: ["/data"]
+    - group: ""
+      kind: Secret
+      name: hubble-server-certs
+      jsonPointers: ["/data"]
+    - group: ""
+      kind: Secret
+      name: hubble-relay-client-certs
+      jsonPointers: ["/data"]
