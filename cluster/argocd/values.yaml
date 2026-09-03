@@ -37,12 +37,23 @@ controller:
   # rendering the whole app-of-apps (11+ child Applications' worth of Helm
   # charts, cilium and kube-prometheus-stack among them) all at once is a
   # real memory spike, well above what steady-state reconciliation of any one
-  # of them needs. 1Gi is sized for that one-time worst case, not steady
-  # state - Kubernetes limits are a ceiling, not a reservation, so headroom
-  # here does not cost anything once the initial sync settles.
+  # of them needs. 1Gi was sized for that one-time worst case at the time -
+  # 2Gi now, because the fleet it compares in one pass on a from-scratch
+  # sync has grown since: 17 Applications, and platform-policy alone renders
+  # ~100 resources (NetworkPolicy x 25+, CiliumNetworkPolicy x 20+,
+  # ResourceQuota/LimitRange x 14 each, ...). Confirmed live on build 0002:
+  # 1Gi still OOMKilled (exitCode 137) mid-sync, repeatedly, which orphaned
+  # in-progress sync operations on every restart - a stuck-looking
+  # platform-policy sync with zero actual apply activity was this, not a
+  # frozen controller. Kubernetes limits are a ceiling, not a reservation,
+  # so headroom here does not cost anything once the initial sync settles.
+  # Raising this without also raising the argocd infra-quota below just
+  # trades an OOMKill for a quota-rejected pod - same mistake made twice
+  # already this build (metallb-system, longhorn-system); don't make a
+  # third here.
   resources:
-    requests: {cpu: 100m, memory: 256Mi}
-    limits: {memory: 1Gi}
+    requests: {cpu: 100m, memory: 384Mi}
+    limits: {memory: 2Gi}
 
 repoServer:
   replicas: 1
