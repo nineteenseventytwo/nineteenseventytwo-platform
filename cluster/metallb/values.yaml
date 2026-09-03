@@ -18,6 +18,23 @@ speaker:
   # announcements rather than an obvious failure.
   frr:
     enabled: false
+
+# frrk8s.enabled is a SEPARATE toggle from speaker.frr.enabled above, and
+# defaults to true regardless of it — chart 0.16.x moved to frr-k8s
+# (github.com/metallb/frr-k8s) as the BGP backend, replacing the older
+# embedded-FRR approach speaker.frr.enabled used to fully control. Setting
+# only speaker.frr.enabled: false, as this file did until now, left an
+# entire unwanted FRR/BGP DaemonSet running anyway — 5 containers per pod,
+# ~640Mi of limits.memory for a component this cluster (L2 mode, see header)
+# has no use for. Confirmed live: this is what exhausted infra-quota's 1Gi
+# limits.memory in metallb-system before metallb-controller could even be
+# scheduled, blocking every speaker pod on "secret metallb-memberlist not
+# found" (the controller creates that secret at runtime and never got the
+# chance to). false here removes the frr-k8s DaemonSet entirely, matching
+# the L2-only architecture this file already states.
+frrk8s:
+  enabled: false
+
 prometheus:
   serviceAccount: kube-prometheus-stack-prometheus
   namespace: monitoring
