@@ -97,6 +97,26 @@ spec:
 # worst case, not just today's ~900m actually requested, plus Longhorn's own
 # manager/engine/instance-manager DaemonSets, which are legitimately the
 # heaviest thing in this cluster.
+# Raised from 4Gi (PR #106's original sizing) after a from-scratch build 0002
+# confirmed it was too tight: none of the DaemonSet/Deployment CSI sidecar
+# containers here (csi-attacher/provisioner/resizer/snapshotter,
+# longhorn-csi-plugin, engine-image) carry an explicit resources block, so
+# every one of them falls back to this namespace's LimitRange default
+# (256Mi/container) rather than the small requests longhornManager's own
+# explicit resources use. 16 already-running containers alone == 4Gi, exactly
+# the old hard cap - so longhorn-csi-plugin (2 pods x 3 containers, +1.5Gi)
+# could never even be admitted: FailedCreate, exceeded quota. Confirmed live:
+# that DaemonSet never having a single running pod is what starved every CSI
+# sidecar of the unix socket it polls at startup (Still connecting ->
+# context deadline exceeded, on an endless crash loop), which in turn left
+# every PVC in the cluster Pending forever - vault and monitoring both.
+#
+# 8Gi leaves headroom PR #106's steady-state snapshot never had to account
+# for: Longhorn creates instance-manager pods dynamically, per volume, once
+# PVCs actually provision - none exist yet on this build precisely because
+# this quota was blocking the chain that creates them. Watch actual usage
+# once vault's and monitoring's volumes are live; raise again, same as this
+# PR, if instance-manager pods get admission-rejected in turn.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -105,8 +125,8 @@ metadata:
 spec:
   hard:
     requests.cpu: "3"
-    requests.memory: 2Gi
-    limits.memory: 4Gi
+    requests.memory: 3Gi
+    limits.memory: 8Gi
 ---
 apiVersion: v1
 kind: ResourceQuota
