@@ -59,6 +59,46 @@ the file on write.
 `KUBECONFIG` is also an org secret, but it belongs to Phase C
 (`deploy-cluster.yml`) — nothing in this phase needs it.
 
+`IMAGE_INVENTORY_KUBECONFIG` (a **repo** secret, not org — `image-vuln-scan.yml`
+is the only workflow that reads it) belongs later still: it needs
+`policy/41-ci-image-inventory.yaml`'s `ci-image-inventory` ServiceAccount,
+which only exists once `platform-policy` has synced in Phase D. Unlike
+`KUBECONFIG`, this one is scoped read-only (`get`/`list` on `pods`,
+cluster-wide — enough to list running images, nothing else) and **does not
+survive a cluster rebuild**: it embeds that ServiceAccount's token and the
+cluster's own CA, both of which are new every time `kubeadm init` runs.
+Regenerate it any time the cluster is rebuilt, not just once at initial
+setup:
+
+```bash
+TOKEN=$(kubectl --kubeconfig=./build/kubeconfig -n security get secret ci-image-inventory-token -o jsonpath='{.data.token}' | base64 -d)
+CA=$(kubectl --kubeconfig=./build/kubeconfig -n security get secret ci-image-inventory-token -o jsonpath='{.data.ca\.crt}')
+
+cat > /tmp/image-inventory-kubeconfig <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+  - name: nineteenseventytwo
+    cluster:
+      server: https://192.168.20.202:6443
+      certificate-authority-data: ${CA}
+contexts:
+  - name: ci-image-inventory
+    context:
+      cluster: nineteenseventytwo
+      user: ci-image-inventory
+      namespace: security
+current-context: ci-image-inventory
+users:
+  - name: ci-image-inventory
+    user:
+      token: ${TOKEN}
+EOF
+
+gh secret set IMAGE_INVENTORY_KUBECONFIG --repo nineteenseventytwo/nineteenseventytwo-platform --body "$(cat /tmp/image-inventory-kubeconfig)"
+rm /tmp/image-inventory-kubeconfig
+```
+
 ## 4. Publish the images
 
 Step 5's `make deploy-cicd` pulls `gha-runner` at the exact tag
