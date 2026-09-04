@@ -191,6 +191,7 @@
   register: kube_control_plane_helm_check
   changed_when: false
   failed_when: false
+  check_mode: false
   tags: [cni]
 
 - name: Install helm
@@ -230,6 +231,7 @@
   register: kube_control_plane_helm_diff_check
   changed_when: false
   failed_when: false
+  check_mode: false
   become: true
   tags: [cni]
 
