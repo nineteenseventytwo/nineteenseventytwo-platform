@@ -280,6 +280,20 @@ The gap was entirely on the Vault-config side: there was nothing scoped to
 actually log in *as*, so root was the only option by omission, not by
 design.
 
+**`make sign-ws` is the one exception** — its own prompt (`if [ -z
+"$VAULT_TOKEN" ]; then read -s -p "Vault token: " ...`) checks the
+*environment variable* specifically, not `~/.vault-token`, because the
+signing itself runs inside a container that only gets what's explicitly
+passed through. `vault login` alone leaves you re-typing the same token into
+that prompt. Export it into the shell once after logging in and every
+`make sign-ws` in that session skips the prompt:
+
+```bash
+vault login -method=userpass username=mchellmer
+export VAULT_TOKEN=$(vault print token)
+make sign-ws
+```
+
 The root token still works after this — Vault policies are additive, not
 exclusive — but should stop being the thing reached for day to day now that
 a properly scoped alternative exists. Keep it for what it's actually for:
