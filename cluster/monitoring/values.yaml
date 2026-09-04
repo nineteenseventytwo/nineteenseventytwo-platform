@@ -31,6 +31,8 @@ prometheus:
 alertmanager:
   alertmanagerSpec:
     replicas: 1
+    # Its SA is bound to nothing; see ../README.md#alertmanager-holds-a-token-that-grants-nothing
+    automountServiceAccountToken: false
     resources:
       requests: {cpu: 25m, memory: 64Mi}
       limits: {memory: 128Mi}

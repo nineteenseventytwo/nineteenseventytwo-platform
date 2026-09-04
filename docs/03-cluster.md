@@ -92,6 +92,12 @@ Run against the **empty** hardened cluster, before any workload exists to
 muddy it, and commit the result. A before/after pair across the Cilium and
 default-deny work is worth more than either scan alone.
 
+The post-install half of that pair is triaged against
+[ADR-0017](decisions/ADR-0017-kubescape-accepted-controls.md), which is what
+makes the number actionable — see
+[REBUILD.md step 4.6](REBUILD.md#46-post-install-scan--the-other-half-of-the-pair)
+for the gate.
+
 > The pre-install window for this cluster's own baseline closed before this
 > step was actually run — the committed `docs/baseline-nsa.json` is a
 > **post-install** scan (captured 2026-08-28, against a loaded cluster), not

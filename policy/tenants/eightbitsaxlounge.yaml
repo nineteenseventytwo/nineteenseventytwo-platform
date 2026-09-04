@@ -169,25 +169,15 @@ spec:
     - to:
         - podSelector: {}
 ---
-# CI-scoped credential for the operations docs/05-migration.md keeps in the
-# app repo rather than moving to GitOps - chat-set-environment,
-# midi-data-*, midi-request-* - "data/runtime operations against a running
-# deployment, not cluster config". Routine deploys are Argo CD's own
-# reconciliation of apps/eightbitsaxlounge/, not this ServiceAccount:
-# Deployments/Services/Ingresses are deliberately read-only below so this
-# credential can't fight that reconciliation loop. Restarting a workload from
-# here means deleting its Pod (the "pods: delete" verb) and letting the
-# Deployment's own controller recreate it - not patching the Deployment
-# directly.
-#
-# The exact verb set is a reasonable baseline, not a transcript of the actual
-# app-repo scripts, which live in eightbitsaxlounge/server and weren't
-# available to check against while 8bsl's own migration is on hold. Revisit
-# when that migration resumes and the real scripts can be checked against it.
-#
-# generate-kubeconfig.sh in this same directory turns this ServiceAccount
-# into the kubeconfig the app repo's pipeline actually reads - see that
-# script for how it gets from here into Vault.
+# CI-scoped credential for the runtime operations docs/05-migration.md keeps
+# in the app repo rather than moving to GitOps - chat-set-environment,
+# midi-data-*, midi-request-*. Routine deploys are Argo CD's own
+# reconciliation of apps/eightbitsaxlounge/, not this ServiceAccount, which is
+# why Deployments stay read-only below: the credential must not be able to
+# fight that loop. Verb set checked against the real playbooks on 2026-09-04
+# - what it gained, lost, and still deliberately withholds, and why:
+#   README.md#the-verb-set-vs-what-the-scripts-actually-do
+# generate-kubeconfig.sh turns this into the kubeconfig CI reads, via Vault.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -217,11 +207,11 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "watch", "delete"]
   - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
-  - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]   # the midi playbooks resolve clusterIP before every HTTP call
+    verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "update", "patch"]
@@ -279,11 +269,11 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "watch", "delete"]
   - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
-  - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]   # the midi playbooks resolve clusterIP before every HTTP call
+    verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "update", "patch"]

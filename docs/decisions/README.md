@@ -21,6 +21,8 @@ inconvenient.
 | [0013](ADR-0013-platform-repo-public.md) | The platform repo goes public | Accepted |
 | [0014](ADR-0014-pod-identity-webhook.md) | Deploy the EKS pod-identity-webhook for cluster→AWS federation | Accepted |
 | [0015](ADR-0015-cilium-gateway-api.md) | Cilium Gateway API replaces ingress-nginx | Accepted |
+| [0016](ADR-0016-cpu-limits-from-limitrange.md) | CPU limits come from the namespace LimitRange, not chart values | Accepted |
+| [0017](ADR-0017-kubescape-accepted-controls.md) | Which Kubescape NSA controls this cluster accepts as failing | Accepted |
 
 ## Template
 

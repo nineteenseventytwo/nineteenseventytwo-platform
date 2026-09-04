@@ -205,3 +205,72 @@ use — MetalLB does the allocation, and `l2announcements.enabled: false` in
 Cilium's values is deliberate. `infrastructure.annotations` is what actually
 reaches the Service MetalLB is watching. `192.168.20.241` was already the address
 allocated on first sync; pinning just stops it from ever being anything else.
+
+## Argo CD
+
+### argocd-redis mounts a token it never uses
+
+Kubescape **C-0034, "Automatic mapping of service account"** fails on 38
+resources in this cluster. Thirty-seven are controllers that genuinely need
+their own token to do their job — the argocd application/applicationset
+controllers, cert-manager and its cainjector/webhook, external-secrets, the
+Cilium operator, every Longhorn CSI sidecar, the prometheus-operator, ARC's
+controller, and `pod-identity-webhook` (whose own manifest carries a
+`checkov.io/skip1` annotation saying exactly this). The control does not
+distinguish between them.
+
+`argocd-redis` is the one that is not like the others. The rendered
+Deployment runs as `serviceAccountName: default` with
+`automountServiceAccountToken: true`, and Redis is a cache — it makes no
+API-server calls at all. So the pod carries a mounted, valid token *for the
+namespace's default ServiceAccount*, with nothing that ever reads it. That is
+worth removing on its own merits, independent of the score.
+
+`redis.automountServiceAccountToken: false` in `argocd/values.yaml` is scoped
+to the redis Deployment only. The separate `redis-secret-init` Job has its
+own ServiceAccount and Role — it writes the Redis auth Secret through the API
+and does need a token — and that key does not touch it. Verified by rendering
+the chart before and after: the diff is one line, on the redis Deployment,
+out of 33,759 rendered lines.
+
+Argo CD bootstraps itself via `make bootstrap-argocd` rather than through a
+GitOps Application, so this change needs that command re-run by hand to reach
+the cluster — same as any other `argocd/values.yaml` change.
+
+## Monitoring
+
+### Alertmanager holds a token that grants nothing
+
+The second of the two genuine Kubescape C-0034 findings, and the one that
+needed a live cluster to settle rather than an argument. Alertmanager was
+listed in ADR-0017 as a candidate rather than a fix precisely because its
+`config-reloader` sidecar's behaviour was unverified — the sidecar is the part
+that could plausibly have needed the API.
+
+Three checks, against the running cluster (`build/kubeconfig`, 2026-09-04):
+
+- **The ServiceAccount is bound to nothing.** Sweeping every ClusterRoleBinding
+  and RoleBinding in the cluster for `monitoring-kube-prometheus-alertmanager`
+  as a subject returns no rows, and
+  `kubectl auth can-i --list --as=system:serviceaccount:monitoring:monitoring-kube-prometheus-alertmanager`
+  shows only the `system:discovery` / `system:basic-user` grants every
+  authenticated identity gets — `/healthz`, `/version`, self-subject reviews.
+  `get pods`, `list secrets` and `get configmaps` are all `no`.
+- **`config-reloader` watches the filesystem, not the API.** Its actual args
+  are `--watched-dir=/etc/alertmanager/config`,
+  `--watched-dir=/etc/alertmanager/secrets/slack-alerts` and
+  `--reload-url=http://127.0.0.1:9093/-/reload`. It reloads on inotify and
+  POSTs to localhost. The Secret reaches it as a kubelet-refreshed volume
+  mount, which is the operator's design, not an API call it makes itself.
+- **Alertmanager itself reads `--config.file`**, a path, same as everything
+  else in its argv.
+
+So the projected token is mounted, authenticates successfully, and can do
+nothing with that. `alertmanager.alertmanagerSpec.automountServiceAccountToken:
+false` in `monitoring/values.yaml`.
+
+Note the difference from the argocd-redis case, which needed no cluster to
+decide: there the reasoning was "Redis is a cache, it has no API client at
+all". Here the pod does have a component that legitimately might have needed
+the API, and "probably not" was not good enough to land on a cluster where
+Alertmanager is the only thing that tells anyone something is broken.

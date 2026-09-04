@@ -182,3 +182,36 @@ more dangerous of the two directions).
       bug shape by one manual sweep; nothing stops a fifth from landing
       unnoticed in the next PR that adds a diagnostic `command`/`shell`
       task.
+- [ ] **Kubescape triage, opened after this log closed.** The Deviations
+      table's step 4.6 row concluded the 78→73 pre/post gap was "not a bug —
+      expected" and stopped there. Going through the eighteen failing
+      controls one at a time afterwards found otherwise, and produced
+      [ADR-0016](../decisions/ADR-0016-cpu-limits-from-limitrange.md) and
+      [ADR-0017](../decisions/ADR-0017-kubescape-accepted-controls.md).
+      Four real findings (`pods/exec` granted to both tenant CI accounts and
+      used by none of the app-repo playbooks; `services` read missing and
+      needed by three of them; `argocd-redis` and Alertmanager each mounting a
+      token nothing reads), and the headline mover named in that row —
+      C-0270, "Ensure CPU limits are set", 34 resources — turned out to be
+      measuring controller templates while the limits are injected at Pod
+      admission by the namespace LimitRange. Confirmed live: 62 of 77 running
+      containers carry a CPU limit, and all 15 that do not are in kube-system,
+      the namespace deliberately excluded from LimitRange coverage. What
+      carries:
+  - [x] **Verify `alertmanager.alertmanagerSpec.automountServiceAccountToken:
+        false` live** — done against `build/kubeconfig` the same day. The SA
+        is bound to nothing (`can-i --list` returns only the `system:discovery`
+        grants every identity gets) and `config-reloader` runs on
+        `--watched-dir` inotify plus a localhost reload URL, not the API.
+        Landed, so this is a fourth real finding rather than a carried item.
+  - [ ] **A LimitRange coverage check**, the direct analogue of
+        `tests/verify-default-deny.sh`. ADR-0016's whole mechanism depends on
+        every namespace having one, and nothing asserts that — the same gap
+        that existed for NetworkPolicy until step 4.5's own check was written.
+- [ ] **`chat-set-environment.yaml` needs rewriting to restart by deleting
+      the Pod**, not by scaling the Deployment to 0 and back. It is the one
+      app-repo playbook that cannot run under the tenant CI credential, and
+      granting it `deployments/scale` would let a tenant credential fight
+      Argo CD's reconciliation loop — see
+      [`policy/tenants/README.md`](../../policy/tenants/README.md#deploymentsscale-is-needed-and-is-still-deliberately-not-granted).
+      Belongs with WP-5.
