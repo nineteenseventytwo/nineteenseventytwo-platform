@@ -94,6 +94,8 @@ dex:
   enabled: false   # local admin only until an IdP exists
 
 redis:
+  # Redis makes no API calls; see ../README.md#argocd-redis-mounts-a-token-it-never-uses
+  automountServiceAccountToken: false
   resources:
     requests: {cpu: 25m, memory: 64Mi}
     limits: {memory: 128Mi}

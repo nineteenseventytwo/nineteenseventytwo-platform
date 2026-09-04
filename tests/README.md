@@ -63,3 +63,10 @@ kubescape scan framework nsa --format json --output baseline-nsa.json
 
 A before/after pair across the Cilium and default-deny work is worth more than
 either scan alone.
+
+What to do with the result is
+[ADR-0017](../docs/decisions/ADR-0017-kubescape-accepted-controls.md): every
+control this cluster fails is classified there as fixed, accepted or open, so
+a scan is clean when its failure set matches that table rather than when the
+score reaches some number. Eleven of the eighteen are the CNI and the CSI
+driver being what they are.

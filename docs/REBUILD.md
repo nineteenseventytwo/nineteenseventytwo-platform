@@ -400,6 +400,24 @@ kubescape scan framework nsa --format json \
 The before/after pair across the Cilium and default-deny work is worth more than
 either scan alone.
 
+**Gate:** the failing controls match
+[ADR-0017](decisions/ADR-0017-kubescape-accepted-controls.md)'s table. Not the
+score — the score is expected to drop post-install and saying so proves
+nothing. Diff the set:
+
+```bash
+jq -r '.summaryDetails.controls | to_entries | map(.value)
+       | map(select(.status=="failed")) | sort_by(.controlID)
+       | .[] | "\(.controlID) \(.name) \(.ResourceCounters.failedResources)"' \
+  docs/builds/0003-postinstall-nsa.json
+```
+
+Anything in that output and not in ADR-0017 is a new finding and is triaged
+before the build closes. Build 0003 logged this step as "expected, not a bug"
+and moved on; going through the controls one at a time afterwards found three
+real issues and proved the highest-weighted control was measuring the wrong
+layer.
+
 ---
 
 ## Phase E — Identity
