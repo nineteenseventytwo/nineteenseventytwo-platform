@@ -101,6 +101,23 @@ vault kv put kv/platform/grafana \
   admin-password="$(openssl rand -base64 24)"
 ```
 
+Alertmanager's Slack receiver (`cluster/monitoring/externalsecret-slack-alerts.yaml`)
+reads from here too — missed on build 0002, where nothing surfaced it until
+Alertmanager was already `CreateContainerConfigError` on a missing secret
+mount, hours after this step. Not carried through SOPS for the same reason as
+Grafana's password isn't: the webhook URL is a bearer credential for wherever
+it posts, and this repo is public.
+
+```bash
+vault kv put kv/platform/slack-alerts \
+  webhook_url="<slack incoming webhook url>"
+```
+
+This is separate from the org-level GitHub Actions secret `SLACK_WEBHOOK_URL`
+(`image-vuln-scan.yml`'s weekly report) — same underlying webhook is fine to
+reuse, but the two are read by different systems and neither substitutes for
+the other.
+
 Back in the same vault pod shell from step 4:
 
 ```bash
