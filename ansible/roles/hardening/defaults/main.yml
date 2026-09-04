@@ -7,14 +7,20 @@ hardening_ssh_allow_users:
 hardening_ssh_ca_key_path: /etc/ssh/ca.pub
 # Trust certificates signed by Vault's ssh-client-signer CA (bootstrap/ssh/ca.pub)
 # in addition to authorized_keys, which this never disables on its own.
+#
+# Phase A state for build 0002 (REBUILD.md step 0.7): false, until the new
+# Vault exists and issues a new CA in Phase E. See
+# ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
 hardening_ssh_trust_ca: true
 
 # Reconciles authorized_keys to exactly hardening_ssh_authorized_keys, so
 # certificates become the only way in. Flipping back to false does not restore
-# the old keys, and this is NOT the state a from-scratch build starts from —
+# the old keys.
+#
+# Phase A state for build 0002 (REBUILD.md step 0.7): false. Flip true again,
+# in its own PR, only in Phase E once the new CA is proven working both ways —
 # see ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
-# and docs/REBUILD.md step 0.7 before running deploy-nodes on new hardware.
-hardening_ssh_retire_legacy_keys: true
+hardening_ssh_retire_legacy_keys: false
 hardening_ssh_authorized_keys: []
 
 # ufw. The firewall between VLANs is OPNsense's job; this is defence in depth

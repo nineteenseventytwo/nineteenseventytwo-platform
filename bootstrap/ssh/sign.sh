@@ -60,4 +60,15 @@ if [[ -z "$HOST" ]]; then
   exit 0
 fi
 
-exec ssh -i "$CERT" -i "$KEY" "${USER_NAME}@${HOST}"
+# -i "$KEY" alone is enough: OpenSSH auto-discovers the sibling
+# <key>-cert.pub file by naming convention and offers key+cert together as
+# one identity. Passing -i "$CERT" *as well* used to double-specify the same
+# identity - each -i registers its own candidate, so the cert got offered
+# twice (once via its own -i, once via auto-discovery through the key's -i)
+# on top of whatever an ssh-agent or ~/.ssh/config also contributes for the
+# same key. Confirmed live: that reliably exceeds this cluster's own
+# MaxAuthTries 3 (ansible/roles/hardening/templates/10-hardening.conf.j2)
+# before the valid identity ever gets its turn - "Too many authentication
+# failures" with a freshly-signed, correctly-typed-passphrase certificate,
+# on every node, not a fluke or a stale cert.
+exec ssh -i "$KEY" -o IdentitiesOnly=yes "${USER_NAME}@${HOST}"
