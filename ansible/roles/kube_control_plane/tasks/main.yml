@@ -103,6 +103,7 @@
       /etc/kubernetes/manifests/kube-apiserver.yaml || true
   register: kube_control_plane_running_issuer
   changed_when: false
+  check_mode: false
   become: true
   when: kube_control_plane_admin_conf_stat.stat.exists
 
