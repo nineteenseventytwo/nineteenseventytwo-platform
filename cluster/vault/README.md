@@ -280,6 +280,32 @@ The gap was entirely on the Vault-config side: there was nothing scoped to
 actually log in *as*, so root was the only option by omission, not by
 design.
 
+**`make sign-ws` is the one exception** — its own prompt (`if [ -z
+"$VAULT_TOKEN" ]; then read -s -p "Vault token: " ...`) checks the
+*environment variable* specifically, not `~/.vault-token` — that's just how
+the Makefile recipe is written, nothing container-related. `vault login`
+alone leaves you re-typing the same token into that prompt. Export it into
+the shell once after logging in and every `make sign-ws` in that session
+skips the prompt:
+
+```bash
+vault login -method=userpass username=mchellmer
+export VAULT_TOKEN=$(cat ~/.vault-token)
+make sign-ws
+```
+
+`cat ~/.vault-token`, not `vault print token` — the latter is only in newer
+CLI versions and it's one less thing to depend on when a plain file read
+does the same job.
+
+Run this as one uninterrupted sequence — login, export, sign-ws, nothing
+else in between. Confirmed live (build 0003): a token that had just passed
+`lookup-self` cleanly failed the very next `sign` call with `invalid token`,
+and the audit log showed exactly why — an `auth/token/revoke-self` had run
+between the two. Something in that session revoked its own token before the
+signing call reached it; source never pinned down, but a clean three-command
+run with no extra `vault` commands sandwiched in between reliably avoided it.
+
 The root token still works after this — Vault policies are additive, not
 exclusive — but should stop being the thing reached for day to day now that
 a properly scoped alternative exists. Keep it for what it's actually for:
