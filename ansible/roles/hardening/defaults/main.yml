@@ -8,16 +8,19 @@ hardening_ssh_ca_key_path: /etc/ssh/ca.pub
 # Trust certificates signed by Vault's ssh-client-signer CA (bootstrap/ssh/ca.pub)
 # in addition to authorized_keys, which this never disables on its own.
 #
-# Phase A state for build 0002 (REBUILD.md step 0.7): false, until the new
-# Vault exists and issues a new CA in Phase E. See
+# Phase A state for build 0003 (REBUILD.md step 0.7): false, until the new
+# Vault exists and issues a new CA in Phase E. Reset here after build 0002
+# left this true on main — the previous build's own ca.pub belongs to a Vault
+# that no longer exists once the cluster is re-imaged, and step 0.7 requires
+# both flags false at the start of a build, not just this one. See
 # ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
-hardening_ssh_trust_ca: true
+hardening_ssh_trust_ca: false
 
 # Reconciles authorized_keys to exactly hardening_ssh_authorized_keys, so
 # certificates become the only way in. Flipping back to false does not restore
 # the old keys.
 #
-# Phase A state for build 0002 (REBUILD.md step 0.7): false. Flip true again,
+# Phase A state for build 0003 (REBUILD.md step 0.7): false. Flip true again,
 # in its own PR, only in Phase E once the new CA is proven working both ways —
 # see ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
 hardening_ssh_retire_legacy_keys: false

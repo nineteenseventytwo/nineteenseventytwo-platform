@@ -12,7 +12,8 @@ that is the whole point of keeping one.
 | # | Build | Dates | PRs | Outcome |
 |---|---|---|---|---|
 | [0001](0001-initial-build.md) | Initial build | 2026-08-20 → 2026-09-02 | 106 | Cluster live. Never rebuilt end to end, so the runbook is unproven. |
-| 0002 | *(next — k8s 1.37, first rehearsed rebuild)* | | | |
+| [0002](0002-k8s1.67.md) | Kubernetes 1.37 rebuild | 2026-09-03 → 2026-09-04 | 10 | **Failed.** Phase E SSH cutover locked out 3 of 4 nodes with no CI/SSH recovery path; abandoned for a re-image rather than repaired in place. |
+| [0003](0003-ssh-cutover-retry.md) | SSH cutover retry | 2026-09-04 → *(open)* | | In progress — same target versions as 0002, Phase E gate now enforced in REBUILD.md |
 
 ## Why a log per build, not a single changelog
 
