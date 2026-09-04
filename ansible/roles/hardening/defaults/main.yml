@@ -20,10 +20,11 @@ hardening_ssh_trust_ca: true
 # certificates become the only way in. Flipping back to false does not restore
 # the old keys.
 #
-# Phase A state for build 0003 (REBUILD.md step 0.7): false. Flip true again,
-# in its own PR, only in Phase E once the new CA is proven working both ways —
-# see ../../../README.md#the-ca-cutover-and-why-main-is-not-a-state-a-rebuild-can-start-from
-hardening_ssh_retire_legacy_keys: false
+# Phase E cutover, build 0003: both signing paths (human sign.sh, CI
+# sign-ci.sh via AppRole) proven working against the new CA before this
+# flipped — see docs/builds/0003-ssh-cutover-retry.md. Flipping back to
+# false does not restore the old keys — see this file's own comment above.
+hardening_ssh_retire_legacy_keys: true
 hardening_ssh_authorized_keys: []
 
 # ufw. The firewall between VLANs is OPNsense's job; this is defence in depth
