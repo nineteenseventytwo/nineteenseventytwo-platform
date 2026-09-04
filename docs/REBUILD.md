@@ -20,7 +20,7 @@ captured because no single document ever said when to capture it
 | Phase | What | Reference | Gate |
 |---|---|---|---|
 | **0** | Pre-flight — nothing is touched yet | [04](04-secrets.md), [06](06-aws-federation.md) | `make deps`, JWKS bucket exists, versions pinned, **SSH trust reset (0.7)** |
-| **A** | Nodes: image, network, converge | [00](00-bootstrap.md), [01](01-network-validation.md) | `make test-network`, `make test-nodes` |
+| **A** | Nodes: image, network, converge | [00](00-bootstrap.md), [01](01-network-validation.md) | `make test-network`, `make deploy-nodes CHECK=1` idempotent |
 | **B** | CI/CD host and runners | [02](02-cicd.md) | A job runs on a self-hosted runner |
 | **C** | Kubernetes cluster | [03](03-cluster.md), [06](06-aws-federation.md) | Nodes `Ready`, **baseline scan captured** |
 | **D** | Argo CD, Vault, and everything in `cluster/` | [03](03-cluster.md), [04](04-secrets.md) | All Applications `Synced/Healthy` |
@@ -209,11 +209,33 @@ does not exist yet.
 ### 1.4 Assert the baseline
 
 ```bash
-make test-nodes
+make deploy-nodes CHECK=1
 ```
 
-**Gate:** goss passes on all four. `memory-cgroups-enabled` failing on
-`1972-console-1` is correct — it is not a cluster node.
+Re-runs the exact playbook 1.3 just applied, in check mode — an idempotency
+check on precisely what Phase A converged. **Gate:** zero `changed` across all
+four hosts. Anything reported as would-change here is real drift 1.3 left
+behind, not a false negative — unlike 1.3's own `docker-ce` check-mode
+artifact, this run has nothing left to write, so there is no "would exist
+after a repo add" ambiguity to explain away a `changed`.
+
+**Not `make test-nodes`.** That target runs `site.yml --check --diff` —
+Ansible's own "everything, in dependency order" comment on that file is
+accurate, and it means all three phases: nodes, CI/CD host, and cluster. Run
+here, mid-build, before Phase B and C exist, it fails on tasks that assume
+`deploy-cicd`/`deploy-cluster` already ran (confirmed live: `Could not find the
+requested service github-runner: host` — the CI/CD play's own systemd check,
+querying a service `deploy-cicd` hasn't created yet). `test-nodes` is the
+right check for a **fully built** cluster asserting reality still matches git,
+not a Phase-A-only gate — that distinction wasn't in this doc until it was
+tried mid-build here.
+
+Goss ([`tests/goss/node.yaml`](../tests/goss/node.yaml)) is a separate,
+stronger assertion of the same baseline, but neither target above runs it — it
+needs the `goss` binary on each node and is invoked there by hand. See
+[`tests/README.md`](../tests/README.md#gossnodeyaml) if you want that
+additional check; `memory-cgroups-enabled` failing there on `1972-console-1`
+is correct — it is not a cluster node.
 
 ---
 
@@ -366,8 +388,32 @@ either scan alone.
 ## Phase E — Identity
 
 Reference: [04-secrets.md § 4](04-secrets.md#4-tier-3--ssh-certificates),
-[`bootstrap/ssh/README.md`](../bootstrap/ssh/README.md), and build 0001's
-#47/#52.
+[`bootstrap/ssh/README.md`](../bootstrap/ssh/README.md), build 0001's
+#47/#52, and [build 0002's failure](builds/0002-k8s1.67.md#carried-into-build-0003)
+— read that before starting this phase, not after.
+
+> **`deploy-nodes` (CI) only ever sees what is pushed to `main`.** It runs
+> against a fresh checkout of the branch on a self-hosted runner, not your
+> local disk — a commit that has not been pushed is invisible to it, and so
+> is an edit that was never committed at all. This is exactly how build 0002
+> lost SSH to every cluster node: `hardening_ssh_retire_legacy_keys: false`
+> and the new `ca.pub` were both fixed and confirmed correct *locally*, but
+> `deploy-nodes` kept running against the old committed `true`/old-CA state
+> — which reconciled `authorized_keys` to empty on every node but console
+> (a one-way ratchet) while trusting a CA the new Vault can no longer sign
+> against. By the time the real fix was pushed, the very `deploy-nodes` run
+> needed to deliver it had no SSH access left to run with. Recovery required
+> pulling SD cards on three of four hosts.
+>
+> **Before triggering `deploy-nodes` at any step in this phase** — by hand or
+> by merging a PR that runs it automatically — confirm:
+>
+> ```bash
+> git status --short ansible/roles/hardening/defaults/main.yml bootstrap/ssh/ca.pub
+> git log origin/main..HEAD -- ansible/roles/hardening/defaults/main.yml bootstrap/ssh/ca.pub
+> ```
+>
+> Both must be empty. If either prints anything, push first.
 
 This phase undoes step 0.7 deliberately, in the order that works:
 
@@ -379,16 +425,18 @@ This phase undoes step 0.7 deliberately, in the order that works:
    vault read -field=public_key ssh-client-signer/config/ca > bootstrap/ssh/ca.pub
    ```
 
-   Commit the new `ca.pub`. The one in git before this point belongs to the
-   previous cluster and signs nothing.
+   Commit **and push** the new `ca.pub` — see the warning above — before any
+   `deploy-nodes` run touches it. The one in git before this point belongs to
+   the previous cluster and signs nothing.
 
 2. **Confirm `vault.eightbitsaxlounge.com` resolves from `1972-console-1`** —
    `tests/network-check.sh 12`. Nothing enforces this earlier and it fails
    silently until CI tries to sign.
 
 3. **Trust the CA, keep the static keys:** `hardening_ssh_trust_ca: true`,
-   `hardening_ssh_retire_legacy_keys` still `false`. Re-run `make deploy-nodes`.
-   Both routes in now work.
+   `hardening_ssh_retire_legacy_keys` still `false`. **Push this before**
+   re-running `make deploy-nodes` — the flags gate is only real once it is on
+   the branch CI reads. Both routes in now work.
 
 4. **Prove signing works both ways** before removing the fallback — `make ssh-ws
    HOST=192.168.20.202` for the human path, and `bootstrap/ssh/sign-ci.sh` via
