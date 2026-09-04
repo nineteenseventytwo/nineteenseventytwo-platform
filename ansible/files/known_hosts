@@ -6,10 +6,10 @@
 # Ansible connects via ansible_host (the IP), so the IP is the name that
 # matters; the hostname is listed alongside for humans.
 #
-# Last scanned: 2026-09-03T06:44:26Z from the workstation.
+# Last scanned: 2026-09-04T06:16:37Z from the workstation.
 # Trust-on-first-use unless verified out-of-band against the node's own
 # console:  ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-1972-console-1,192.168.20.201 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOnrfFtbZjff6tkABXBN35MOmkQ68YhbhiNN/BMGh6QA
-1972-master-1,192.168.20.202 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGtTsBWDAXzV/4s8BHZhQ7s/ACfk2l3w7wjVwoVbOv3+
-1972-worker-1,192.168.20.203 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM7iKQfsvl5BC5FP9PaXAsOANMcisbw8RxWrrgN+PwOc
-1972-worker-2,192.168.20.204 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICtlikoJqLsC/unstkINu00JrmIcvuZPdJPqdw1RPtdK
+1972-console-1,192.168.20.201 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDfdFxpTe+4h/48CDFHb9aPUDNpEvGGsRGabFw2JQliC
+1972-master-1,192.168.20.202 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH9aHTnQZVXl1yGaO7PGuw9qA/HjsL2V7DoOr+ePD/HC
+1972-worker-1,192.168.20.203 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAT85XAkQF9YVY8SdUB0/v+fhB8B5Ba3spo92CgixB4w
+1972-worker-2,192.168.20.204 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMAt/R2W4KMfPrg5q/rmfTJh1piBRffWM3FcP1AMAvlt
