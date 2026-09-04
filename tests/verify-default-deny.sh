@@ -21,6 +21,7 @@ EXEMPT=(
   cilium-secrets
   kube-node-lease
   kube-public
+  gateway
   node-exporter-system
 )
 
