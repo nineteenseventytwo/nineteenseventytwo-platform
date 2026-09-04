@@ -84,9 +84,15 @@ alertmanager:
 grafana:
   enabled: true
   replicas: 1
+  # 256Mi OOMKilled under real interactive use (exitCode 137, confirmed live
+  # on build 0003) - ran fine for ~10 hours at idle/scrape-only load, then
+  # crashed once someone actually opened the UI and browsed dashboards.
+  # 512Mi leaves headroom for real session/rendering load; monitoring's own
+  # infra-quota had ~1.25Gi free at the time (2816Mi/4Gi used), so this
+  # doesn't need a quota bump alongside it.
   resources:
     requests: {cpu: 50m, memory: 128Mi}
-    limits: {memory: 256Mi}
+    limits: {memory: 512Mi}
   persistence:
     enabled: true
     storageClassName: longhorn
