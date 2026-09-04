@@ -336,6 +336,23 @@ make bootstrap-argocd
 The last `helm install` a human ever runs. After this, changing the cluster is a
 PR against [`cluster/`](../cluster/).
 
+**Immediately after, restart `cilium-operator`:**
+
+```bash
+kubectl -n kube-system rollout restart deployment/cilium-operator
+```
+
+Cilium is installed pre-Argo by `30-cluster.yml`, before the Gateway API CRDs
+exist — those land later, as part of this step. `cilium-operator`'s own
+Gateway API watches never retry establishing themselves once the CRDs appear
+after it has already started; without this restart, the `gateway` resource
+sits `PROGRAMMED: Unknown` indefinitely and nothing that signs an SSH
+certificate over the public hostname (Phase E) can reach it. Found in build
+0002, recurred in build 0003 because it had only ever been logged as a
+carried-forward TODO rather than added here — see
+[build 0003's log](builds/0003-ssh-cutover-retry.md) for the second time this
+cost real time.
+
 ### 4.2 Wait for the first sync
 
 ```bash

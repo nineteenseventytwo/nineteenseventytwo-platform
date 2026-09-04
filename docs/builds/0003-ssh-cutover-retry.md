@@ -59,6 +59,12 @@ detail that matters is the one that seemed too small to write down at the time.
 | 3.4 | `AWS_PROFILE=nineteenseventytwo-platform-prod make publish-oidc` | SSO session had expired since build 0002 (`Token has expired and refresh failed`) | `aws sso login --profile nineteenseventytwo-platform-prod`, then retried clean — both discovery endpoints verified live (200) |
 | 3.4 (cloud side) | `publish-discovery.sh` suggests setting `publish_cluster_oidc=true` and applying | Flag already defaults `true` in `variables.tf`; a `terraform plan` came back **"No changes."** — the OIDC provider is keyed to the issuer URL and TLS thumbprint, not the cluster's actual signing keys, so it survives a rebuild without needing re-apply even though `kubeadm init` rotates the signing keys every time | Nothing to fix — confirmed via read-only `plan`, no `apply` needed |
 | 3.3 | Store kubeconfig as org secret `KUBECONFIG` | This is a cluster-admin credential going into an org-wide GitHub secret — flagged for explicit sign-off rather than run automatically | User set it directly rather than have it run through an agent session |
+| 4.3 | `cluster/vault/README.md`'s bootstrap-secrets list | Missing a step entirely: `kv/platform/slack-alerts` (consumed by `cluster/monitoring/externalsecret-slack-alerts.yaml`) was never documented — same gap that bit build 0002, only caught this time because the user remembered and asked before Alertmanager actually failed on it | Documented alongside Grafana's own secret — [PR #129](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/129), merged; secret set in Vault directly |
+| 4.3 (step 7) | `vault write auth/userpass/users/mchellmer ... password=-` then `vault login` | Two real, separate problems in sequence. (1) `vault login` with no `VAULT_ADDR` set defaults to `http://127.0.0.1:8200` — not documented inline in this step, same category of gap as build 0002's `KUBECONFIG`/`AWS_PROFILE` env-var gotchas on `publish-oidc`. (2) After pointing at the right address, still `400 invalid username or password` — the interactive `password=-` prompt (type, Enter, Ctrl-D) likely stored a value with different trailing whitespace than what was typed back at login. (3) After re-setting the password cleanly via `printf '%s' '...' \| vault write ... password=-`, login now failed `403 permission denied` — a *third*, different failure: Vault's built-in login-lockout feature (default ~15 min) had tripped from the four earlier failed attempts, and neither `vault write -f auth/userpass/unlock/mchellmer` nor `vault list sys/locked-users/<accessor>` found a working manual-unlock path in this Vault version | (1) and (2) fixed live, no doc change yet — worth adding to step 7's own text. (3) no fix found beyond waiting out the default lockout window; login succeeded once ~15 minutes had passed from the last failed attempt. Both signing paths (`sign.sh` human, `sign-ci.sh` CI via AppRole) confirmed working after |
+| 4.2 (post pod-identity-webhook fix) | Cilium/Gateway wave settles after `bootstrap-argocd` | **Build 0002's own known finding #5 recurred, because the fix was never actually added as a runbook step** — only logged as a carried-forward TODO that never got done. `gateway.gateway.networking.k8s.io/gateway` sat `ADDRESS: <none>, PROGRAMMED: Unknown` indefinitely; `cilium-operator`'s Gateway API watches never re-established once the CRDs appeared after it started, same as build 0002 exactly. This is what caused CI's `sign-ci.sh` to fail with `no route to host` on `192.168.20.241:443` — the Gateway had no address to route to at all | `kubectl -n kube-system rollout restart deployment/cilium-operator` — same fix as build 0002, confirmed live (`PROGRAMMED: True`). **This time actually adding it to `docs/REBUILD.md` Phase D, not just this log**, is carried into the next PR |
+| 4.2 | Argo CD application-controller's discovery cache doesn't retry a failed CRD-group lookup on its own schedule | `pod-identity-webhook` sat `OutOfSync/Missing` for 10+ minutes on `failed to discover server resources for group version cert-manager.io/v1`, with the exact same frozen retry-attempt timestamp the entire time even though `cert-manager.io/v1` was genuinely live and `kubectl`-queryable the whole time. An `argocd.argoproj.io/refresh=hard` annotation and a manual `.operation` reset both had no effect — those touch comparison/sync state, not the controller's own internal REST-mapper discovery cache | `kubectl -n argocd rollout restart statefulset/argocd-application-controller` cleared it; the very next scheduled retry (Argo CD's own operation backoff, not anything I forced) succeeded cleanly. Worth documenting in `cluster/README.md` alongside the existing prune/refresh-semantics note from build 0002, since none of the three commonly-reached-for nudges (hard refresh, operation reset, waiting) actually fixed this one — only a controller restart did |
+| 4.5 | `make verify-default-deny` → exit 0 | **Real bug, not environmental.** `gateway` namespace failed with "no default-deny-all NetworkPolicy and is not on the exemption list" — but `policy/10-default-deny.yaml`'s own header comment has documented `gateway` as one of six deliberately-uncovered namespaces since it was written. `tests/verify-default-deny.sh`'s enforceable `EXEMPT` array — which its own comment says must be "kept in sync" with that documentation — simply never included it. First time this check had ever run against a live cluster with `gateway` present since that comment was written | Added `gateway` to `EXEMPT`. [PR #131](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/131), merged — confirmed clean re-run, exit 0 |
+| 4.6 | Post-install Kubescape, the other half of the before/after pair | 73/100 post-install vs 78/100 pre-install — same direction and similar magnitude to build 0001's own pre/post gap (workloads landing always costs some score; see `docs/builds/0003-postinstall-nsa.json` for the full breakdown, headline movers were `Ensure CPU limits are set` (26%) and `Non-root containers` (33%)) | Not a bug — expected, matches the pattern the runbook's own step 3.5 text predicts |
 
 ## PRs
 
@@ -66,8 +72,12 @@ detail that matters is the one that seemed too small to write down at the time.
 |---|---|
 | [#125](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/125) | Regenerate `known_hosts` for the re-imaged nodes |
 | [#126](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/126)–[#127](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/127) | Throwaway self-hosted-runner proof, then removed |
+| [#128](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/128) | Build log + pre-install Kubescape baseline |
+| [#129](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/129) | Document the missing `slack-alerts` Vault step |
+| [#130](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/130) | Trust the new Vault SSH CA (Phase E step 3) |
+| [#131](https://github.com/nineteenseventytwo/nineteenseventytwo-platform/pull/131) | Fix `verify-default-deny.sh`'s missing `gateway` exemption |
 
-Counts so far: `fix/` 1 · `feat/` 0 · `chore/` 1 · `test/` 1 · `docs/` 0 · total 3.
+Counts so far: `fix/` 2 · `feat/` 1 · `chore/` 1 · `test/` 1 · `docs/` 2 · total 7.
 
 Compare the `fix/` share against build 0002's 8/10 (80%). Anything at or
 above that, on a rebuild that starts from a runbook 0002 already corrected
@@ -80,12 +90,15 @@ it into the config.
       `docs/builds/0003-baseline-nsa.json` — 78/100, matches build 0002's
       pre-install score exactly (same hardening config, same k8s/Cilium
       versions — expected, not a coincidence)
-- [ ] Post-install Kubescape scan for the before/after pair
-- [ ] `make test-network` output (all 12)
+- [x] Post-install Kubescape scan for the before/after pair →
+      `docs/builds/0003-postinstall-nsa.json` — 73/100
+- [x] `make test-network` output (all 12) — 10/10 real checks pass (from
+      `1972-console-1`, correctly), 2 workstation-only checks pass separately
 - [ ] `make test-nodes` across all four hosts
-- [ ] `make verify-default-deny` → 0
-- [ ] `make verify-irsa` → assumed-role identity
-- [ ] `kubectl -n argocd get applications` → all Synced/Healthy
+- [x] `make verify-default-deny` → 0 (after PR #131's fix)
+- [x] `make verify-irsa` → assumed-role identity, `Sealed: false`, `Seal
+      Type: awskms`
+- [x] `kubectl -n argocd get applications` → all 17 Synced/Healthy
 
 ## What broke that the runbook did not predict
 
