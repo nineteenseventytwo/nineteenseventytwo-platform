@@ -367,8 +367,11 @@ bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
 	# configuration annotation cap that client-side apply relies on — the exact
 	# reason 00-gateway-api-crds.yaml's own Application already sets
 	# ServerSideApply=true for this same file. The Application adopts this
-	# release on its first sync, same as Cilium's.
-	$(KUBECTL) apply --server-side -f cluster/gateway-api-crds/standard-install.yaml
+	# release on its first sync, same as Cilium's — and --force-conflicts is
+	# what lets this target survive that adoption and stay re-runnable; see
+	# cluster/README.md#bootstrap-argocd-has-to-be-re-runnable-not-just-runnable
+	$(KUBECTL) apply --server-side --force-conflicts \
+	  -f cluster/gateway-api-crds/standard-install.yaml
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm
 	$(HELM) repo update argo
 	$(HELM) upgrade --install argocd argo/argo-cd \

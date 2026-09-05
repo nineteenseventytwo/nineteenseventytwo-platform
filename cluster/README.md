@@ -274,3 +274,95 @@ decide: there the reasoning was "Redis is a cache, it has no API client at
 all". Here the pod does have a component that legitimately might have needed
 the API, and "probably not" was not good enough to land on a cluster where
 Alertmanager is the only thing that tells anyone something is broken.
+
+### bootstrap-argocd has to be re-runnable, not just runnable
+
+`make bootstrap-argocd` is the only path by which a `cluster/argocd/values.yaml`
+change reaches the cluster — Argo CD's own Helm release is not GitOps-managed,
+so nothing else applies it. Until 2026-09-04 that path was broken on any
+cluster where Argo CD had been running for more than one sync, which is every
+cluster that is not being built from scratch right now.
+
+The target's first step server-side-applies
+`cluster/gateway-api-crds/standard-install.yaml`. Ten CRDs go through fine.
+The two objects that do not are the Gateway API's own admission policy, which
+ships in that same file:
+
+```
+Apply failed with 1 conflict: conflict with "argocd-controller": .spec.matchConstraints
+Apply failed with 1 conflict: conflict with "argocd-controller": .spec.matchResources
+```
+
+- `ValidatingAdmissionPolicy/safe-upgrades.gateway.networking.k8s.io` →
+  `.spec.matchConstraints`
+- `ValidatingAdmissionPolicyBinding/safe-upgrades.gateway.networking.k8s.io` →
+  `.spec.matchResources`
+
+Both are owned by the `argocd-controller` field manager, because the
+`gateway-api-crds` Application syncs the identical file with
+`ServerSideApply=true`. This is the adoption the comment above the target
+already describes working as intended — the target just never accounted for
+what adoption does to its own next run. `make` exits 1 before `helm upgrade`
+runs at all, so the values change silently does not land and the failure looks
+like it is about CRDs rather than about Argo CD.
+
+`--force-conflicts` is the right answer here, not a workaround, and the
+ownership history proves it rather than merely arguing it. On this cluster:
+
+```
+kubectl            2026-09-04T06:56:33Z   # bootstrap applied it
+argocd-controller  2026-09-04T06:58:37Z   # first sync took the fields
+```
+
+Argo CD has already taken these exact fields from `kubectl` once, unprompted,
+two minutes after bootstrap. Forcing hands them back for the duration of one
+apply; the `gateway-api-crds` Application (`selfHeal: true`,
+`ServerSideApply=true`) takes them again on its next sync, exactly as it did
+the first time. Both managers are applying the same file from the same commit,
+so there is no divergent value for either to win — the conflict is about
+bookkeeping, not content.
+
+### A kube-prometheus-stack sync takes ~18 minutes, and looks wedged the whole time
+
+Measured 2026-09-04: an Alertmanager values change synced from
+`startedAt: 19:56:38Z` to `finishedAt: 20:14:35Z` — **17m57s**, `phase:
+Succeeded`, no retries, nothing wrong. On three 2 GB Pis, rendering and
+diffing this chart is simply that slow.
+
+What makes it expensive is not the wait, it is that every signal during the
+wait says something is broken:
+
+```
+phase:     Running
+message:   <none>
+resources: 0            # in .status.operationState.syncResult, for ~18 minutes
+```
+
+`.status.sync.status` reads **`Synced`** and `.status.sync.revision` moves to
+the new commit almost immediately, while the live objects still hold their old
+values and the application-controller logs this every two minutes:
+
+```
+"Skipping auto-sync: another operation is in progress" application=monitoring
+```
+
+All of that is normal for an in-flight sync. Nothing logs at `level=error`.
+Checking `kubectl get application` alone will tell you the change landed
+roughly fifteen minutes before it does.
+
+**Do not restart the application-controller on this evidence alone.** Builds
+0002 and 0003 both recorded genuinely wedged operations with a near-identical
+surface — an orphaned sync after an OOMKill, and a `platform-policy` sync with
+no apply activity — and the fix there was a controller restart. The difference
+is only visible in time: a wedged operation never reaches `Succeeded`, a slow
+one does. Read `.status.operationState.startedAt` first and give this chart
+twenty minutes before concluding anything:
+
+```bash
+kubectl -n argocd get application monitoring \
+  -o jsonpath='{.status.operationState.phase} {.status.operationState.startedAt}{"\n"}'
+```
+
+If it is still `Running` well past that, then it is the build-0003 case and a
+controller restart is the documented fix — `argocd.argoproj.io/refresh=hard`
+and an `.operation` reset were both established there not to clear it.
