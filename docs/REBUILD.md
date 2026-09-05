@@ -388,7 +388,10 @@ make verify-default-deny
 ```
 
 **Gate:** exit code 0. Build 0001 spent eleven `fix/` PRs on NetworkPolicy gaps
-found by deploying rather than by checking; this target is the check.
+found by deploying rather than by checking; this target is the check. **125
+means the cluster was unreachable, not that it passed** — until 2026-09-05
+that case also returned 0, so a gate on this step could be cleared without the
+check ever running.
 
 ### 4.6 Post-install scan — the other half of the pair
 

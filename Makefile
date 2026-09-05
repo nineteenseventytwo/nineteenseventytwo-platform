@@ -58,12 +58,19 @@ ENGINE           ?= $(if $(GITHUB_ACTIONS),docker,$(if $(shell command -v podman
 SSH_KEY          ?= $(HOME)/.ssh/ansible-workstation
 KNOWN_HOSTS      ?= $(PWD)/ansible/files/known_hosts
 SOPS_AGE_DIR     ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/age,$(HOME)/.config/sops/age)
-KUBECONFIG       ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/kube/config,$(HOME)/.kube/config)
+# $(BUILD_DIR)/kubeconfig on a workstation, not ~/.kube/config: that is where
+# `make kubeconfig` actually writes, so the default now matches the only
+# supported way of obtaining one. It was $(HOME)/.kube/config, which meant
+# every kubectl/helm target failed with a bare `statfs ...: no such file or
+# directory` on a machine that had run `make kubeconfig` and had a perfectly
+# good kubeconfig sitting in ./build. abspath at the mount site (below) makes
+# the relative path work.
+KUBECONFIG       ?= $(if $(GITHUB_ACTIONS),$(RUNNER_TEMP)/kube/config,$(BUILD_DIR)/kubeconfig)
 
 # Two container shapes, because the credentials differ. Ansible targets need
 # an SSH key and the age key; kubectl/helm targets need a kubeconfig and no
 # SSH at all. Mounting the union would mean every `helm upgrade` also carried
-# a key that can root every node, and would make ~/.kube/config a hard
+# a key that can root every node, and would make a kubeconfig a hard
 # prerequisite for targets that never touch the cluster.
 #
 # Mount the one SSH key we need, not all of ~/.ssh — that directory holds
@@ -122,11 +129,9 @@ CONTAINER_RUN = $(ENGINE) run --rm -i $(DOCKER_USER) \
 # (./build/kubeconfig, per docs/03-cluster.md) — it reads as a *named volume*
 # to create, and named volume names can't contain /, so this fails with
 # "names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*" rather than anything that
-# reads like a path problem. The default below is already absolute
-# ($(HOME)/... or $(RUNNER_TEMP)/...), which is why this never surfaced until
-# someone reasonably overrode it with the relative path the docs themselves
-# print. abspath is a no-op on an already-absolute path, so this is safe
-# either way.
+# reads like a path problem. This is now load-bearing rather than defensive:
+# the workstation default *is* that relative path. abspath is a no-op on an
+# already-absolute path, so CI's $(RUNNER_TEMP)/... is unaffected.
 # $(BUILD_DIR)/helm/{config,cache} persist Helm's own state (repositories.yaml,
 # the downloaded index) across separate $(HELM) invocations. Each line of a
 # recipe is its own shell, so each one is a fresh `podman run --rm` — without
