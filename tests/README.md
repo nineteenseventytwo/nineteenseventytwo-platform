@@ -49,7 +49,14 @@ cluster, for months — this makes it a check instead of a claim.
 make verify-default-deny
 ```
 
-Exit code is the count of uncovered, unexempted namespaces.
+Exit code is the count of uncovered, unexempted namespaces — or **125** if the
+cluster could not be reached at all.
+
+That second code exists because the first one used to cover both. With no
+kubeconfig the script's namespace enumeration returned nothing, the loop ran
+zero times, and it exited 0: a gate that passes when the check never ran, which
+is the same class of thing this script was written to stop. Confirmed
+2026-09-05, fixed the same day.
 
 ## What is deliberately not tested here
 
