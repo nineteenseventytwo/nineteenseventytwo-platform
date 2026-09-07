@@ -171,34 +171,37 @@ against build 0003's carried list, which had gone stale in two places.
       them, so `REBUILD.md` stored cluster-admin at step 3.3 and never came
       back. New step **4.7** does the swap, 3.3 says plainly that it is
       temporary, and Phase F's evidence list covers it.
-- [ ] **Determine what the live secret actually holds** — not knowable from the
-      repos (GitHub secrets are write-only). Either read the apiserver audit
-      log for the username `deploy-cluster.yml` last authenticated as, or just
-      re-run the swap. See
-      [06 §The kubeconfig question](06-programme-status.md#the-kubeconfig-question).
+- [ ] **Re-run the kubeconfig swap — the org secret holds cluster-admin.**
+      Settled 2026-09-07: `build/kubeconfig` is `kubernetes-admin` with
+      `client-certificate-data`, which is what `make kubeconfig` fetches (its
+      own help text says "the **admin** kubeconfig"). The swap in
+      `04-secrets.md#replacing-the-kubeconfig-secret` builds a *different*
+      file from the `ci-argocd-sync-token` Secret and writes it to
+      `/tmp/`, never to `build/kubeconfig` — so setting the org secret from
+      `build/kubeconfig` stages admin, which is exactly the trap new step 4.7
+      exists to close. **Worse than a token:** a kubeadm client certificate
+      cannot be revoked by deleting a Secret. It is valid for a year and there
+      is no CRL — rotating it means rotating the cluster CA. Run the swap.
 - [x] **A LimitRange coverage check** — done 2026-09-07,
       `tests/verify-limitrange.sh` + `make verify-limitrange`, modelled on
       `verify-default-deny.sh` including its unreachable-cluster guard.
-- [ ] **Close the `gateway` namespace gap the new check found.** `gateway` is
-      the only namespace outside the documented exemptions with **neither a
-      LimitRange nor a ResourceQuota**, and it runs the Cilium Gateway's Envoy
-      pods. Unlike its default-deny exemption, which is deliberate and
-      explained, nothing says this one is.
-      **Do not add a LimitRange to it blind.** Build 0002 lost an evening to
-      exactly that move: `longhorn-system`'s new LimitRange `default.cpu` of
-      `200m` landed under instance-manager's existing explicit `400m` *request*,
-      which is invalid at admission and retries forever with no pod ever
-      created. Check first:
+- [x] **The `gateway` namespace is not a gap — the check was.** Settled live
+      2026-09-07. `gateway` holds the `Gateway` object and its LoadBalancer
+      `Service` and **nothing else**: Cilium serves the Gateway's data plane
+      from the `cilium-envoy` DaemonSet in `kube-system`, one per node, so no
+      pod ever runs in that namespace. A LimitRange there would default
+      resources for containers that cannot exist, and a compute ResourceQuota
+      would be equally inert. Both are correctly absent.
 
-      ```bash
-      kubectl -n gateway get pods -o jsonpath=\
-        '{range .items[*].spec.containers[*]}{.name}{"\t"}{.resources}{"\n"}{end}'
-      ```
-
-      Size the `default` above anything already requested there, then add both
-      the LimitRange and a ResourceQuota — or write down why `gateway` is
-      exempt from both, in the same place the NetworkPolicy exemption is
-      explained.
+      Rather than skip it by name, the check now carries **two kinds of
+      exemption and verifies the second**: `kube-system` is exempt by decision
+      (it runs pods, and is deliberately excluded per
+      `policy/21-resource-quotas.yaml`), while `gateway`, `cilium-secrets`,
+      `kube-node-lease` and `kube-public` are exempt *because* no pod runs
+      there — a claim about the cluster, so the script asserts it and fails if
+      a pod ever appears. If Cilium is reconfigured to provision a per-Gateway
+      Deployment, this catches it instead of hiding it. Both branches
+      negative-tested; live run exits 0.
 
 **Gate:** `make verify-default-deny` and `make verify-limitrange` both exit 0;
 the cloud repo's README has no stale SCP TODO; `cluster/README.md` documents

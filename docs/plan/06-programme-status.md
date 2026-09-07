@@ -155,9 +155,9 @@ Four options exist, and picking one is the first move — the completion plan
   were both written on 2026-09-07. See the appendix.
 - **`KUBECONFIG` org secret** — the scoped RBAC and the swap procedure both
   exist; what was missing was any step sequencing them. Fixed in `REBUILD.md`
-  (new step 4.7) on 2026-09-07. Whether the *live* secret currently holds the
-  scoped credential or the admin one is not knowable from the repos — check the
-  audit log or re-run the swap. See the appendix.
+  (new step 4.7) on 2026-09-07. The live secret was confirmed the same day to
+  hold **cluster-admin** — a client certificate, so not revocable short of
+  rotating the cluster CA. Run the swap. See the appendix.
 
 
 ---
@@ -287,16 +287,30 @@ Build 0003's log records the predictable outcome, at step 3.3:
 > This is a cluster-admin credential going into an org-wide GitHub secret —
 > flagged for explicit sign-off rather than run automatically
 
-**So the state of the live secret is genuinely unknown from the repos.** GitHub
-Actions secrets are write-only, so it cannot be read back to settle it. Two
-ways to find out:
+**Settled 2026-09-07: the org secret holds cluster-admin.** The secret was set
+from `build/kubeconfig`, and that file is:
 
-1. **The apiserver audit log** — enabled in `ansible/roles/kube_control_plane`,
-   and this is exactly what it is for. Check which username
-   `deploy-cluster.yml`'s last run authenticated as:
-   `system:serviceaccount:argocd:ci-argocd-sync` means the swap happened,
-   `kubernetes-admin` means it did not.
-2. **Just re-run the swap.** Cheap, and it settles the question either way.
+```
+user name: kubernetes-admin | credential keys: [client-certificate-data, client-key-data]
+current-context: kubernetes-admin@nineteenseventytwo
+```
+
+`make kubeconfig`'s own help text says it fetches "the **admin** kubeconfig".
+The swap procedure in `04-secrets.md#replacing-the-kubeconfig-secret` builds a
+*different* artefact — constructed from the `ci-argocd-sync-token` Secret and
+written to `/tmp/ci-argocd-sync.kubeconfig`, never to `build/kubeconfig`. The
+two are easy to conflate because both are "the kubeconfig", and that is exactly
+the trap step 3.3 set.
+
+**This is worse than a stale token would be.** A kubeadm admin credential is a
+client *certificate*: it cannot be revoked by deleting a Secret, it is valid
+for a year, and there is no CRL in play — rotating it means rotating the
+cluster CA. So it is the one static credential in the estate that cannot be
+withdrawn, in a lab that has otherwise retired its static SSH keys entirely.
+
+**Action: run the swap** (`04-secrets.md#replacing-the-kubeconfig-secret`),
+then confirm via the apiserver audit log that `deploy-cluster.yml`
+authenticates as `system:serviceaccount:argocd:ci-argocd-sync`.
 
 **Fixed in the runbook 2026-09-07:** step 3.3 now states plainly that it is
 staging a temporary cluster-admin credential and why it has to be; new step
