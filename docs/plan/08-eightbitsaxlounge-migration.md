@@ -308,11 +308,273 @@ targets the retired runner.
 
 ---
 
-## Open decisions
+## Decisions — settled 2026-09-07
 
-| | Question | Recommendation |
-|---|---|---|
-| **M1** | Port `shutdown.yaml` or drop it? | **Port it.** It is ~20 lines, it is the only graceful-shutdown path, and the alternative is pulling power on Longhorn replicas. |
-| **M2** | Required status checks and approvals on `main`, across all three repos? | **Require checks, keep approvals at 0.** Checks catch what a one-person estate cannot self-review; a mandatory approval on a solo repo is theatre that gets bypassed. |
-| **M3** | TLS on `midi` → Windows PC? | **Not initially.** It stays inside VLAN 20 with an explicit allow-pair at both layers. Revisit if the PC ever leaves VLAN 20 — record it as accepted, not overlooked. |
-| **M4** | `dev` and `prod`, or `prod` only? | **Keep both.** The quota already provisions both, and dev is where the HTTPRoute and ExternalSecret wiring gets proven before prod. |
+### M1 — Port `shutdown.yaml`. **Yes.**
+
+Becomes `ansible/playbooks/40-shutdown.yml` + `make shutdown`. Extends to the
+EC2 worker in [07's Phase 9](07-completion-plan.md#phase-9--hybrid), where it is
+worth more — a stopped instance bills only for its EBS volume.
+
+**The wider intent — the cluster is off unless it is needed — has consequences
+worth naming now**, because four things in this estate assume it is always up:
+
+| | Effect of an off-by-default cluster |
+|---|---|
+| Longhorn | The whole reason ordered shutdown matters. Replicas must detach cleanly; pulling power is what `docs/07-runbooks.md` exists to clean up after. |
+| cert-manager | Let's Encrypt certs are 90 days, renewed at ~60. A cluster off for a long stretch renews late or not at all, and DNS-01 needs the cluster running. Not fatal, but a month of downtime around a renewal window is. |
+| `image-vuln-scan.yml` | Weekly, Mondays 06:00 UTC. Enumerates images **from the live cluster**, so it fails outright if the cluster is off at that moment. |
+| Prowler CronJob | Daily 05:00 UTC. Scans AWS, not the cluster — but it *runs* in the cluster, so an off cluster means no posture scan that day. |
+
+Argo CD will also reconcile a backlog on every boot, which is fine but makes
+"everything Synced" a slower gate than it looks.
+
+Worth deciding whether the two scheduled scans move to GitHub-hosted runners so
+they survive the cluster being down. That is a small change and it decouples
+posture reporting from uptime — recommended, but not blocking the migration.
+
+### M2 — Required status checks. **Yes, and the order matters.**
+
+What "expand" means concretely, in three parts:
+
+**1. The app repo has no ruleset at all.** It needs the base one first, matching
+what `platform` and `cloud` already enforce on `main`:
+
+- `deletion` — the branch cannot be deleted
+- `non_fast_forward` — no force-push over history
+- `pull_request` — changes land through a PR, not a direct push
+- `required_signatures` — commits must be signed
+
+That last one is not theoretical here: signing is already configured on the
+workstation (recent platform commits verify `G`), and neither existing ruleset
+has any bypass actor. So mirroring it costs nothing and closes the gap where the
+*app* repo is the one that is public.
+
+**2. Then add `required_status_checks`, naming contexts explicitly.** This is
+the part `platform` and `cloud` are currently missing — both rulesets require a
+PR but require nothing *of* it, so a red PR merges as easily as a green one.
+Name the checks: `lint`, `Checkov`, `test`.
+
+**3. Order is load-bearing.** A required check that never reports blocks every
+merge permanently, and a repo with no `pull_request` workflows reports nothing.
+So: **add the CI workflow first, open one PR, confirm each check reports, then
+require it.** Doing it the other way round locks the repo and the fix needs
+admin rights to undo.
+
+On approvals staying at **0**: a required check is a machine that cannot be
+tired or in a hurry. A required approval on a single-maintainer repo is the same
+person clicking a button they already decided to click — it adds a step without
+adding a reader. Revisit if anyone else ever commits.
+
+### M3 — TLS on `midi` → the Windows PC. **Revised: yes, do it.**
+
+The earlier recommendation was wrong, and the reason it was wrong is that it
+argued about the wrong property.
+
+**Confidentiality is not the point.** MIDI effect commands are not secret, and
+the link stays inside VLAN 20. On that basis "no TLS" looked defensible.
+
+**Authentication is the point.** Right now anything on VLAN 20 that can reach
+`192.168.20.210:5000` can drive the pedal. NetworkPolicy constrains what the
+*cluster* may talk to; it does nothing about the other hosts on that segment,
+and VLAN 20 is not a two-host link — it holds four Pis, the PC, and whatever
+else lands there. **mTLS makes the pedal answer only to the `midi` pod**, which
+is a real control rather than a checkbox.
+
+The estate already has the right tool and it was built for exactly this. From
+`cluster/cert-manager/clusterissuer-internal-ca.yaml`:
+
+> For machine-to-machine services that do not need public trust. Cheaper, no
+> rate limits, and it is how mTLS gets bootstrapped later if a mesh ever
+> arrives.
+
+**The real cost is renewal on a Windows host**, not the crypto. cert-manager
+cannot renew a certificate that lives on a Windows box, and a cert expiring
+mid-stream stops the pedal responding. Handle it by issuing from `internal-ca`
+with a long duration and folding installation into `midi-pc-deploy.yaml`, which
+already deploys to that host — renewal becomes a re-run of a playbook that
+exists, on a calendar reminder, rather than a new mechanism.
+
+The pod side is trivial: it mounts the internal CA from the cluster to verify
+the server, and presents its own `internal-ca`-issued cert as the client.
+
+**Do it after the cluster half is migrated and working, not during.** Getting
+`midi` running under Argo CD and getting mTLS onto a Windows service are two
+debugging problems, and combining them means neither failure is legible.
+
+### M4 — Keep dev and prod, and extend the toggle to every service. **Yes — but not the way it works today.**
+
+The idea is right and it pays for itself twice: one environment running at a
+time roughly halves the tenant footprint, which turns **F5**'s 92% quota fit
+into comfortable headroom.
+
+**The current mechanism cannot survive the move**, and this is the same problem
+build 0003 carried forward. `chat-set-environment.yaml` runs
+`kubectl scale deployment --replicas=0/1`. Under Argo CD with auto-sync that is
+a fight it loses: the manifest in git says one replica, so the next
+reconciliation puts it back. It also needs `deployments/scale`, which
+`policy/tenants/README.md` deliberately does not grant a tenant credential —
+precisely so a tenant cannot fight the reconciliation loop.
+
+**Under GitOps the replica count belongs to git.** So the toggle becomes a
+committed value, not an imperative command:
+
+- one `active-env` value committed in `apps/eightbitsaxlounge/`
+- each environment's manifests take their replica count from it — the inactive
+  one renders `replicas: 0`
+- the workflow's job is to *commit the flip*, then let Argo CD converge
+
+That is strictly better than what exists: the toggle is auditable (it is a
+commit), it needs no cluster credential at all, it cannot drift back, and it
+covers every service rather than just `chat`. It also closes the carried
+`chat-set-environment.yaml` item by deleting the problem instead of reworking
+it.
+
+Worth confirming during migration: `db` and `state` hold **state**. Scaling
+CouchDB and NATS to zero with the rest is probably wanted — the whole point is
+that nothing runs — but their PVCs persist, so decide explicitly whether the
+inactive environment keeps its data (it should) and whether both environments
+need their own copies (they already have separate PVCs, so yes).
+
+---
+
+## Still open
+
+- **F1 is done** — the repo transferred to `nineteenseventytwo` on 2026-09-07.
+  Local clones still have the old `mchellmer/` remote; GitHub redirects, but
+  update it (`git remote set-url`) so the origin is not lying.
+- Whether the two scheduled scans move to hosted runners, given M1's
+  off-by-default cluster.
+- Whether `platform` and `cloud` get `required_status_checks` at the same time
+  as the app repo (M2) — recommended, same PR.
+
+---
+
+## Appendix — diagnosing the Windows MIDI service
+
+For the M3/F9 pre-flight: establish whether the Windows half is running, which
+version it is running, and whether deployment has been failing silently. Run
+these on the PC in an **elevated PowerShell**.
+
+The layout `midi-pc-deploy.yaml` builds:
+
+```
+C:\Tools\nssm\nssm.exe                       the service manager
+C:\Services\Midi\{dev,prod}\<version>\       one directory per deployed version
+C:\Services\Midi\{dev,prod}\current    -->   symlink to the active version
+C:\Services\Midi\logs\MidiApi-{Dev,Prod}-std{out,err}.log
+```
+
+Services are `MidiApi-Dev` (port 5000) and `MidiApi-Prod` (port 5001).
+
+### 1. What is actually running
+
+```powershell
+$nssm = "C:\Tools\nssm\nssm.exe"
+foreach ($s in "MidiApi-Dev","MidiApi-Prod") {
+  "$s : " + (& $nssm status $s 2>&1)
+}
+Get-Service MidiApi-* | Format-Table Name,Status,StartType
+Get-NetTCPConnection -State Listen |
+  Where-Object LocalPort -in 5000,5001 |
+  Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
+`SERVICE_RUNNING` plus a listener on `0.0.0.0` is healthy. A listener bound to
+`127.0.0.1` only would explain the cluster being unable to reach it while the
+service looks fine locally.
+
+### 2. Which version — this is the one that exposes a silent failure
+
+```powershell
+foreach ($e in "dev","prod") {
+  $base = "C:\Services\Midi\$e"
+  "--- $e"
+  (Get-Item "$base\current" -ErrorAction SilentlyContinue).Target
+  Get-ChildItem $base -Directory | Select-Object Name,CreationTime
+  Get-ChildItem $base -Filter *.tar.gz -ErrorAction SilentlyContinue |
+    Select-Object Name,Length,CreationTime
+}
+```
+
+Compare the symlink target against `midi/version.txt` in the repo (currently
+**4.0.2**). **The expected failure mode is that `current` points at an older
+version than the repo**: the service keeps running the last good build while
+every deployment since has failed. Leftover `.tar.gz` files, or a version
+directory with no `.exe` inside it, mean the download or extraction step is
+where it breaks.
+
+### 3. The logs
+
+```powershell
+foreach ($n in "MidiApi-Dev","MidiApi-Prod") {
+  "===== $n"
+  Get-Content "C:\Services\Midi\logs\$n-stderr.log" -Tail 40 -ErrorAction SilentlyContinue
+  Get-Content "C:\Services\Midi\logs\$n-stdout.log" -Tail 20 -ErrorAction SilentlyContinue
+}
+Get-EventLog -LogName Application -Newest 40 |
+  Where-Object Source -match "MidiApi|nssm|\.NET" |
+  Format-Table TimeGenerated,EntryType,Message -Wrap
+```
+
+A stderr log whose newest entry is months old is itself the finding — it means
+the process has not restarted since, which is consistent with "running happily,
+never redeployed".
+
+### 4. Is the pedal actually there
+
+The service can be perfectly healthy and still not drive anything if the USB
+device moved or re-enumerated:
+
+```powershell
+Get-PnpDevice -Class MEDIA -Status OK |
+  Select-Object FriendlyName,InstanceId
+```
+
+Expect the **One Series Ventris Reverb** (the name `MIDI_DEVICE_NAME` uses). If
+it is absent or renamed, the API is up and the pedal is unreachable — a
+different fault with the same symptom.
+
+### 5. Reachability, from both ends
+
+```powershell
+# on the PC — does it answer locally
+Invoke-WebRequest http://localhost:5001/health -UseBasicParsing |
+  Select-Object StatusCode
+# and is the firewall open on the LAN side
+Get-NetFirewallRule -Enabled True -Direction Inbound |
+  Where-Object DisplayName -match "Midi|5000|5001"
+```
+
+```bash
+# from a Pi on VLAN 20 — does it answer across the network
+curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://192.168.20.210:5001/health
+```
+
+Local 200 with a cross-network failure is a Windows Firewall or bind-address
+problem. Both failing is the service. The PC's address changed from
+`192.168.68.50` to `192.168.20.210`, so any firewall rule scoped to the old
+subnet will now deny — a strong candidate for the silent breakage.
+
+### 6. Clearing it
+
+Once the fault is known:
+
+```powershell
+$nssm = "C:\Tools\nssm\nssm.exe"
+& $nssm stop   MidiApi-Prod
+& $nssm restart MidiApi-Prod
+& $nssm status  MidiApi-Prod
+
+# full reinstall of the service definition only — leaves deployed files alone
+& $nssm remove MidiApi-Prod confirm
+```
+
+Then re-run `midi-pc-deploy.yaml` **after** fixing `init-pc.yaml`'s address
+(`192.168.68.50` → `192.168.20.210`) and .NET version (`9.0` → `10`), so the
+redeploy is against correct facts rather than reproducing the drift.
+
+**Capture the answers before changing anything.** Whether this was already
+broken is the single fact that makes the cluster-side migration debuggable —
+once `midi` is running under Argo CD, a failure here is indistinguishable from a
+failure there.
