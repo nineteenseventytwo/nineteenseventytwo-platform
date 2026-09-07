@@ -237,6 +237,75 @@ Argo CD bootstraps itself via `make bootstrap-argocd` rather than through a
 GitOps Application, so this change needs that command re-run by hand to reach
 the cluster — same as any other `argocd/values.yaml` change.
 
+### Nudging a sync by hand: three things that do not work the way they look
+
+Carried out of builds 0002 and 0003, where between them these cost several
+hours across three separate incidents. All three concern the manual nudge
+pattern this repo's own Makefile uses (`argocd-sync` / `argocd-sync-wait`),
+and none of them is documented in Argo CD's own pages in a form that would
+have prevented any of it.
+
+**1. `prune: true` is not inherited by a manual sync.** An Application whose
+`syncPolicy.automated.prune` is true still will not prune when the sync is
+triggered by patching `.operation`. The manual operation applies everything in
+the desired manifest and silently skips removing what is no longer in it:
+
+```
+status: 'PruneSkipped', message: 'ignored (requires pruning)'
+```
+
+In build 0002 this held a stale `frr-k8s` DaemonSet in place, saturating the
+metallb quota for several minutes after the fix that removed it had already
+synced. **Always set `"prune":true` on the operation object itself**, not just
+`revision`.
+
+**2. A patch with identical content is a no-op.** `kubectl patch application
+... --type merge` with the same content already on `.operation` produces no
+diff, so Kubernetes queues nothing. `phase` and `message` keep showing the
+previous operation's result, which reads exactly like a sync that ran and did
+nothing. To force a genuinely new operation, clear `.operation` to `null`
+first, then set it:
+
+```bash
+kubectl -n argocd patch application <app> --type merge -p '{"operation":null}'
+kubectl -n argocd patch application <app> --type merge \
+  -p '{"operation":{"sync":{"revision":"main","prune":true}}}'
+```
+
+When only a re-*comparison* is needed and the resources already match, the
+`argocd.argoproj.io/refresh=hard` annotation is the right tool instead — that
+is what actually cleared `platform-manifests`' stale `OutOfSync` in build 0002.
+
+**3. Neither of the above fixes a stale discovery cache — only a controller
+restart does.** In build 0003 `pod-identity-webhook` sat `OutOfSync/Missing`
+for over ten minutes on:
+
+```
+failed to discover server resources for group version cert-manager.io/v1
+```
+
+`cert-manager.io/v1` was live and `kubectl`-queryable the entire time, and the
+retry-attempt timestamp stayed frozen. Both a hard refresh and an `.operation`
+reset had no effect, because they touch comparison and sync state — not the
+application-controller's own internal REST-mapper discovery cache, which does
+not retry a failed CRD-group lookup on its own schedule. The fix:
+
+```bash
+kubectl -n argocd rollout restart statefulset/argocd-application-controller
+```
+
+The next scheduled retry then succeeded with nothing else forced.
+
+**How to tell them apart.** The symptom is the discriminator, and reaching for
+the wrong tool wastes the time all three of these already cost:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Synced, but a deleted resource is still there | prune not inherited | `"prune":true` on the operation |
+| Patch applied, `phase`/`message` unchanged | identical-content no-op | clear `.operation` to `null` first |
+| `OutOfSync`, resources actually match | stale comparison | `refresh=hard` annotation |
+| `failed to discover server resources for group version ...` | stale discovery cache | restart the application-controller |
+
 ## Monitoring
 
 ### Alertmanager holds a token that grants nothing
