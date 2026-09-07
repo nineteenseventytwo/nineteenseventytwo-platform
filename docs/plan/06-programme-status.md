@@ -308,9 +308,32 @@ for a year, and there is no CRL in play — rotating it means rotating the
 cluster CA. So it is the one static credential in the estate that cannot be
 withdrawn, in a lab that has otherwise retired its static SSH keys entirely.
 
+**Confirmed against the apiserver audit log, 2026-09-07.** `deploy-cluster.yml`
+was dispatched with `rebuild=false` (run `34090268719`, the no-op nudge path)
+and the audit log on `1972-master-1` shows exactly one non-`system:` identity
+in the run window:
+
+```
+06:19:00.169  kubernetes-admin  get    -                       (discovery)
+06:19:00.173  kubernetes-admin  get    -                       (discovery)
+06:19:00.196  kubernetes-admin  get    applications/platform
+06:19:00.203  kubernetes-admin  patch  applications/platform
+06:19:00.310  kubernetes-admin  get    applications/platform
+```
+
+Two things fall out of that, and the second is the useful one:
+
+1. **The org secret holds cluster-admin.** Not inferred — observed.
+2. **The scoped Role is exactly sufficient.** Those five calls are two
+   discovery `get`s plus `get`/`patch`/`get` on one `Application` in `argocd`.
+   `policy/40-ci-argocd-sync.yaml` grants `get`/`list`/`patch` on
+   `applications.argoproj.io` in that namespace — so the swap is a drop-in
+   with nothing to widen. The audit log proves the problem and sizes the fix
+   in the same query.
+
 **Action: run the swap** (`04-secrets.md#replacing-the-kubeconfig-secret`),
-then confirm via the apiserver audit log that `deploy-cluster.yml`
-authenticates as `system:serviceaccount:argocd:ci-argocd-sync`.
+then re-dispatch and confirm the same five calls appear as
+`system:serviceaccount:argocd:ci-argocd-sync`.
 
 **Fixed in the runbook 2026-09-07:** step 3.3 now states plainly that it is
 staging a temporary cluster-admin credential and why it has to be; new step

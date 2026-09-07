@@ -181,7 +181,12 @@ against build 0003's carried list, which had gone stale in two places.
       `build/kubeconfig` stages admin, which is exactly the trap new step 4.7
       exists to close. **Worse than a token:** a kubeadm client certificate
       cannot be revoked by deleting a Secret. It is valid for a year and there
-      is no CRL — rotating it means rotating the cluster CA. Run the swap.
+      is no CRL — rotating it means rotating the cluster CA.
+      **Confirmed against the audit log 2026-09-07** (run `34090268719`): the
+      only non-`system:` identity in the window is `kubernetes-admin`, doing
+      `get`/`patch`/`get` on `applications/platform` plus two discovery calls
+      — which is exactly what `ci-argocd-sync`'s Role already grants, so the
+      swap is a drop-in with nothing to widen. Run it.
 - [x] **A LimitRange coverage check** — done 2026-09-07,
       `tests/verify-limitrange.sh` + `make verify-limitrange`, modelled on
       `verify-default-deny.sh` including its unreachable-cluster guard.
