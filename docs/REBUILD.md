@@ -288,8 +288,17 @@ Run from the workstation.
 make kubeconfig                # writes ./build/kubeconfig
 ```
 
-Store it as the org secret `KUBECONFIG`. Scope it — do not hand out
-cluster-admin if you can avoid it.
+Store it as the org secret `KUBECONFIG`.
+
+**This is cluster-admin, and at this point in the build it has to be.** The
+scoped identity that should hold this secret — `ci-argocd-sync` — is created by
+`policy/40-ci-argocd-sync.yaml`, which Argo CD does not apply until Phase D.
+There is nothing to scope to yet.
+
+So this is a *temporary* credential, and **step 4.7 is what replaces it**. If
+you stop after Phase C, a cluster-admin kubeconfig is sitting in an org-wide
+Actions secret. Build 0003 shipped exactly that, because this runbook stored it
+here and never came back for it.
 
 ### 3.4 Publish the OIDC discovery documents
 
@@ -423,6 +432,30 @@ layer.
 
 ---
 
+### 4.7 Replace the cluster-admin kubeconfig — **closes 3.3**
+
+`policy/40-ci-argocd-sync.yaml` has synced by now, so the scoped identity
+exists. Swap it in:
+
+```bash
+kubectl get serviceaccount ci-argocd-sync -n argocd
+kubectl get secret ci-argocd-sync-token -n argocd \
+  -o jsonpath='{.data.token}' | base64 -d | wc -c     # non-zero is enough
+```
+
+Then build and store the scoped kubeconfig — full procedure, with the heredoc,
+in [04-secrets.md](04-secrets.md#replacing-the-kubeconfig-secret).
+
+**Gate:** `deploy-cluster.yml` still completes its Argo CD nudge-and-wait on the
+new credential, and the apiserver audit log shows it authenticating as
+`system:serviceaccount:argocd:ci-argocd-sync` rather than `kubernetes-admin`.
+
+Added 2026-09-07. Before that this step did not exist anywhere in the runbook —
+the RBAC (`policy/40-ci-argocd-sync.yaml`) and the swap procedure
+(`04-secrets.md`) were both written and correct, and nothing sequenced them, so
+every build re-introduced the admin credential and relied on someone
+remembering an unticked box in a different document.
+
 ## Phase E — Identity
 
 Reference: [04-secrets.md § 4](04-secrets.md#4-tier-3--ssh-certificates),
@@ -502,6 +535,7 @@ cluster node is refused.
 - [ ] `make verify-default-deny` — 0
 - [ ] `make verify-irsa` — assumed-role identity
 - [ ] `kubectl -n argocd get applications` — all `Synced/Healthy`
+- [ ] `KUBECONFIG` holds the `ci-argocd-sync` credential, not cluster-admin (4.7)
 
 ### Definition of done
 

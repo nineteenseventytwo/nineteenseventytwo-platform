@@ -298,6 +298,10 @@ test-nodes: ## Assert every node matches the hardened baseline
 verify-default-deny: ## Assert every namespace has default-deny-all or is on the documented exemption list
 	tests/verify-default-deny.sh
 
+.PHONY: verify-limitrange
+verify-limitrange: ## Assert every namespace has a LimitRange or is on the documented exemption list (ADR-0016)
+	tests/verify-limitrange.sh
+
 # --------------------------------------------------------------------------
 # Phase B — nodes and CI/CD
 # --------------------------------------------------------------------------
