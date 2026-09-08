@@ -1,0 +1,29 @@
+---
+# The allow-pair default-deny-all (policy/tenants/eightbitsaxlounge.yaml)
+# requires. Only `data` (the Go CRUD API — the next service in the
+# migration order after db) ever talks to CouchDB; nothing else in this
+# namespace, or any other, needs to reach port 5984. Written ahead of
+# data's own migration — an ingress rule naming a label selector that
+# matches no pod yet is inert, not invalid, and this is exactly the shape
+# data's Deployment will carry when it lands.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-to-db
+  namespace: eightbitsaxlounge-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eightbitsaxlounge
+              component: data
+      ports:
+        - protocol: TCP
+          port: 5984

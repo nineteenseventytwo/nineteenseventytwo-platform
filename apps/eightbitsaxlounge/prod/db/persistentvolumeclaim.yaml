@@ -1,0 +1,19 @@
+---
+# 2Gi for prod, not the 1Gi dev gets — same reasoning, more headroom since
+# prod is the one that matters if it fills. Still nowhere near the original
+# 10Gi; raise with a reason if actual usage ever approaches it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: couchdb-data
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi

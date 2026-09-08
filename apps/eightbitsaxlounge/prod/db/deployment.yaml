@@ -1,0 +1,142 @@
+---
+# CouchDB, single node — the source of truth for device config, presets and
+# application state. Migrated from eightbitsaxlounge/db (ADR-0012); the app
+# repo builds and pushes ghcr.io/nineteenseventytwo/eightbitsaxlounge-db,
+# this repo owns everything about how it runs.
+#
+# Non-root by design, not by accident — the base image's own entrypoint
+# drops privileges via setpriv only when it detects id -u = 0; started
+# non-root (this image sets USER couchdb) it skips that step and execs
+# directly. Verified end to end in the app repo before this landed:
+# single-node setup, _users/_replicator/_global_changes created, /_up
+# answers ok.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eightbitsaxlounge-db
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: db
+  annotations:
+    # ADR-0016: CPU/memory requests and limits come from the namespace
+    # LimitRange, not from manifests — a component sets its own only
+    # when it has a specific reason to differ, which db does not.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    # Same precedent as policy/30-prowler.yaml's own accepted CKV_K8S_40:
+    # the base image bakes in uid 5984 (couchdb) and the entrypoint's
+    # privilege-drop logic is written around that specific uid — not a
+    # choice this manifest makes or could raise unilaterally.
+    checkov.io/skip5: "CKV_K8S_40=image hardcodes uid 5984 (couchdb), confirmed empirically the entrypoint's setpriv logic targets that exact uid"
+    # The official couchdb image only reads COUCHDB_PASSWORD from the
+    # environment — there is no file-based alternative the upstream
+    # entrypoint supports.
+    checkov.io/skip6: "CKV_K8S_35=upstream couchdb image only reads COUCHDB_PASSWORD from the environment, no file-based alternative exists"
+    # Confirmed live 2026-09-08: the entrypoint writes runtime config to
+    # /opt/couchdb/etc/local.d/docker.ini, baked into the image rather
+    # than a volume. `docker run --read-only` fails outright —
+    # "Read-only file system" on that exact path. Would need an
+    # initContainer to seed an emptyDir at /opt/couchdb/etc before this
+    # is safe; out of scope for this migration step.
+    checkov.io/skip7: "CKV_K8S_22=entrypoint writes docker.ini into the image layer; confirmed to fail under a read-only root fs"
+    # Tags in this repo are immutable once published — release-template.yaml's
+    # own "check if image exists in registry, skip build" logic depends
+    # on that invariant. Always re-pulling an immutable tag is pure
+    # overhead, not a safety property; the pin below is by digest
+    # anyway, which makes the policy moot regardless.
+    checkov.io/skip8: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: db
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: db
+        version: "2.0.4"
+    spec:
+      # CKV_K8S_38: a database doesn't call the API server. Contrast
+      # cluster/pod-identity-webhook/20-deployment.yaml, which keeps its
+      # token because it genuinely is a controller that watches
+      # ServiceAccounts — db has no such need.
+      automountServiceAccountToken: false
+      # fsGroup, not just the image's own non-root user. A fresh PVC from
+      # the CSI driver arrives root-owned with no relationship to any image
+      # layer — confirmed live against a real bind-mount reproducing the
+      # same shape: uid 5984 against a root-owned data dir gets a hard
+      # crash (mem3_nodes, {error,eacces}), not a slow start. fsGroup 5984
+      # matches the `couchdb` user's gid baked into the image, and is what
+      # actually makes the volume writable at mount time.
+      securityContext:
+        fsGroup: 5984
+        runAsNonRoot: true
+      containers:
+        - name: couchdb
+          # 2.0.4, pinned by digest (CKV_K8S_43) rather than tag — belt and
+          # braces given the tag is already immutable in this repo's
+          # release model (skip8 above).
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:93d5cc97589b9f9185cbc1b98c8b84afb2b27528c51c8f0c90710ff870b3d28b
+          imagePullPolicy: IfNotPresent
+          # PSS `restricted` (prod enforces it; dev only warns, but the
+          # image already runs non-root so there is no reason for the two
+          # environments to differ here). runAsNonRoot above just asserts
+          # what USER couchdb in the image already does; the four lines
+          # below are what dev's own dry-run flagged as missing.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 5984
+              name: http
+          startupProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 2
+            failureThreshold: 60
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          env:
+            - name: COUCHDB_USER
+              value: admin
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret-db-couchdb
+                  key: password
+            - name: NODENAME
+              value: "127.0.0.1"
+          # No explicit resources: — the namespace LimitRange
+          # (policy/20-limitrange-default.yaml) supplies the default per
+          # ADR-0016; this component has no reason yet to differ from it.
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
+      volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb-data
