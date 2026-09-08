@@ -18,6 +18,36 @@ metadata:
   labels:
     app: eightbitsaxlounge
     component: db
+  annotations:
+    # ADR-0016: CPU/memory requests and limits come from the namespace
+    # LimitRange, not from manifests — a component sets its own only
+    # when it has a specific reason to differ, which db does not.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    # Same precedent as policy/30-prowler.yaml's own accepted CKV_K8S_40:
+    # the base image bakes in uid 5984 (couchdb) and the entrypoint's
+    # privilege-drop logic is written around that specific uid — not a
+    # choice this manifest makes or could raise unilaterally.
+    checkov.io/skip5: "CKV_K8S_40=image hardcodes uid 5984 (couchdb), confirmed empirically the entrypoint's setpriv logic targets that exact uid"
+    # The official couchdb image only reads COUCHDB_PASSWORD from the
+    # environment — there is no file-based alternative the upstream
+    # entrypoint supports.
+    checkov.io/skip6: "CKV_K8S_35=upstream couchdb image only reads COUCHDB_PASSWORD from the environment, no file-based alternative exists"
+    # Confirmed live 2026-09-08: the entrypoint writes runtime config to
+    # /opt/couchdb/etc/local.d/docker.ini, baked into the image rather
+    # than a volume. `docker run --read-only` fails outright —
+    # "Read-only file system" on that exact path. Would need an
+    # initContainer to seed an emptyDir at /opt/couchdb/etc before this
+    # is safe; out of scope for this migration step.
+    checkov.io/skip7: "CKV_K8S_22=entrypoint writes docker.ini into the image layer; confirmed to fail under a read-only root fs"
+    # Tags in this repo are immutable once published — release-template.yaml's
+    # own "check if image exists in registry, skip build" logic depends
+    # on that invariant. Always re-pulling an immutable tag is pure
+    # overhead, not a safety property; the pin below is by digest
+    # anyway, which makes the policy moot regardless.
+    checkov.io/skip8: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
 spec:
   replicas: 1
   strategy:
@@ -32,36 +62,6 @@ spec:
         app: eightbitsaxlounge
         component: db
         version: "2.0.4"
-      annotations:
-        # ADR-0016: CPU/memory requests and limits come from the namespace
-        # LimitRange, not from manifests — a component sets its own only
-        # when it has a specific reason to differ, which db does not.
-        checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
-        checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
-        checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
-        checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
-        # Same precedent as policy/30-prowler.yaml's own accepted CKV_K8S_40:
-        # the base image bakes in uid 5984 (couchdb) and the entrypoint's
-        # privilege-drop logic is written around that specific uid — not a
-        # choice this manifest makes or could raise unilaterally.
-        checkov.io/skip5: "CKV_K8S_40=image hardcodes uid 5984 (couchdb), confirmed empirically the entrypoint's setpriv logic targets that exact uid"
-        # The official couchdb image only reads COUCHDB_PASSWORD from the
-        # environment — there is no file-based alternative the upstream
-        # entrypoint supports.
-        checkov.io/skip6: "CKV_K8S_35=upstream couchdb image only reads COUCHDB_PASSWORD from the environment, no file-based alternative exists"
-        # Confirmed live 2026-09-08: the entrypoint writes runtime config to
-        # /opt/couchdb/etc/local.d/docker.ini, baked into the image rather
-        # than a volume. `docker run --read-only` fails outright —
-        # "Read-only file system" on that exact path. Would need an
-        # initContainer to seed an emptyDir at /opt/couchdb/etc before this
-        # is safe; out of scope for this migration step.
-        checkov.io/skip7: "CKV_K8S_22=entrypoint writes docker.ini into the image layer; confirmed to fail under a read-only root fs"
-        # Tags in this repo are immutable once published — release-template.yaml's
-        # own "check if image exists in registry, skip build" logic depends
-        # on that invariant. Always re-pulling an immutable tag is pure
-        # overhead, not a safety property; the pin below is by digest
-        # anyway, which makes the policy moot regardless.
-        checkov.io/skip8: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
     spec:
       # CKV_K8S_38: a database doesn't call the API server. Contrast
       # cluster/pod-identity-webhook/20-deployment.yaml, which keeps its
