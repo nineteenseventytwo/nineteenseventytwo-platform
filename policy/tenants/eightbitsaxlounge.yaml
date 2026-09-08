@@ -32,6 +32,14 @@ metadata:
 # Three nodes with 2 GB each is ~6 GB total, of which the platform itself uses
 # roughly half. These numbers are deliberately tight; raise them in a PR with
 # the reason, not by editing the cluster.
+#
+# limits.memory raised 1536Mi -> 2Gi migrating the first eightbitsaxlounge
+# service (db). Summing all six services' declared/default requests and
+# limits against the pre-migration quota left ~8% headroom on
+# limits.memory alone (migration plan F5) — the first service to need a
+# byte more would have failed admission and looked like a broken manifest
+# rather than an exhausted quota. Raised once, ahead of the six landing one
+# at a time, rather than in six separate PRs each nudging it further.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -41,7 +49,7 @@ spec:
   hard:
     requests.cpu: "1"
     requests.memory: 768Mi
-    limits.memory: 1536Mi
+    limits.memory: 2Gi
     persistentvolumeclaims: "4"
     requests.storage: 8Gi
     count/deployments.apps: "10"

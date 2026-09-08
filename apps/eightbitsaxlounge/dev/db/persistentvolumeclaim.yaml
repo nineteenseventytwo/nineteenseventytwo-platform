@@ -1,0 +1,22 @@
+---
+# Sized to what a Twitch-overlay device-config/preset store actually holds,
+# not the 10Gi carried over from the pre-migration manifest — that figure
+# alone would have exceeded the entire dev tenant's 8Gi storage quota
+# before state's or chat's own PVCs were even counted. 1Gi leaves ample
+# headroom for this workload; raise it in a PR with the reason if it's ever
+# actually approached.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: couchdb-data
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,104 @@
+---
+# CouchDB, single node — the source of truth for device config, presets and
+# application state. Migrated from eightbitsaxlounge/db (ADR-0012); the app
+# repo builds and pushes ghcr.io/nineteenseventytwo/eightbitsaxlounge-db,
+# this repo owns everything about how it runs.
+#
+# Non-root by design, not by accident — the base image's own entrypoint
+# drops privileges via setpriv only when it detects id -u = 0; started
+# non-root (this image sets USER couchdb) it skips that step and execs
+# directly. Verified end to end in the app repo before this landed:
+# single-node setup, _users/_replicator/_global_changes created, /_up
+# answers ok.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eightbitsaxlounge-db
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: db
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: db
+        version: "2.0.4"
+    spec:
+      # fsGroup, not just the image's own non-root user. A fresh PVC from
+      # the CSI driver arrives root-owned with no relationship to any image
+      # layer — confirmed live against a real bind-mount reproducing the
+      # same shape: uid 5984 against a root-owned data dir gets a hard
+      # crash (mem3_nodes, {error,eacces}), not a slow start. fsGroup 5984
+      # matches the `couchdb` user's gid baked into the image, and is what
+      # actually makes the volume writable at mount time.
+      securityContext:
+        fsGroup: 5984
+        runAsNonRoot: true
+      containers:
+        - name: couchdb
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db:2.0.4
+          imagePullPolicy: IfNotPresent
+          # PSS `restricted` (prod enforces it; dev only warns, but the
+          # image already runs non-root so there is no reason for the two
+          # environments to differ here). runAsNonRoot above just asserts
+          # what USER couchdb in the image already does; the four lines
+          # below are what dev's own dry-run flagged as missing.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 5984
+              name: http
+          startupProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 2
+            failureThreshold: 60
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          env:
+            - name: COUCHDB_USER
+              value: admin
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret-db-couchdb
+                  key: password
+            - name: NODENAME
+              value: "127.0.0.1"
+          # No explicit resources: — the namespace LimitRange
+          # (policy/20-limitrange-default.yaml) supplies the default per
+          # ADR-0016; this component has no reason yet to differ from it.
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
+      volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb-data
