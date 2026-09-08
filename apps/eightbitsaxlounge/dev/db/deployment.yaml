@@ -55,7 +55,7 @@ spec:
         # "Read-only file system" on that exact path. Would need an
         # initContainer to seed an emptyDir at /opt/couchdb/etc before this
         # is safe; out of scope for this migration step.
-        checkov.io/skip7: "CKV_K8S_22=entrypoint writes runtime config to /opt/couchdb/etc/local.d/docker.ini in the image layer, confirmed to fail outright under a read-only root filesystem"
+        checkov.io/skip7: "CKV_K8S_22=entrypoint writes docker.ini into the image layer; confirmed to fail under a read-only root fs"
         # Tags in this repo are immutable once published — release-template.yaml's
         # own "check if image exists in registry, skip build" logic depends
         # on that invariant. Always re-pulling an immutable tag is pure
