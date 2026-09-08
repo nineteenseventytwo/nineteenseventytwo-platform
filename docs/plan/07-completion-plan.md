@@ -171,42 +171,16 @@ against build 0003's carried list, which had gone stale in two places.
       them, so `REBUILD.md` stored cluster-admin at step 3.3 and never came
       back. New step **4.7** does the swap, 3.3 says plainly that it is
       temporary, and Phase F's evidence list covers it.
-- [ ] **Re-run the kubeconfig swap — the org secret holds cluster-admin.**
-      Settled 2026-09-07: `build/kubeconfig` is `kubernetes-admin` with
-      `client-certificate-data`, which is what `make kubeconfig` fetches (its
-      own help text says "the **admin** kubeconfig"). The swap in
-      `04-secrets.md#replacing-the-kubeconfig-secret` builds a *different*
-      file from the `ci-argocd-sync-token` Secret and writes it to
-      `/tmp/`, never to `build/kubeconfig` — so setting the org secret from
-      `build/kubeconfig` stages admin, which is exactly the trap new step 4.7
-      exists to close. **Worse than a token:** a kubeadm client certificate
-      cannot be revoked by deleting a Secret. It is valid for a year and there
-      is no CRL — rotating it means rotating the cluster CA.
-      **Confirmed against the audit log 2026-09-07** (run `34090268719`): the
-      only non-`system:` identity in the window is `kubernetes-admin`, doing
-      `get`/`patch`/`get` on `applications/platform` plus two discovery calls
-      — which is exactly what `ci-argocd-sync`'s Role already grants, so the
-      swap is a drop-in with nothing to widen. Run it.
-- [x] **A LimitRange coverage check** — done 2026-09-07,
-      `tests/verify-limitrange.sh` + `make verify-limitrange`, modelled on
-      `verify-default-deny.sh` including its unreachable-cluster guard.
-- [x] **The `gateway` namespace is not a gap — the check was.** Settled live
-      2026-09-07. `gateway` holds the `Gateway` object and its LoadBalancer
-      `Service` and **nothing else**: Cilium serves the Gateway's data plane
-      from the `cilium-envoy` DaemonSet in `kube-system`, one per node, so no
-      pod ever runs in that namespace. A LimitRange there would default
-      resources for containers that cannot exist, and a compute ResourceQuota
-      would be equally inert. Both are correctly absent.
-
-      Rather than skip it by name, the check now carries **two kinds of
-      exemption and verifies the second**: `kube-system` is exempt by decision
-      (it runs pods, and is deliberately excluded per
-      `policy/21-resource-quotas.yaml`), while `gateway`, `cilium-secrets`,
-      `kube-node-lease` and `kube-public` are exempt *because* no pod runs
-      there — a claim about the cluster, so the script asserts it and fails if
-      a pod ever appears. If Cilium is reconfigured to provision a per-Gateway
-      Deployment, this catches it instead of hiding it. Both branches
-      negative-tested; live run exits 0.
+- [x] **The kubeconfig swap is done and verified.** 2026-09-07: the org secret
+      now carries the `ci-argocd-sync` credential. Audit log across two runs —
+      `kubernetes-admin` 5 calls → 0, `ci-argocd-sync` 0 → 10, no non-`system:`
+      identity left in the window. Nothing needed widening.
+- [ ] **Note the un-revoked admin certificate in build 0004's log.** The swap
+      removed the credential from GitHub but cannot invalidate it — a kubeadm
+      client cert has no CRL and a year of validity. Exposure was narrow
+      (2026-09-04 to 2026-09-07, one consumer, lab-network runner), so it is
+      accepted rather than rotated. A from-scratch build regenerates the cluster
+      CA and closes it; record that as a deliberate closure, not a side effect.
 
 **Gate:** `make verify-default-deny` and `make verify-limitrange` both exit 0;
 the cloud repo's README has no stale SCP TODO; `cluster/README.md` documents

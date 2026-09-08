@@ -331,9 +331,29 @@ Two things fall out of that, and the second is the useful one:
    with nothing to widen. The audit log proves the problem and sizes the fix
    in the same query.
 
-**Action: run the swap** (`04-secrets.md#replacing-the-kubeconfig-secret`),
-then re-dispatch and confirm the same five calls appear as
-`system:serviceaccount:argocd:ci-argocd-sync`.
+**Swapped and verified, 2026-09-07.** Re-dispatched (run `34091464019`) and
+read the same window again:
+
+| | previous run 06:19 | after the swap 06:34 |
+|---|---|---|
+| `kubernetes-admin` calls | **5** | **0** |
+| `ci-argocd-sync` calls | 0 | **10** |
+| non-`system:` identities | `kubernetes-admin` | **none** |
+
+Same five operations, now under the scoped ServiceAccount, and nothing needed
+widening — as the first query predicted. `deploy-cluster.yml` no longer holds a
+cluster-admin credential.
+
+**One residual, recorded rather than actioned.** The swap removes the admin
+credential from the org secret; it does not *invalidate* it. A kubeadm client
+certificate cannot be revoked, and that one was in an org-wide Actions secret
+between 2026-09-04 and 2026-09-07. Exposure is narrow — `deploy-cluster.yml`
+was its only consumer, and it runs on the lab-network self-hosted runner — so
+the proportionate response is to accept it knowingly rather than rotate the
+cluster CA now. **Build 0004 closes it for free:** a from-scratch build
+re-images the nodes and `kubeadm init` generates a new CA, which invalidates the
+old certificate. Worth a line in that build's log so it is closed deliberately
+rather than by accident.
 
 **Fixed in the runbook 2026-09-07:** step 3.3 now states plainly that it is
 staging a temporary cluster-admin credential and why it has to be; new step
