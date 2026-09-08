@@ -21,6 +21,21 @@ apps/
       *.yaml
 ```
 
+**Flat, no per-component subdirectory** — this is load-bearing, not a style
+preference. The `100-apps` ApplicationSet's Application source has no
+`directory.recurse: true`, so it only sees files directly inside `dev/`/
+`prod/`; anything one level deeper is invisible to it and silently never
+deploys, while the Application itself still reports `Synced/Healthy` — an
+empty comparison is a trivially true one. Confirmed live 2026-09-08: a first
+attempt nested `apps/eightbitsaxlounge/dev/db/*.yaml` and every resource in it
+went undetected for several minutes before anyone noticed, precisely because
+nothing about the Application's status said anything was wrong.
+
+For a tenant with more than one component (eightbitsaxlounge will end up with
+six), prefix each file with the component name instead of nesting a
+directory: `db-deployment.yaml`, `db-service.yaml`, `chat-deployment.yaml`,
+and so on, all siblings directly under `dev/`/`prod/`.
+
 `<name>` and the `dev`/`prod` subdirectory together name the namespace the
 manifests deploy into: `apps/eightbitsaxlounge/dev/` → namespace
 `eightbitsaxlounge-dev`. That namespace, its ResourceQuota, LimitRange and
