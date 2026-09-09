@@ -1,0 +1,169 @@
+---
+# NATS JetStream, single node — the event broker for OVERLAY_UPDATES,
+# CHAT_CONTROLS, MIDI_STATE, DATA_API. Migrated from eightbitsaxlounge/state
+# (ADR-0012). StatefulSet, not Deployment: JetStream's file storage
+# (store_dir, nats.conf.template) needs a stable identity and a PVC that
+# survives a restart, which volumeClaimTemplates gives per-pod and a bare
+# Deployment's PVC does not — this is the one component in the migration
+# that genuinely needs it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: eightbitsaxlounge-state
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: state
+  annotations:
+    # ADR-0016 does not apply here the way it does for db — this component
+    # sets its own explicit requests/limits because it has a concrete
+    # reason to: JetStream's own store_dir limits (nats.conf.template:
+    # max_mem_store 64MB, max_file_store 200MB) exceed the namespace
+    # LimitRange default (192Mi dev / 256Mi prod), so the default would
+    # undersize it. Carried over unchanged from the pre-migration manifest,
+    # which already set these deliberately.
+    checkov.io/skip1: "CKV_K8S_10=explicit requests set below — JetStream's own store limits exceed the namespace LimitRange default"
+    checkov.io/skip2: "CKV_K8S_11=explicit limits set below — JetStream's own store limits exceed the namespace LimitRange default"
+    checkov.io/skip3: "CKV_K8S_12=explicit requests set below — JetStream's own store limits exceed the namespace LimitRange default"
+    checkov.io/skip4: "CKV_K8S_13=explicit limits set below — JetStream's own store limits exceed the namespace LimitRange default"
+    # Same class of finding as db's CKV_K8S_40: the base image ships no
+    # dedicated user, so one was created at build time (Dockerfile) at
+    # uid/gid 1000 — not a choice this manifest makes or could raise
+    # unilaterally without rebuilding the image.
+    checkov.io/skip5: "CKV_K8S_40=image creates a dedicated nats-run user at uid 1000 at build time; not adjustable here"
+    # entrypoint.sh substitutes five passwords into nats.conf.template and
+    # writes the result to /etc/nats/nats.conf inside the image layer at
+    # every start — same shape, same reason, as db's docker.ini finding.
+    checkov.io/skip6: "CKV_K8S_22=entrypoint writes nats.conf into the image layer at every start; confirmed to fail under a read-only root fs"
+    # Tags are immutable once published in this repo's release model —
+    # pinned by digest below regardless, so this is moot either way.
+    checkov.io/skip7: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
+    # entrypoint.sh substitutes all five passwords into nats.conf via sed
+    # from the environment — there is no file-based alternative this
+    # image supports, same as db's identical finding.
+    checkov.io/skip8: "CKV_K8S_35=entrypoint substitutes passwords into nats.conf from the environment; no file-based alternative exists"
+spec:
+  serviceName: eightbitsaxlounge-state-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: state
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: state
+        version: "0.0.23"
+    spec:
+      # CKV_K8S_38: NATS doesn't call the API server — it's a message
+      # broker, not a controller.
+      automountServiceAccountToken: false
+      # fsGroup 1000, matching nats-run's gid — same PVC-ownership finding
+      # as db's fsGroup: 5984. A fresh PV from the CSI driver arrives
+      # root-owned regardless of the image's own user; without this,
+      # JetStream fails outright at startup ("could not create storage
+      # directory - mkdir /data/jetstream: permission denied"), confirmed
+      # live against a real bind-mount reproducing the exact shape before
+      # this was written.
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        # Required alongside runAsNonRoot for the same reason as db: the
+        # image's own USER directive is the name `nats-run`, not a numeric
+        # uid, and the kubelet cannot verify non-root-ness from a name
+        # without running the image — it refuses to start the container
+        # rather than assume. Learned live on db; applied here up front.
+        runAsUser: 1000
+      containers:
+        - name: nats
+          # 0.0.23, pinned by digest — the first two releases (0.0.21,
+          # 0.0.22) failed in CI before publishing: 0.0.21 for a genuine
+          # Dockerfile bug (non-root couldn't write /data with no volume
+          # mounted), 0.0.22 for a pre-existing smoke-test gap unrelated
+          # to this migration (the runner's own network topology). See
+          # eightbitsaxlounge#69, #70, #71.
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:5534417469f442015b895e218fb75558223e881dc562b8e3c2d0ff621b2011d8
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "/etc/nats/nats.conf"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: client
+              containerPort: 4222
+            - name: monitor
+              containerPort: 8222
+            - name: cluster
+              containerPort: 6222
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - "sleep 2 && /usr/local/bin/jetstream-bootstrap.sh 2>&1 || true"
+          env:
+            - name: NATS_URL
+              value: "nats://127.0.0.1:4222"
+            - name: SYSTEM_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: system_pass
+            - name: OVERLAY_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: overlay_pass
+            - name: CHAT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: chat_pass
+            - name: MIDI_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: midi_pass
+            - name: DATA_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: data_pass
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 4222
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 4222
+            initialDelaySeconds: 35
+            periodSeconds: 5
+            failureThreshold: 2
+            timeoutSeconds: 3
+      terminationGracePeriodSeconds: 120
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: longhorn
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

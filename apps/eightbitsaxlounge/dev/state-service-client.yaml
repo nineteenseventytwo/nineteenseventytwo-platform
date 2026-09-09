@@ -1,0 +1,24 @@
+---
+# ClusterIP for in-namespace clients — chat, overlay, midi, data — plus the
+# monitor port for anything that scrapes NATS directly. `nats` is the DNS
+# name in-namespace clients use to reach it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: eightbitsaxlounge-state-client
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: state
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+    - name: monitor
+      port: 8222
+      targetPort: 8222
+  selector:
+    app: eightbitsaxlounge
+    component: state
