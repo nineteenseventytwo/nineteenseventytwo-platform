@@ -36,7 +36,7 @@ spec:
       labels:
         app: eightbitsaxlounge
         component: data
-        version: "2.0.1"
+        version: "2.0.2"
     spec:
       # CKV_K8S_38: a stateless CRUD API doesn't call the API server.
       automountServiceAccountToken: false
@@ -49,7 +49,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: data
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:a8eb4f94669db3b8b5047c8475a06e80fb94a902cef725c6e351cdb427e66dc1
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:b1f35ef3396bedd407866874842828a4f5cafab6981dca7c8056a79db0c6bc54
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
