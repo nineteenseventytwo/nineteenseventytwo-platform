@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eightbitsaxlounge-data-service
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: data
+spec:
+  selector:
+    app: eightbitsaxlounge
+    component: data
+  ports:
+    - port: 80
+      targetPort: 8080
