@@ -302,6 +302,20 @@ verify-default-deny: ## Assert every namespace has default-deny-all or is on the
 verify-limitrange: ## Assert every namespace has a LimitRange or is on the documented exemption list (ADR-0016)
 	tests/verify-limitrange.sh
 
+# Plain kubectl on the host, not $(KUBECTL) — port-forward binds a socket
+# your browser needs to reach directly. Routed through the containerized
+# wrapper, the bound port lives inside that container's network namespace
+# instead, unreachable from localhost. Every other target here is a
+# one-shot admin command; this one is a long-lived tunnel to your own
+# machine, which is a different enough job to earn the exception.
+.PHONY: port-forward
+port-forward: ## Forward a Service to localhost for interactive testing. Usage: make port-forward NS=eightbitsaxlounge-dev SVC=eightbitsaxlounge-db-service PORT=5984 [LOCAL_PORT=5984]
+	@test -n "$(NS)"   || { echo "NS is required, e.g. NS=eightbitsaxlounge-dev"; exit 1; }
+	@test -n "$(SVC)"  || { echo "SVC is required, e.g. SVC=eightbitsaxlounge-db-service"; exit 1; }
+	@test -n "$(PORT)" || { echo "PORT is required, e.g. PORT=5984"; exit 1; }
+	KUBECONFIG=$(BUILD_DIR)/kubeconfig kubectl -n $(NS) port-forward \
+	  svc/$(SVC) $(if $(LOCAL_PORT),$(LOCAL_PORT),$(PORT)):$(PORT)
+
 # --------------------------------------------------------------------------
 # Phase B — nodes and CI/CD
 # --------------------------------------------------------------------------
