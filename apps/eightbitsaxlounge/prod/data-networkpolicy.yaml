@@ -1,0 +1,36 @@
+---
+# midi is the only in-cluster consumer (ConnectionStrings:
+# EightBitSaxLoungeDataLayer) — chat and overlay never call this API.
+# Egress to db is what data itself needs to reach out on; db's own
+# allow-data-to-db already covers the ingress half.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-midi-to-data
+  namespace: eightbitsaxlounge-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: data
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eightbitsaxlounge
+              component: midi
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: eightbitsaxlounge
+              component: db
+      ports:
+        - protocol: TCP
+          port: 5984
