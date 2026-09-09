@@ -78,6 +78,15 @@ spec:
       securityContext:
         fsGroup: 5984
         runAsNonRoot: true
+        # Required alongside runAsNonRoot, confirmed live 2026-09-08: the
+        # image's own USER directive is the name `couchdb`, not a numeric
+        # uid, and the kubelet cannot resolve a name from image metadata
+        # to verify non-root-ness without running the image — it refuses
+        # to start the container at all ("has runAsNonRoot and image has
+        # non-numeric user (couchdb), cannot verify user is non-root")
+        # rather than assume. Same uid confirmed throughout this migration
+        # (fsGroup above, the entrypoint's own setpriv target).
+        runAsUser: 5984
       containers:
         - name: couchdb
           # 2.0.4, pinned by digest (CKV_K8S_43) rather than tag — belt and
