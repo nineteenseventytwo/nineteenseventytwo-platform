@@ -1,0 +1,26 @@
+---
+# Headless — clusterIP: None — gives the StatefulSet's pod a stable DNS
+# identity (state-0.eightbitsaxlounge-state-headless). Not used for
+# clustering today (single replica, migration plan explicitly defers HA —
+# see the commented-out clustering block in nats.conf.template), but
+# StatefulSets expect a serviceName regardless of replica count.
+apiVersion: v1
+kind: Service
+metadata:
+  name: eightbitsaxlounge-state-headless
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: state
+spec:
+  clusterIP: None
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+    - name: monitor
+      port: 8222
+      targetPort: 8222
+  selector:
+    app: eightbitsaxlounge
+    component: state
