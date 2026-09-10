@@ -17,6 +17,13 @@ spec:
   hostnames:
     - "overlay-dev.eightbitsaxlounge.com"
   rules:
-    - backendRefs:
-        - name: eightbitsaxlounge-overlay-service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: eightbitsaxlounge-overlay-service
           port: 80
+          weight: 1
