@@ -51,7 +51,7 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   `grafana.` — so they resolve on VLAN 20 without waiting on public DNS
   propagation.
 
-  **Concretely, three overrides**, each a Host record pointing at the pinned
+  **Concretely, five overrides**, each a Host record pointing at the pinned
   Gateway address (`cluster/gateway/00-gateway.yaml`'s
   `metallb.io/loadBalancerIPs` — ingress-nginx's own equivalent
   `loadBalancerIP` until the [Gateway API cutover](decisions/ADR-0015-cilium-gateway-api.md)):
@@ -61,6 +61,12 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
   | `argocd` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
   | `vault` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
   | `grafana` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
+  | `overlay` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
+  | `overlay-dev` | `eightbitsaxlounge.com` | A | `192.168.20.241` |
+
+  The last two are eightbitsaxlounge/overlay's OBS browser-source URLs
+  (ADR-0012) — added when that component moved into the platform, same
+  Gateway, same IP, no controller of their own.
 
   In the OPNsense web UI:
 
@@ -70,9 +76,9 @@ had to become Cilium — Flannel cannot enforce NetworkPolicy at all.
      (`eightbitsaxlounge.com`), **Type** `A`, **IP address**
      (`192.168.20.241`). Description is free text — `lab ingress` or similar
      is enough to explain it to a future you.
-  4. **Save**, then repeat for `vault` and `grafana` — same domain, same IP,
-     only **Host** changes.
-  5. **Apply** at the top of the Overrides tab once all three are added.
+  4. **Save**, then repeat for `vault`, `grafana`, `overlay`, and
+     `overlay-dev` — same domain, same IP, only **Host** changes.
+  5. **Apply** at the top of the Overrides tab once all five are added.
      Nothing takes effect until this step; the individual **Save** on each
      row only stages it.
   6. Confirm with `tests/network-check.sh 12` from a Pi on VLAN 20, or
