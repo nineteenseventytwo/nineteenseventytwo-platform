@@ -1,0 +1,20 @@
+---
+# Port 8080 (not 80) to match chat's existing hardcoded configuration
+# (chat/k8s/configmap.yaml: midi_device_url=http://eightbitsaxlounge-midi-service:8080).
+apiVersion: v1
+kind: Service
+metadata:
+  name: eightbitsaxlounge-midi-service
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: midi
+spec:
+  selector:
+    app: eightbitsaxlounge
+    component: midi
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
