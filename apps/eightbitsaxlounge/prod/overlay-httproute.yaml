@@ -12,7 +12,9 @@ metadata:
   namespace: eightbitsaxlounge-prod
 spec:
   parentRefs:
-    - name: gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway
       namespace: gateway
   hostnames:
     - "overlay.eightbitsaxlounge.com"
