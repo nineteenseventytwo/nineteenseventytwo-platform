@@ -59,3 +59,27 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+
+    # eightbitsaxlounge/overlay — the OBS browser-source page (ADR-0012).
+    # Two listeners, not one: prod is the live-stream URL, dev is for
+    # testing the overlay without touching what's on-air.
+    - name: overlay-https
+      port: 443
+      protocol: HTTPS
+      hostname: "overlay.eightbitsaxlounge.com" # tracks lab_domain
+      tls:
+        certificateRefs:
+          - name: overlay-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: overlay-dev-https
+      port: 443
+      protocol: HTTPS
+      hostname: "overlay-dev.eightbitsaxlounge.com" # tracks lab_domain
+      tls:
+        certificateRefs:
+          - name: overlay-dev-tls
+      allowedRoutes:
+        namespaces:
+          from: All

@@ -1,0 +1,42 @@
+---
+# overlay has no in-cluster consumers and calls no other in-cluster
+# service's HTTP API — it only subscribes to NATS overlay.* topics, which
+# state's own NetworkPolicy (allow-consumers-to-state) already documents
+# on its ingress side. This egress rule mirrors that from overlay's own
+# side, matching the db/data/midi precedent of documenting both ends even
+# though the tenant baseline's same-namespace podSelector:{} rule already
+# permits it.
+#
+# Ingress is deliberately wide open (from anywhere), not scoped to a
+# podSelector: overlay is the one component in this migration meant to be
+# reached from outside the cluster (the Gateway, for OBS's browser
+# source), and the tenant baseline's same-namespace rule doesn't cover
+# that path — Gateway-proxied traffic isn't same-namespace pod traffic.
+# Not yet confirmed exactly what source identity Cilium's Gateway API
+# implementation presents this traffic as, so this stays broad rather
+# than guessing a specific podSelector/ipBlock that might be wrong and
+# silently break external access. Tighten once verified live post-merge.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-overlay
+  namespace: eightbitsaxlounge-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: overlay
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: eightbitsaxlounge
+              component: state
+      ports:
+        - protocol: TCP
+          port: 4222

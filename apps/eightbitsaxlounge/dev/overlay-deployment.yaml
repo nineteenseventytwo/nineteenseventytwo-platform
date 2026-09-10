@@ -1,0 +1,96 @@
+---
+# Browser-overlay service — subscribes to NATS overlay.* topics (published
+# by midi's SetEffectHandler) and pushes updates to browsers via
+# socket.io. Migrated from eightbitsaxlounge/overlay (ADR-0012). Purely a
+# NATS consumer + static file server: no in-cluster HTTP consumers, no
+# dependency on db/data/midi's HTTP APIs — its only inbound traffic is
+# external, via the Gateway (overlay-httproute.yaml), for OBS's browser
+# source and anyone previewing the stream overlay directly.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eightbitsaxlounge-overlay
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: overlay
+  annotations:
+    # ADR-0016: requests/limits come from the namespace LimitRange, same
+    # reasoning as every other component in this migration.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    # Base image (node:26-slim) bakes in a `node` user at uid 1000 — the
+    # Dockerfile's own comment notes this was confirmed live rather than
+    # assumed (a naive adduser -u 1000 collides with it).
+    checkov.io/skip5: "CKV_K8S_40=base image's built-in node user is uid 1000; not adjustable here"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: overlay
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: overlay
+        version: "4.0.1"
+    spec:
+      # CKV_K8S_38: a NATS subscriber + static file server never calls the
+      # k8s API server.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: overlay
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-overlay@sha256:58512f52c832c0473981ba52a9fc61dd2ae9408ec9123cb9157f01d14deb6b5f
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+            # Confirmed live with `docker run --read-only`: starts and
+            # serves cleanly, no writes to its own filesystem. A real fix,
+            # not a skip.
+            readOnlyRootFilesystem: true
+          env:
+            - name: PORT
+              value: "3000"
+            - name: NATS_URL
+              value: "nats://eightbitsaxlounge-state-client:4222"
+            - name: NATS_USER
+              value: "overlay"
+            - name: NATS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: overlay_pass
+          ports:
+            - containerPort: 3000
+              name: http
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
