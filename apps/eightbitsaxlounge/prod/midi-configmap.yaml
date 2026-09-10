@@ -1,0 +1,19 @@
+---
+# Non-secret runtime config. device_service_url is the PC's own address —
+# not sensitive, but env-specific: one Windows PC hosts both the dev (5000)
+# and prod (5001) MIDI device-service instances side by side (F9). Plain
+# HTTP for now, matching the PC's current ASPNETCORE_URLS — M3's mTLS
+# decision is not yet applied here because it requires PC-side config and
+# the PC is offline; tracked as a follow-up once it's back online.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eightbitsaxlounge-midi-config
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: midi
+data:
+  device_service_url: "http://192.168.20.210:5001"
+  token_expiry_minutes: "60"
+  nats_user: "midi"

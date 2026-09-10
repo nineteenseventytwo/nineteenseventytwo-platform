@@ -1,0 +1,162 @@
+---
+# JWT-authenticated proxy that fronts the physical MIDI hardware. Migrated
+# from eightbitsaxlounge/midi's k8s/deployment.yaml (ADR-0012). This is the
+# "proxy mode" instance — MidiDeviceService:Url is set, so incoming
+# requests require JWT (RequireAuthorization on every route), and only the
+# final device-I/O call (SendControlChangeMessageByDeviceMidiConnectNameAsync)
+# leaves the cluster, proxied outbound to the Windows PC. All data-layer
+# reads/writes (SetEffect, InitDatamodel, UploadEffects, UploadDevice) run
+# entirely here against `data` — confirmed by reading
+# SendControlChangeMessageHandler.cs, which depends on IMidiDeviceService
+# only, no IMidiDataService. The PC-side device-mode instance never
+# receives those endpoints, so no ingress into the cluster is needed from
+# the PC — only cluster egress out to it (see midi-networkpolicy.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eightbitsaxlounge-midi
+  namespace: eightbitsaxlounge-dev
+  labels:
+    app: eightbitsaxlounge
+    component: midi
+  annotations:
+    # ADR-0016: requests/limits come from the namespace LimitRange, same
+    # reasoning as db/state/data.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    # Same class of finding as db/state/data: the image's own USER
+    # directive is the name `app`, not a numeric uid. uid 1654 is the
+    # built-in non-root `app` user baked into mcr.microsoft.com/dotnet/
+    # aspnet:10.0 at build time (confirmed live: `id app` in the base
+    # image), not adjustable here.
+    checkov.io/skip5: "CKV_K8S_40=image uses the built-in dotnet/aspnet:10.0 app user at uid 1654; not adjustable here"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: midi
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: midi
+        version: "4.0.4"
+    spec:
+      # CKV_K8S_38: this API never calls the k8s API server.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+      containers:
+        - name: midi-api
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-midi@sha256:6b48d27f5547a81eac113dd9ffc8c910500d1c584a95f751df828b7d7c7a646c
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+            # Confirmed live with `docker run --read-only`: the app starts
+            # and serves traffic cleanly with no writes to its own
+            # filesystem (the Data Protection warning about an in-memory
+            # key ring is expected and harmless — JWTs are signed with our
+            # own configured SecretKey, not the built-in key ring).
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Development"
+            - name: Authentication__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: secret-key
+            - name: Authentication__Issuer
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: issuer
+            - name: Authentication__Audience
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: audience
+            - name: Authentication__TokenExpiryInMinutes
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-midi-config
+                  key: token_expiry_minutes
+            - name: Authentication__Clients__0__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: client-0-id
+            - name: Authentication__Clients__0__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: client-0-secret
+            - name: Authentication__Clients__1__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: client-1-id
+            - name: Authentication__Clients__1__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: client-1-secret
+            - name: MidiDeviceService__Url
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-midi-config
+                  key: device_service_url
+            - name: MidiDeviceService__BypassKey
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: device-bypass-key
+            - name: ConnectionStrings__EightBitSaxLoungeDataLayer
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-midi-secrets
+                  key: connection-string
+            - name: Nats__User
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-midi-config
+                  key: nats_user
+            - name: Nats__Pass
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: midi_pass
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 2
+            failureThreshold: 20
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
