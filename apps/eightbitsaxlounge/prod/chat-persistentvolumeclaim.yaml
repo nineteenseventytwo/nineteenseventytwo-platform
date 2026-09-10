@@ -1,0 +1,20 @@
+---
+# Holds /app/tokens/tokens.db — the Twitch OAuth refresh tokens for the
+# bot and broadcaster accounts (docs/TWITCH_SETUP.md). A SQLite file of a
+# handful of rows; 1Gi matches the pre-migration manifest's own sizing
+# and leaves ample headroom against the tenant's storage quota (ADR-0016).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eightbitsaxlounge-chat-tokens
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: chat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi

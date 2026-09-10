@@ -1,0 +1,170 @@
+---
+# Twitch chat bot — subscribes to Twitch EventSub, publishes overlay.*
+# updates to NATS, and calls midi's HTTP API to change device effects.
+# Migrated from eightbitsaxlounge/chat (ADR-0012). Sixth and last of six
+# eightbitsaxlounge services (F4 order: db → state → data → midi →
+# overlay → chat).
+#
+# No Service, no Ingress/HTTPRoute: chat has no in-cluster consumers and
+# is never called from outside the cluster — matches the pre-migration
+# manifest set, which also had no k8s/service.yaml. Port 8080 (health
+# probes) is reached by the kubelet directly against the pod, not via a
+# Service. Port 4343 (the one-time Twitch OAuth callback,
+# docs/TWITCH_SETUP.md) is reached only via `make port-forward` during
+# that one-time setup — never routine traffic.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eightbitsaxlounge-chat
+  namespace: eightbitsaxlounge-prod
+  labels:
+    app: eightbitsaxlounge
+    component: chat
+  annotations:
+    # ADR-0016: requests/limits come from the namespace LimitRange, same
+    # reasoning as every other component in this migration.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    # Dockerfile creates a dedicated app user at uid 1000 at build time
+    # (useradd --uid 1000), not adjustable here — same class of finding as
+    # db/state/data.
+    checkov.io/skip5: "CKV_K8S_40=image creates a dedicated app user at uid 1000 at build time; not adjustable here"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eightbitsaxlounge
+      component: chat
+  template:
+    metadata:
+      labels:
+        app: eightbitsaxlounge
+        component: chat
+        version: "7.0.2"
+    spec:
+      # CKV_K8S_38: this bot never calls the k8s API server.
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: twitch-bot
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:d0721d717430433190fea680edca539da4d7b8cd6773d3c6bc3aafdc0896c3c1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          # Not read-only: the Twitch OAuth token database
+          # (/app/tokens/tokens.db, on the PVC below) is written to at
+          # runtime by design — that's the whole point of the PVC.
+          env:
+            - name: TWITCH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-chat-secrets
+                  key: client-id
+            - name: TWITCH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-chat-secrets
+                  key: client-secret
+            - name: TWITCH_CHANNEL
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: twitch_channel
+            - name: TWITCH_BOT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: bot_id
+            - name: TWITCH_OWNER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: bot_owner_id
+            - name: TWITCH_PREFIX
+              value: "!"
+            - name: MIDI_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-chat-secrets
+                  key: midi-client-id
+            - name: MIDI_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eightbitsaxlounge-chat-secrets
+                  key: midi-client-secret
+            - name: MIDI_DEVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: midi_device_url
+            - name: MIDI_API_TIMEOUT
+              value: "30"
+            - name: MIDI_DEVICE_NAME
+              value: "One Series Ventris Reverb"
+            - name: BOT_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: bot_name
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: log_level
+            - name: NATS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: nats_url
+            - name: NATS_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: eightbitsaxlounge-chat-config
+                  key: nats_user
+            - name: NATS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: state-nats-creds
+                  key: chat_pass
+          ports:
+            - containerPort: 8080
+              name: health
+            - containerPort: 4343
+              name: oauth
+          volumeMounts:
+            - name: tokens-volume
+              mountPath: /app/tokens
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 2
+            failureThreshold: 30
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: tokens-volume
+          persistentVolumeClaim:
+            claimName: eightbitsaxlounge-chat-tokens
