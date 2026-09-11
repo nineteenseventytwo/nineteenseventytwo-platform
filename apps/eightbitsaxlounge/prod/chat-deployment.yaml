@@ -44,7 +44,7 @@ spec:
       labels:
         app: eightbitsaxlounge
         component: chat
-        version: "7.0.2"
+        version: "7.0.3"
     spec:
       # CKV_K8S_38: this bot never calls the k8s API server.
       automountServiceAccountToken: false
@@ -54,7 +54,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: twitch-bot
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:d0721d717430433190fea680edca539da4d7b8cd6773d3c6bc3aafdc0896c3c1
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:ead81c9b76dce0763efdcddfc55a4438acc3dc588b1dd168f403e7a0faf80f67
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
