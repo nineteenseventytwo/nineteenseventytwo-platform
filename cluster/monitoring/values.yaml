@@ -36,6 +36,18 @@ alertmanager:
     resources:
       requests: {cpu: 25m, memory: 64Mi}
       limits: {memory: 128Mi}
+    # 1972-master-1 carries the standard control-plane NoSchedule taint and
+    # sits at ~592Mi requested out of ~3.32Gi allocatable — almost entirely
+    # idle, since only DaemonSets and the static control-plane pods
+    # tolerate it. alertmanager/grafana/prometheusOperator/kube-state-
+    # metrics are small and steady-state — safe to let the scheduler place
+    # them there when it has room. prometheus itself deliberately does NOT
+    # get this: "heaviest thing in the cluster" (1Gi limit) has no
+    # business sharing a node with etcd.
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+        operator: Exists
     storage:
       volumeClaimTemplate:
         spec:
@@ -95,6 +107,10 @@ grafana:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 512Mi}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
   persistence:
     enabled: true
     storageClassName: longhorn
@@ -118,6 +134,10 @@ prometheusOperator:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
 
 nodeExporter:
   enabled: true
@@ -139,6 +159,10 @@ kube-state-metrics:
   resources:
     requests: {cpu: 25m, memory: 64Mi}
     limits: {memory: 128Mi}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
 
 # kubeadm puts these on 127.0.0.1 by default; the ClusterConfiguration in
 # kube_control_plane binds them to 0.0.0.0 so these scrape targets work.

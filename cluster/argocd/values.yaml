@@ -66,6 +66,21 @@ server:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
+  # 1972-master-1 carries the standard control-plane NoSchedule taint and
+  # was sitting at ~592Mi requested out of ~3.32Gi allocatable - almost
+  # entirely idle, since only DaemonSets and the static control-plane pods
+  # tolerate it. server/applicationSet/redis are small, steady-state
+  # components (no fleet-wide render burst) - safe to let the scheduler
+  # place them there when it has room. controller and repo-server
+  # deliberately do NOT get this: controller's own limit is 2Gi (see
+  # below, sized for comparing the whole app-of-apps in one pass) and
+  # repo-server does the actual git-clone + Helm-render work per sync -
+  # both are exactly the bursty, memory-spiking profile that has no
+  # business sharing a node with etcd.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
   # ingress-nginx's replacement. The Gateway itself already carries the
   # cert-manager annotation and owns the argocd-tls Certificate
   # (cluster/gateway/00-gateway.yaml) - nothing to duplicate here. Argo CD's
@@ -86,6 +101,10 @@ applicationSet:
   resources:
     requests: {cpu: 25m, memory: 64Mi}
     limits: {memory: 192Mi}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
 
 notifications:
   enabled: false   # nothing to notify yet; re-enable with a real webhook
@@ -99,3 +118,7 @@ redis:
   resources:
     requests: {cpu: 25m, memory: 64Mi}
     limits: {memory: 128Mi}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists

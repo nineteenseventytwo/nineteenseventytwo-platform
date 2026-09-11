@@ -41,6 +41,19 @@ longhornManager:
     limits: {memory: 256Mi}
 longhornUI:
   replicas: 1
+  # 1972-master-1 carries the standard control-plane NoSchedule taint and
+  # sits at ~592Mi requested out of ~3.32Gi allocatable — almost entirely
+  # idle, since only DaemonSets and the static control-plane pods tolerate
+  # it. The UI is a stateless dashboard with no data-plane role — safe to
+  # let it land there. longhornManager (systemManagedComponentsNodeSelector
+  # above) and driver-deployer deliberately do NOT get this: those are the
+  # I/O-heavy storage-serving components "Worker SSDs only" already keeps
+  # off this node, for the same reason — replica rebuild traffic sharing a
+  # node/disk with etcd is exactly the risk that selector avoids.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
 
 # IRSA. See ../README.md#irsa-annotation-placement
 serviceAccount:
