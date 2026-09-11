@@ -36,18 +36,23 @@ alertmanager:
     resources:
       requests: {cpu: 25m, memory: 64Mi}
       limits: {memory: 128Mi}
-    # 1972-master-1 carries the standard control-plane NoSchedule taint and
-    # sits at ~592Mi requested out of ~3.32Gi allocatable — almost entirely
-    # idle, since only DaemonSets and the static control-plane pods
-    # tolerate it. alertmanager/grafana/prometheusOperator/kube-state-
-    # metrics are small and steady-state — safe to let the scheduler place
-    # them there when it has room. prometheus itself deliberately does NOT
-    # get this: "heaviest thing in the cluster" (1Gi limit) has no
-    # business sharing a node with etcd.
-    tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        effect: NoSchedule
-        operator: Exists
+    # No control-plane toleration here (unlike prometheusOperator/kube-
+    # state-metrics below) — Longhorn's own systemManagedComponentsNode-
+    # Selector (cluster/longhorn/values.yaml, "Worker SSDs only") keeps
+    # the Longhorn CSI node plugin off 1972-master-1 entirely, so nothing
+    # with a Longhorn-backed PVC can ever mount one there:
+    #
+    #   AttachVolume.Attach failed ...: CSINode 1972-master-1 does not
+    #   contain driver driver.longhorn.io
+    #
+    # This one has storage.volumeClaimTemplate below (storageClassName:
+    # longhorn) — added and then reverted the same day (2026-09-11) after
+    # the identical mistake genuinely broke grafana (below): a toleration
+    # let the scheduler put it on master-1, where it could never attach
+    # its PVC, no matter what rollout strategy it used. This CR's own
+    # tolerations never actually got exercised before the revert, only
+    # because nothing had triggered the operator to reschedule it yet —
+    # not because it would have been safe.
     storage:
       volumeClaimTemplate:
         spec:
@@ -107,23 +112,21 @@ grafana:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 512Mi}
-  tolerations:
-    - key: node-role.kubernetes.io/control-plane
-      effect: NoSchedule
-      operator: Exists
-  # Recreate, not the RollingUpdate default, for two independent reasons
-  # that both show up the moment this Deployment's spec actually changes
-  # (confirmed live 2026-09-11, rolling out the toleration above):
-  # 1. persistence below is a ReadWriteOnce PVC — a RollingUpdate surge pod
-  #    scheduled to a different node (exactly what the toleration above
-  #    makes possible) can't attach it while the old pod still holds it,
-  #    same deadlock already fixed for eightbitsaxlounge-chat.
-  # 2. infra-quota's limits.memory sits at its 4Gi hard cap with zero
-  #    headroom — a surge pod (old + new coexisting, even briefly) needs
-  #    quota this namespace does not have, so the ReplicaSet's pod
-  #    creation is flatly quota-rejected. Recreate needs no surge: it
-  #    terminates the old pod (freeing its quota) before creating the new
-  #    one, so peak usage never exceeds today's steady state.
+  # No control-plane toleration (see alertmanager's comment above for why:
+  # persistence below is a Longhorn-backed PVC, and Longhorn's CSI node
+  # plugin is deliberately absent from 1972-master-1). Briefly added one
+  # on 2026-09-11 and it broke grafana live: the scheduler put the new
+  # pod on master-1, where it could never attach its volume —
+  # "CSINode 1972-master-1 does not contain driver driver.longhorn.io" —
+  # leaving grafana with zero running pods until the toleration was
+  # reverted and the pod deleted so a fresh one would schedule onto a
+  # worker instead.
+  #
+  # deploymentStrategy stays Recreate even without the toleration: it's
+  # still a ReadWriteOnce PVC, so any future cross-worker rescheduling
+  # (e.g. a drained/cordoned node) hits the same old-pod-holds-the-volume
+  # deadlock already fixed for eightbitsaxlounge-chat. Recreate costs
+  # nothing at steady state and removes that class of failure entirely.
   deploymentStrategy:
     type: Recreate
   persistence:
@@ -149,6 +152,11 @@ prometheusOperator:
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {memory: 256Mi}
+  # Stateless, no PVC — unlike grafana/alertmanager above, this one has
+  # nothing that could hit Longhorn's CSI-driver-absent-on-master-1 wall,
+  # so the toleration is safe. Confirmed live 2026-09-11: rescheduled onto
+  # 1972-master-1 immediately once Recreate below removed the quota
+  # blocker, no issues.
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
