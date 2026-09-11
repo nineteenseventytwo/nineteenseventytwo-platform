@@ -111,6 +111,21 @@ grafana:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
       operator: Exists
+  # Recreate, not the RollingUpdate default, for two independent reasons
+  # that both show up the moment this Deployment's spec actually changes
+  # (confirmed live 2026-09-11, rolling out the toleration above):
+  # 1. persistence below is a ReadWriteOnce PVC — a RollingUpdate surge pod
+  #    scheduled to a different node (exactly what the toleration above
+  #    makes possible) can't attach it while the old pod still holds it,
+  #    same deadlock already fixed for eightbitsaxlounge-chat.
+  # 2. infra-quota's limits.memory sits at its 4Gi hard cap with zero
+  #    headroom — a surge pod (old + new coexisting, even briefly) needs
+  #    quota this namespace does not have, so the ReplicaSet's pod
+  #    creation is flatly quota-rejected. Recreate needs no surge: it
+  #    terminates the old pod (freeing its quota) before creating the new
+  #    one, so peak usage never exceeds today's steady state.
+  deploymentStrategy:
+    type: Recreate
   persistence:
     enabled: true
     storageClassName: longhorn
@@ -138,6 +153,12 @@ prometheusOperator:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
       operator: Exists
+  # infra-quota's limits.memory is at its 4Gi hard cap with zero headroom
+  # (see grafana's comment above) — RollingUpdate's surge pod is flatly
+  # quota-rejected. No PVC on this one, but the quota problem alone is
+  # enough reason.
+  strategy:
+    type: Recreate
 
 nodeExporter:
   enabled: true
@@ -163,6 +184,12 @@ kube-state-metrics:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
       operator: Exists
+  # Same infra-quota headroom problem as prometheusOperator/grafana above.
+  # This subchart's own key: a plain string, not {type: Recreate} like the
+  # others — confirmed against its actual deployment.yaml template
+  # (`strategy.type: {{ .Values.updateStrategy | default "RollingUpdate"
+  # }}`), since `strategy:`/`deploymentStrategy:` are silently ignored here.
+  updateStrategy: Recreate
 
 # kubeadm puts these on 127.0.0.1 by default; the ClusterConfiguration in
 # kube_control_plane binds them to 0.0.0.0 so these scrape targets work.
