@@ -33,6 +33,16 @@ metadata:
     checkov.io/skip5: "CKV_K8S_40=image creates a dedicated app user at uid 1000 at build time; not adjustable here"
 spec:
   replicas: 1
+  # Recreate, not the RollingUpdate default: tokens-volume below is
+  # ReadWriteOnce, and a surge pod scheduled to a different node can't
+  # attach it while the old pod still holds it — RollingUpdate's default
+  # maxSurge deadlocks the rollout waiting on a volume detach that never
+  # comes until the old pod is gone. db's deployment already uses
+  # Recreate for the same reason (its own single-writer PVC). Hit live
+  # during the chat 7.0.3 rollout on 2026-09-11 — the new pod sat in
+  # ContainerCreating until the old ReplicaSet was manually scaled to 0.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: eightbitsaxlounge

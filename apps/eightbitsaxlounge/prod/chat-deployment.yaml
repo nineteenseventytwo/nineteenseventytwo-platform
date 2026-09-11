@@ -35,6 +35,16 @@ spec:
   # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
   # see apps/eightbitsaxlounge/README.md for why and for the online value.
   replicas: 0
+  # Recreate, not the RollingUpdate default: tokens-volume below is
+  # ReadWriteOnce, and a surge pod scheduled to a different node can't
+  # attach it while the old pod still holds it — RollingUpdate's default
+  # maxSurge deadlocks the rollout waiting on a volume detach that never
+  # comes until the old pod is gone. db's deployment already uses
+  # Recreate for the same reason (its own single-writer PVC). Hit live
+  # during the chat 7.0.3 rollout on 2026-09-11 — the new pod sat in
+  # ContainerCreating until the old ReplicaSet was manually scaled to 0.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: eightbitsaxlounge
