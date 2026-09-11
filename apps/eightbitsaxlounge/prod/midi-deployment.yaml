@@ -33,7 +33,9 @@ metadata:
     # image), not adjustable here.
     checkov.io/skip5: "CKV_K8S_40=image uses the built-in dotnet/aspnet:10.0 app user at uid 1654; not adjustable here"
 spec:
-  replicas: 1
+  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
+  # see apps/eightbitsaxlounge/README.md for why and for the online value.
+  replicas: 0
   selector:
     matchLabels:
       app: eightbitsaxlounge
