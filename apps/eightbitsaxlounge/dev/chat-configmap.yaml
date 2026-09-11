@@ -12,7 +12,21 @@ data:
   midi_device_url: "http://eightbitsaxlounge-midi-service:8080"
   log_level: "INFO"
   bot_name: "EightBitSaxBot"
-  bot_id: "896950964"
-  bot_owner_id: "1424580736"
+  # Were swapped until 2026-09-11: 896950964 is the8bitsaxlounge (the
+  # broadcaster), 1424580736 is the8bitsaxbot (the actual bot account) —
+  # confirmed via GET /helix/users. The swap wasn't just cosmetic: chat's
+  # own startup reconciliation (bots/twitch/bot.py) treats twitch_bot_id as
+  # "which token is mine, skip it" and builds a ChatMessageSubscription
+  # against every *other* stored token's channel. With the swap, that
+  # built a subscription against the8bitsaxbot's own (empty) channel
+  # instead of the8bitsaxlounge's real one — chat only kept working
+  # because of a subscription created by hand directly against the
+  # conduit during the 2026-09-11 live-stream incident, which the buggy
+  # reconciliation happened to leave alone. Un-swapping here is what lets
+  # chat's own reconciliation get it right without that crutch. Visible
+  # effect: the bot now posts as "the8bitsaxbot" instead of
+  # "the8bitsaxlounge".
+  bot_id: "1424580736"
+  bot_owner_id: "896950964"
   nats_url: "nats://eightbitsaxlounge-state-client:4222"
   nats_user: "chat"
