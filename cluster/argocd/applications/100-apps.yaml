@@ -26,6 +26,20 @@ spec:
       name: "app-{{index .path.segments 1}}-{{index .path.segments 2}}"
       annotations:
         argocd.argoproj.io/sync-wave: "100"
+        # eightbitsaxlounge-state (a StatefulSet) stays perpetually
+        # OutOfSync under Argo's default client-side diff: three rounds of
+        # targeted ignoreDifferences additions (below) each provably
+        # covered the entire real delta — confirmed via
+        # `kubectl apply --server-side --dry-run=server` against the live
+        # object — yet none cleared the status, even after a genuinely
+        # fresh (noCache) comparison. Server-Side Diff compares against
+        # the API server's own dry-run result instead of Argo's
+        # client-side normalization heuristic, which is the documented
+        # fix for exactly this class of server-defaulted-field mismatch.
+        # Applies to every app this ApplicationSet generates (today, only
+        # eightbitsaxlounge) — a reasonable default for any future app
+        # too, not a special case worth branching the template over.
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
