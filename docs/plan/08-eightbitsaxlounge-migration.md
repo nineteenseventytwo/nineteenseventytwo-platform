@@ -243,17 +243,22 @@ the failure this playbook exists to avoid. Decide: port it to
 
 ### Phase 6.1a — Prerequisites _(~6h)_
 
-- [ ] **F1** — transfer the repo to `nineteenseventytwo`
-- [ ] **F7** — ruleset on `main`; enable secret scanning, push protection and
-      Dependabot; add `.github/dependabot.yml`
-- [ ] Add a PR CI workflow: lint + test + Checkov + Trivy fs, on
+- [x] **F1** — transfer the repo to `nineteenseventytwo`
+- [x] **F7** — ruleset on `main`; enable secret scanning, push protection and
+      Dependabot; add `.github/dependabot.yml` — confirmed active: `deletion`,
+      `non_fast_forward`, `pull_request`, `required_signatures`,
+      `required_status_checks` naming `test`/`security`/`yaml`
+- [x] Add a PR CI workflow: lint + test + Checkov + Trivy fs, on
       `pull_request`, **hosted runners only** — self-hosted on a `pull_request`
       trigger is what ADR-0010 exists to prevent, and a public repo makes it a
-      live path into VLAN 20
-- [ ] **F5** — raise the `dev` tenant `limits.memory` to `2Gi`
-- [ ] **F9** — verify the Windows-side MIDI service is actually running before
+      live path into VLAN 20 — `pr.yml`, all jobs `runs-on: ubuntu-latest`
+- [x] **F5** — raise the `dev` tenant `limits.memory` to `2Gi` — both `dev`
+      and `prod` tenants, per `policy/tenants/eightbitsaxlounge.yaml`'s own
+      comment citing this finding by name
+- [x] **F9** — verify the Windows-side MIDI service is actually running before
       anything else moves; fix `init-pc.yaml`'s address and .NET version
-- [ ] **F6** — pin `data`, `db` and `state` base images to digests
+- [x] **F6** — pin `data`, `db` and `state` base images to digests — every
+      `image:` across all six services' manifests, not just these three
 
 **Gate:** the repo is in the org, a PR runs CI on a hosted runner, and the
 Windows MIDI service is confirmed working or confirmed broken — but known.
@@ -282,19 +287,25 @@ overlay updating, state persisting.
 
 ### Phase 6.2 — Retire the old layer _(~10h)_
 
-- [ ] Repoint the 15 `runs-on: self-hosted` workflows: build/release → hosted
-      or the ARC scale set; the runtime-operation ones
-      (`chat-set-environment`, `midi-data-*`, `midi-request-*`) stay in the app
-      repo but need a runner that exists
-- [ ] **F10** — add the six missing rows to the mapping table; decide
-      `shutdown.yaml`
-- [ ] Delete `security/` and `monitoring/`
-- [ ] Replace `server/README.md` with a stub, work the table to zero, delete
-      `server/`
-- [ ] Correct 05-migration's stale `ingress-nginx` row (**F2**)
+- [x] Repoint the `runs-on: self-hosted` workflows: build/release → hosted
+      (`ubuntu-24.04-arm`); the runtime-operation ones (`chat-set-environment`,
+      `midi-data-*`, `midi-request-*`, `deploy-pc`) stay self-hosted —
+      confirmed each one genuinely needs the docker.sock sibling-container
+      pattern and/or real VLAN 20 reach, which neither of this repo's ARC
+      scale sets offers both of at once. Not 15 in the end: `midi-release.yaml`'s
+      `deploy-k8s` job was dead weight (superseded by Argo CD) and deleted
+      outright rather than repointed
+- [x] **F10** — add the six missing rows to the mapping table; decide
+      `shutdown.yaml` — decided differently than M1 below: deleted outright,
+      replacement deferred, rather than ported here
+- [x] Delete `security/` and `monitoring/`
+- [x] ~~Replace `server/README.md` with a stub~~, work the table to zero,
+      delete `server/` — deleted outright instead of stubbed, once everything
+      eightbitsaxlounge needed was confirmed working in both environments
+- [x] Correct 05-migration's stale `ingress-nginx` row (**F2**)
 
 **Gate:** the mapping table has no open rows; `server/` is gone; no workflow
-targets the retired runner.
+targets the retired runner. **Met, 2026-09-12.**
 
 ### Follow-on, deliberately not blocking
 
@@ -441,12 +452,33 @@ need their own copies (they already have separate PVCs, so yes).
 ## Still open
 
 - **F1 is done** — the repo transferred to `nineteenseventytwo` on 2026-09-07.
-  Local clones still have the old `mchellmer/` remote; GitHub redirects, but
-  update it (`git remote set-url`) so the origin is not lying.
+  The local clone this migration ran from already carries the
+  `nineteenseventytwo/` remote (checked 2026-09-12) — nothing to update there.
+- **M4's toggle mechanism ended up different from what this section
+  recommends.** The plan below argues for a git-committed replica flip
+  specifically because `kubectl scale` loses the fight with Argo's
+  auto-sync. What actually shipped (2026-09-12) is the imperative version
+  anyway — `chat-set-environment.yaml` fixed to actually reach the cluster,
+  paired with an `ignoreDifferences` entry on `Deployment/eightbitsaxlounge-
+  chat`'s `/spec/replicas` in `cluster/argocd/applications/100-apps.yaml` so
+  selfHeal stops fighting it. Chosen live, in response to a direct ask for a
+  toggle usable "without accessing cluster directly or raising a PR" — a
+  real trade-off against this plan's own reasoning (broader-access
+  credential, not commit-auditable), not an oversight. It also went further
+  than a toggle for `chat` alone: `db`/`state`/`data`/`midi`/`overlay` all run
+  in both `dev` and `prod` permanently now, since none of them ever needed
+  the exclusivity `chat` genuinely has (see
+  `apps/eightbitsaxlounge/README.md`).
 - Whether the two scheduled scans move to hosted runners, given M1's
-  off-by-default cluster.
+  off-by-default cluster — still open, and out of scope for
+  eightbitsaxlounge specifically: this migration did not adopt an
+  off-by-default cluster, so the failure mode M1 describes doesn't apply to
+  this tenant, but it may still apply platform-wide.
 - Whether `platform` and `cloud` get `required_status_checks` at the same time
-  as the app repo (M2) — recommended, same PR.
+  as the app repo (M2) — still open. Checked 2026-09-12: `eightbitsaxlounge`
+  has the full set; `platform` has everything except
+  `required_status_checks`; `cloud` has `required_status_checks` but not
+  `required_signatures`. Neither matches `eightbitsaxlounge`'s ruleset yet.
 
 ---
 
