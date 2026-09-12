@@ -59,27 +59,30 @@ spec:
           jsonPointers:
             - /spec/replicas
         # eightbitsaxlounge-state has shown OutOfSync since its own
-        # migration, surviving every hard-refresh. Root-caused via the
-        # Application API's managed-resources endpoint, comparing
-        # targetState/normalizedLiveState/modified directly rather than
-        # eyeballing a raw diff (a raw target-vs-normalized diff is noisy
-        # even on resources Argo reports as in-sync — managedFields,
-        # generation and pod-template defaulting show up there too but
-        # don't set `modified`). Two distinct, additive causes, both
-        # server-side defaulting Argo's normalizer doesn't know how to
-        # reconcile for *this* kind:
-        #   1. The embedded PVC template in volumeClaimTemplates gains
-        #      apiVersion/kind/status (and spec.volumeMode) once
-        #      Kubernetes creates the real PVC from it — fields the git
-        #      manifest never sets.
-        #   2. spec.persistentVolumeClaimRetentionPolicy,
-        #      spec.podManagementPolicy, spec.revisionHistoryLimit and
-        #      spec.updateStrategy are all server-defaulted at the top
-        #      level of the StatefulSet spec and never set in git either.
-        #      Deployment's analogous defaulted field (spec.strategy) IS
-        #      handled by Argo's built-in normalizer (confirmed: db's
-        #      Deployment reports modified:false despite a similar raw
-        #      diff) — StatefulSet's equivalents apparently are not.
+        # migration, surviving every hard-refresh, two prior fix attempts
+        # (jqPathExpressions alone for the PVC template fields, then also
+        # adding jsonPointers for the top-level StatefulSet spec fields)
+        # and neither moved `.status.resources[].status` off OutOfSync,
+        # confirmed live via a fresh hard-refresh against each attempt.
+        # A `kubectl apply --server-side --dry-run=server` of this exact
+        # manifest against the live object proves every one of the eight
+        # fields below (four top-level, four inside volumeClaimTemplates)
+        # is the *entire* remaining delta — nothing else changes. And a
+        # side-by-side diff against eightbitsaxlounge-db's Deployment
+        # (which Argo reports fully Synced with zero ignoreDifferences)
+        # shows db has the exact same category of pod-template-level
+        # server defaults (dnsPolicy, restartPolicy, schedulerName,
+        # container probe/port/terminationMessage defaults) that Argo's
+        # built-in normalizer already handles without help — ruling those
+        # out here too. That leaves the ignoreDifferences mechanism itself
+        # as the remaining variable: jsonPointers is proven working in
+        # this app (the sibling entry above, `/spec/replicas` surviving
+        # selfHeal for chat's toggle) while jqPathExpressions' `[]?`
+        # wildcard array syntax for the embedded volumeClaimTemplates
+        # entry was never independently confirmed to take effect. Since
+        # there's exactly one template in this array, switching those
+        # four to explicit-index jsonPointers removes jq entirely as a
+        # variable for this next attempt.
         - kind: StatefulSet
           name: eightbitsaxlounge-state
           jsonPointers:
@@ -87,11 +90,10 @@ spec:
             - /spec/podManagementPolicy
             - /spec/revisionHistoryLimit
             - /spec/updateStrategy
-          jqPathExpressions:
-            - ".spec.volumeClaimTemplates[]?.apiVersion"
-            - ".spec.volumeClaimTemplates[]?.kind"
-            - ".spec.volumeClaimTemplates[]?.status"
-            - ".spec.volumeClaimTemplates[]?.spec.volumeMode"
+            - /spec/volumeClaimTemplates/0/apiVersion
+            - /spec/volumeClaimTemplates/0/kind
+            - /spec/volumeClaimTemplates/0/status
+            - /spec/volumeClaimTemplates/0/spec/volumeMode
       syncPolicy:
         automated:
           prune: true
