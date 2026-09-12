@@ -75,20 +75,44 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          # startupProbe/livenessProbe/readinessProbe all hit /health, and
+          # /health calls CouchDB's own /_up (go/handlers.go's
+          # HealthCheckHandler) - by design, since data genuinely isn't
+          # ready to serve while db is unreachable. That coupling is right
+          # for readiness, wrong for liveness: db-deployment.yaml gives its
+          # own /_up startupProbe 120s (failureThreshold: 60) precisely
+          # because a Recreate-strategy StatefulSet/Deployment on Longhorn
+          # can take that long to come back - confirmed live, ~70-80s
+          # during the 2026-09-12 dev/prod bring-up. data's startupProbe
+          # only allowed 40s (failureThreshold: 20) for the exact same
+          # dependency, so a cold db start inside db's own accepted window
+          # was already tripping data's tighter one and getting it killed
+          # before db had even finished - the root cause behind this
+          # component's historically high restart count. Matched to db's
+          # own threshold here.
+          #
+          # livenessProbe removed rather than loosened: a livenessProbe
+          # checking a downstream dependency is the wrong Kubernetes
+          # pattern regardless of the threshold - it means kubelet kills
+          # and restarts an otherwise-perfectly-healthy data pod every time
+          # db blips, when the correct behavior is readinessProbe alone
+          # pulling data out of Service routing until db recovers, with no
+          # restart at all. There's no separate liveness-only endpoint in
+          # this codebase yet (HealthCheckHandler is the only one, and it
+          # always calls CheckHealth()) - adding one is the more complete
+          # fix and is a real, if small, code change; omitting the probe
+          # entirely is the immediate, no-code-change fix for the
+          # cascading-restart symptom. CKV_K8S_8 (liveness probe should be
+          # configured) is soft_fail in this repo's own lint.yml, so this
+          # doesn't need a checkov skip annotation, but the reasoning is
+          # worth having in-repo either way.
           startupProbe:
             httpGet:
               path: /health
               port: 8080
             periodSeconds: 2
-            failureThreshold: 20
+            failureThreshold: 60
             timeoutSeconds: 3
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
