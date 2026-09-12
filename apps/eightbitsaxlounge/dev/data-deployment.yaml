@@ -26,7 +26,9 @@ metadata:
     # environment by main.go directly, same finding as db.
     checkov.io/skip6: "CKV_K8S_35=COUCHDB_PASSWORD read from the environment directly; no file-based alternative exists in this codebase"
 spec:
-  replicas: 2
+  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
+  # see apps/eightbitsaxlounge/README.md for why and for the online value.
+  replicas: 0
   selector:
     matchLabels:
       app: eightbitsaxlounge

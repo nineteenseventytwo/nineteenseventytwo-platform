@@ -32,9 +32,7 @@ metadata:
     # db/state/data.
     checkov.io/skip5: "CKV_K8S_40=image creates a dedicated app user at uid 1000 at build time; not adjustable here"
 spec:
-  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
-  # see apps/eightbitsaxlounge/README.md for why and for the online value.
-  replicas: 0
+  replicas: 1
   # Recreate, not the RollingUpdate default: tokens-volume below is
   # ReadWriteOnce, and a surge pod scheduled to a different node can't
   # attach it while the old pod still holds it — RollingUpdate's default
