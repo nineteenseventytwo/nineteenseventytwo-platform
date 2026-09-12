@@ -44,9 +44,7 @@ metadata:
     checkov.io/skip8: "CKV_K8S_35=entrypoint substitutes passwords into nats.conf from the environment; no file-based alternative exists"
 spec:
   serviceName: eightbitsaxlounge-state-headless
-  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
-  # see apps/eightbitsaxlounge/README.md for why and for the online value.
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: eightbitsaxlounge

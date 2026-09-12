@@ -26,9 +26,7 @@ metadata:
     # assumed (a naive adduser -u 1000 collides with it).
     checkov.io/skip5: "CKV_K8S_40=base image's built-in node user is uid 1000; not adjustable here"
 spec:
-  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
-  # see apps/eightbitsaxlounge/README.md for why and for the online value.
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: eightbitsaxlounge
@@ -43,6 +41,16 @@ spec:
       # CKV_K8S_38: a NATS subscriber + static file server never calls the
       # k8s API server.
       automountServiceAccountToken: false
+      # 1972-master-1 carries the standard control-plane NoSchedule taint
+      # and has spare capacity — see PR #164/#165/#166's reasoning,
+      # already applied to argocd/monitoring/longhorn-ui. This component
+      # is stateless (no PVC), so it has none of the Longhorn-CSI-absent-
+      # on-master-1 restrictions that ruled out grafana/alertmanager
+      # there.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+          operator: Exists
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

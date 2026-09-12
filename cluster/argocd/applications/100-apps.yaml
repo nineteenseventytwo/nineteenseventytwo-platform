@@ -41,6 +41,23 @@ spec:
         # in a namespace with no quota is the exact failure this is meant to
         # prevent.
         namespace: "{{index .path.segments 1}}-{{index .path.segments 2}}"
+      # Scoped by resource name, not by app — this template is shared
+      # across every apps/*/* directory, and "eightbitsaxlounge-chat" is
+      # specific enough not to collide with anything else under apps/.
+      # chat is the one eightbitsaxlounge workload an operator still
+      # scales imperatively at runtime (the "Chat Set Active Environment"
+      # GitHub Actions workflow in nineteenseventytwo-eightbitsaxlounge,
+      # toggling which of dev/prod's chat is the one live on the shared
+      # Twitch conduit) — every other service in every app now runs at
+      # its committed replica count in both environments simultaneously.
+      # Without this, selfHeal reverts that scale back to whatever's
+      # committed here on its next reconcile (up to every 3 minutes),
+      # undoing the toggle within minutes of it running.
+      ignoreDifferences:
+        - kind: Deployment
+          name: eightbitsaxlounge-chat
+          jsonPointers:
+            - /spec/replicas
       syncPolicy:
         automated:
           prune: true
