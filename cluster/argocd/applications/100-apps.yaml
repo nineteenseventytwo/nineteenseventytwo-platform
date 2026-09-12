@@ -59,29 +59,39 @@ spec:
           jsonPointers:
             - /spec/replicas
         # eightbitsaxlounge-state has shown OutOfSync since its own
-        # migration, surviving every hard-refresh — a known Argo CD
-        # limitation with StatefulSets, not a real drift. Confirmed via
-        # the Application API's managed-resources diff (targetState vs
-        # normalizedLiveState): every field it reported differing was
-        # ordinary server-side defaulting Argo's normalizer handles fine
-        # for the sibling Deployments in this same app (probe
-        # successThreshold, port protocol, terminationMessagePath,
-        # dnsPolicy, restartPolicy, schedulerName, updateStrategy, ...) —
-        # StatefulSet is the only *kind* here with embedded
-        # volumeClaimTemplates, and the live object's PVC template gains
-        # apiVersion/kind/status fields the manifest never has once
-        # Kubernetes creates the real PVC from it. That mismatch appears
-        # to break normalization for the whole resource rather than just
-        # the PVC template fields, since every other field it lists is
-        # something Argo already ignores correctly elsewhere. Matches a
-        # long-documented upstream Argo CD issue with StatefulSet
-        # volumeClaimTemplates diffing.
+        # migration, surviving every hard-refresh. Root-caused via the
+        # Application API's managed-resources endpoint, comparing
+        # targetState/normalizedLiveState/modified directly rather than
+        # eyeballing a raw diff (a raw target-vs-normalized diff is noisy
+        # even on resources Argo reports as in-sync — managedFields,
+        # generation and pod-template defaulting show up there too but
+        # don't set `modified`). Two distinct, additive causes, both
+        # server-side defaulting Argo's normalizer doesn't know how to
+        # reconcile for *this* kind:
+        #   1. The embedded PVC template in volumeClaimTemplates gains
+        #      apiVersion/kind/status (and spec.volumeMode) once
+        #      Kubernetes creates the real PVC from it — fields the git
+        #      manifest never sets.
+        #   2. spec.persistentVolumeClaimRetentionPolicy,
+        #      spec.podManagementPolicy, spec.revisionHistoryLimit and
+        #      spec.updateStrategy are all server-defaulted at the top
+        #      level of the StatefulSet spec and never set in git either.
+        #      Deployment's analogous defaulted field (spec.strategy) IS
+        #      handled by Argo's built-in normalizer (confirmed: db's
+        #      Deployment reports modified:false despite a similar raw
+        #      diff) — StatefulSet's equivalents apparently are not.
         - kind: StatefulSet
           name: eightbitsaxlounge-state
+          jsonPointers:
+            - /spec/persistentVolumeClaimRetentionPolicy
+            - /spec/podManagementPolicy
+            - /spec/revisionHistoryLimit
+            - /spec/updateStrategy
           jqPathExpressions:
             - ".spec.volumeClaimTemplates[]?.apiVersion"
             - ".spec.volumeClaimTemplates[]?.kind"
             - ".spec.volumeClaimTemplates[]?.status"
+            - ".spec.volumeClaimTemplates[]?.spec.volumeMode"
       syncPolicy:
         automated:
           prune: true
