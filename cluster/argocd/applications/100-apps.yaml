@@ -58,6 +58,30 @@ spec:
           name: eightbitsaxlounge-chat
           jsonPointers:
             - /spec/replicas
+        # eightbitsaxlounge-state has shown OutOfSync since its own
+        # migration, surviving every hard-refresh — a known Argo CD
+        # limitation with StatefulSets, not a real drift. Confirmed via
+        # the Application API's managed-resources diff (targetState vs
+        # normalizedLiveState): every field it reported differing was
+        # ordinary server-side defaulting Argo's normalizer handles fine
+        # for the sibling Deployments in this same app (probe
+        # successThreshold, port protocol, terminationMessagePath,
+        # dnsPolicy, restartPolicy, schedulerName, updateStrategy, ...) —
+        # StatefulSet is the only *kind* here with embedded
+        # volumeClaimTemplates, and the live object's PVC template gains
+        # apiVersion/kind/status fields the manifest never has once
+        # Kubernetes creates the real PVC from it. That mismatch appears
+        # to break normalization for the whole resource rather than just
+        # the PVC template fields, since every other field it lists is
+        # something Argo already ignores correctly elsewhere. Matches a
+        # long-documented upstream Argo CD issue with StatefulSet
+        # volumeClaimTemplates diffing.
+        - kind: StatefulSet
+          name: eightbitsaxlounge-state
+          jqPathExpressions:
+            - ".spec.volumeClaimTemplates[]?.apiVersion"
+            - ".spec.volumeClaimTemplates[]?.kind"
+            - ".spec.volumeClaimTemplates[]?.status"
       syncPolicy:
         automated:
           prune: true
