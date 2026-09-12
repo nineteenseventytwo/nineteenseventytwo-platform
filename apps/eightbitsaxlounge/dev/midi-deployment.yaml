@@ -47,6 +47,16 @@ spec:
     spec:
       # CKV_K8S_38: this API never calls the k8s API server.
       automountServiceAccountToken: false
+      # 1972-master-1 carries the standard control-plane NoSchedule taint
+      # and has spare capacity — see PR #164/#165/#166's reasoning,
+      # already applied to argocd/monitoring/longhorn-ui. This component
+      # is stateless (no PVC), so it has none of the Longhorn-CSI-absent-
+      # on-master-1 restrictions that ruled out grafana/alertmanager
+      # there.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+          operator: Exists
       securityContext:
         runAsNonRoot: true
         runAsUser: 1654

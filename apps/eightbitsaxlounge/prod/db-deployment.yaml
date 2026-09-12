@@ -49,9 +49,7 @@ metadata:
     # anyway, which makes the policy moot regardless.
     checkov.io/skip8: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
 spec:
-  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
-  # see apps/eightbitsaxlounge/README.md for why and for the online value.
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:

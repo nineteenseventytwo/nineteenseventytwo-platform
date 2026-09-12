@@ -33,9 +33,7 @@ metadata:
     # image), not adjustable here.
     checkov.io/skip5: "CKV_K8S_40=image uses the built-in dotnet/aspnet:10.0 app user at uid 1654; not adjustable here"
 spec:
-  # 0 = parked. Only one eightbitsaxlounge environment runs at a time —
-  # see apps/eightbitsaxlounge/README.md for why and for the online value.
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: eightbitsaxlounge
@@ -49,6 +47,16 @@ spec:
     spec:
       # CKV_K8S_38: this API never calls the k8s API server.
       automountServiceAccountToken: false
+      # 1972-master-1 carries the standard control-plane NoSchedule taint
+      # and has spare capacity — see PR #164/#165/#166's reasoning,
+      # already applied to argocd/monitoring/longhorn-ui. This component
+      # is stateless (no PVC), so it has none of the Longhorn-CSI-absent-
+      # on-master-1 restrictions that ruled out grafana/alertmanager
+      # there.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+          operator: Exists
       securityContext:
         runAsNonRoot: true
         runAsUser: 1654
