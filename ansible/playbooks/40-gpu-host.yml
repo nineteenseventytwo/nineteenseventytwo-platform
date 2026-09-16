@@ -1,0 +1,66 @@
+---
+# Prepare the PC's Linux boot to serve inference to composer.
+#
+#   make deploy-gpu-host          (CHECK=1 for a dry run)
+#
+# **Not part of site.yml.** The other playbooks converge machines that are
+# always on; this one targets a dual-boot PC that spends much of its time in
+# Windows serving the eightbitsaxlounge midi device service. Running the whole
+# estate should not fail because a host is booted into the other operating
+# system, so this stays a deliberate, separate invocation.
+#
+# Definition of done: a pod in composer-dev reaches the proxy and gets a
+# completion; the same request without a cluster-node source address is
+# refused; /api/delete is refused from anywhere.
+- name: Prepare the GPU host
+  hosts: gpu
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    # The PC answers on this address in both boots, so reachability proves
+    # nothing about which one is running. Fail early and clearly rather than
+    # part-way through an apt task with a confusing error.
+    - name: Assert the host is booted into Linux
+      ansible.builtin.assert:
+        that: ansible_system == "Linux"
+        fail_msg: >-
+          {{ inventory_hostname }} is reachable but not running Linux. It is
+          most likely booted into Windows for the midi device service — the two
+          are mutually exclusive by design. Boot it to Linux and re-run.
+
+  roles:
+    - role: common
+      tags: [common]
+    - role: docker
+      tags: [docker]
+    - role: gpu_host
+      tags: [gpu]
+
+  post_tasks:
+    - name: Check the GPU is visible to the driver
+      ansible.builtin.command: nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+      register: gpu_host_smi
+      changed_when: false
+      tags: [gpu]
+
+    - name: Report the GPU
+      ansible.builtin.debug:
+        msg: "{{ gpu_host_smi.stdout }}"
+      tags: [gpu]
+
+    - name: Check inference answers through the proxy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ gpu_host_proxy_port }}/api/tags"
+        status_code: 200
+      tags: [gpu]
+
+    # The control that makes the port safe to expose. If this starts
+    # succeeding, the proxy is not doing its job and the cluster can delete
+    # models.
+    - name: Check the management API is refused
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ gpu_host_proxy_port }}/api/delete"
+        method: DELETE
+        status_code: 404
+      tags: [gpu]

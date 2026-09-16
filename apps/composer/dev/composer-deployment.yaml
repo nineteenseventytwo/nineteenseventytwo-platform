@@ -1,0 +1,109 @@
+---
+# The arrangement API. Takes a piano score, returns a bossa arrangement scored
+# for a Game Boy backing track — see the composer repo's
+# docs/performance-context.md.
+#
+# Runs here on arm64 and delivers inference work to the GPU host outside the
+# cluster (07's D1(b)). The cluster does not gain a GPU node, so ADR-0011
+# holds and multi-arch builds stay unnecessary.
+#
+# **This deployment does not depend on the GPU host.** composer's default
+# arranger is deterministic: it derives the harmony from the score and renders
+# the parts by rule, with no model involved. That is a complete, harmonically
+# sound arrangement. The model-driven arranger is switched on by setting
+# COMPOSER_ARRANGER=plan once the host is up, which is a ConfigMap edit rather
+# than a deployment change. Shipping this before the PC is therefore not
+# shipping something broken — it is shipping the half that is ready.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: composer
+  namespace: composer-dev
+  labels:
+    app: composer
+    component: api
+  annotations:
+    # ADR-0016: requests/limits come from the namespace LimitRange.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+spec:
+  # One replica. There is no availability requirement — a failed arrangement is
+  # retried by the person who asked for it — and a second replica would double
+  # the tenant's memory request to serve a workload with no concurrency
+  # pressure.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: composer
+      component: api
+  template:
+    metadata:
+      labels:
+        app: composer
+        component: api
+    spec:
+      # Does not call the API server.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # Matches the uid the image creates. High rather than the conventional
+        # 1000 (CKV_K8S_40) so that a container escape or a mishandled host
+        # mount cannot land on a real person's files. The eightbitsaxlounge
+        # manifests skip that check because uid 1000 is baked into images this
+        # estate does not control; composer's image is built in-house, so it
+        # gets the fix instead of the exemption.
+        runAsUser: 10001
+      containers:
+        - name: composer
+          # composer 0.1.1, arm64, published 2026-09-17. Pinned by digest like
+          # every other image here: a tag is a moving target, and the weekly
+          # vulnerability scan cannot say anything useful about one.
+          image: ghcr.io/nineteenseventytwo/composer@sha256:9e85d12b0b551889b0d3af22187051499b2ad11020138a6f1b2abbc615f73c3f
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+            # Not read-only: uploads and the rendered score are written to a
+            # temp file before being served, and music21 writes there too.
+            # An emptyDir mounted at /tmp is the fix, below — the root
+            # filesystem itself stays untouched.
+            readOnlyRootFilesystem: true
+          envFrom:
+            - configMapRef:
+                name: composer-config
+          ports:
+            - containerPort: 8000
+              name: http
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # /health is genuinely independent of the GPU host: it answers
+          # without touching inference, and the pipeline's blocking work runs
+          # off the event loop, so a long arrangement cannot starve it. A
+          # liveness probe is therefore safe here, unlike eightbitsaxlounge's
+          # data component where /health called a downstream dependency.
+          startupProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir:
+            # Bounded: a score is tens of kilobytes and its arrangement under a
+            # megabyte. Unbounded, a temp-file leak would fill the node rather
+            # than the pod — and this endpoint accepts uploads.
+            sizeLimit: 128Mi

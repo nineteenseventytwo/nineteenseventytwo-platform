@@ -363,6 +363,10 @@ endif
 # Phase C — cluster
 # --------------------------------------------------------------------------
 
+.PHONY: deploy-gpu-host
+deploy-gpu-host: ## Prepare the PC's Linux boot to serve inference (CHECK=1 for a dry run)
+	$(PLAYBOOK) ansible/playbooks/40-gpu-host.yml $(CHECK_ARGS)
+
 .PHONY: deploy-cluster
 deploy-cluster: ## kubeadm init, Cilium, join workers, default-deny (CHECK=1 for a dry run)
 	$(PLAYBOOK) ansible/playbooks/30-cluster.yml $(CHECK_ARGS)
