@@ -1,0 +1,101 @@
+---
+# Tenant: composer
+#
+# Guardrails only. Workload manifests live in apps/composer/ and are reconciled
+# by the same Argo CD instance that reconciles this file — see ADR-0012.
+# Applied one sync-wave earlier, so a namespace always has its quota and
+# default-deny policy before anything is scheduled into it.
+#
+# dev only for now. composer has no prod consumer yet: the arrangement pipeline
+# is reached by hand, not by another service, so a second environment would be
+# two namespaces to keep in step for no one's benefit. Add prod when something
+# depends on it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: composer-dev
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: tenant
+    platform.nineteenseventytwo/tenant: composer
+---
+# Sized from measurement, not from the eightbitsaxlounge template.
+#
+# music21's reputation for memory is real but misattributed: importing it costs
+# ~56 MB, and parsing the largest score in composer's reference corpus (112
+# bars, 1527 notes) adds only ~15 MB on top. The import is paid once per
+# process and shared across concurrent requests, so per-request marginal cost
+# is ~15 MB rather than ~90 MB. Peak RSS measured at 91 MB; with FastAPI and
+# uvicorn a realistic pod sits at 150–200 MB.
+#
+# 256Mi requested and 768Mi allowed therefore has real headroom rather than
+# hopeful headroom. Three 2 GB nodes leave roughly 1.2 GB unrequested after the
+# platform and eightbitsaxlounge; this takes a fifth of it.
+#
+# Raise in a PR with the reason, never by editing the cluster.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: composer-dev
+spec:
+  hard:
+    requests.cpu: "500m"
+    requests.memory: 256Mi
+    limits.memory: 768Mi
+    persistentvolumeclaims: "0"
+    count/deployments.apps: "4"
+    services.loadbalancers: "0"
+---
+# Larger per-container ceiling than the eightbitsaxlounge tenant's 512Mi:
+# one composer pod legitimately holds a parsed score plus the music21 import,
+# and a limit that fits the average would evict on the largest input rather
+# than on a leak.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: composer-dev
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 500m, memory: 384Mi}
+      defaultRequest: {cpu: 100m, memory: 192Mi}
+      max: {memory: 768Mi}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: composer-dev
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-and-ingress
+  namespace: composer-dev
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}

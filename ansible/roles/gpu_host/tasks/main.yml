@@ -1,0 +1,140 @@
+---
+# Prepares the PC's Linux boot to serve inference.
+#
+# Salvaged from the composer repo's infra/ansible/playbooks/setup-gpu-node.yaml
+# before that directory was deleted:
+#   git show 7e8390c:infra/ansible/playbooks/setup-gpu-node.yaml
+# The driver and container-toolkit tasks below are that file's, kept because
+# they were working and there is no virtue in rewriting them. What is dropped
+# is everything that joined the host to the cluster — kubeadm, the kubelet, the
+# device plugin, the node label — because D1(b) decided the host stays outside
+# it and ADR-0011 depends on that staying true.
+
+- name: Install the NVIDIA driver
+  when: ansible_os_family == "Debian"
+  block:
+    - name: Install ubuntu-drivers-common
+      ansible.builtin.apt:
+        name: ubuntu-drivers-common
+        state: present
+        update_cache: true
+
+    - name: Auto-install the recommended NVIDIA driver
+      ansible.builtin.command:
+        cmd: ubuntu-drivers autoinstall
+      register: gpu_host_driver_install
+      changed_when: "'already installed' not in gpu_host_gpu_host_driver_install.stdout"
+
+    - name: Check whether the driver install needs a reboot
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: gpu_host_reboot_required
+
+    - name: Reboot if the driver install requires it
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: gpu_host_reboot_required.stat.exists
+
+- name: Install the NVIDIA container toolkit
+  when: ansible_os_family == "Debian"
+  block:
+    - name: Fetch the NVIDIA container toolkit signing key
+      ansible.builtin.get_url:
+        url: https://nvidia.github.io/libnvidia-container/gpgkey
+        dest: /tmp/nvidia-ctk-gpgkey.asc
+        mode: "0644"
+
+    - name: Dearmor the NVIDIA signing key
+      ansible.builtin.command:
+        cmd: "gpg --dearmor -o {{ gpu_host_nvidia_ctk_keyring }} /tmp/nvidia-ctk-gpgkey.asc"
+        creates: "{{ gpu_host_nvidia_ctk_keyring }}"
+
+    # The salvaged version piped curl into sed into tee. Written as a file
+    # instead: the repository line is a known constant, so fetching it at run
+    # time only made the task depend on the network twice and defeated
+    # --check. It also carried an unpipefailed pipe, where a failed curl would
+    # have written an empty sources file and the apt install would then have
+    # failed somewhere less obvious.
+    - name: Add the NVIDIA container toolkit repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        mode: "0644"
+        content: |
+          deb [signed-by={{ gpu_host_nvidia_ctk_keyring }}] https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /
+
+    - name: Install the NVIDIA container toolkit
+      ansible.builtin.apt:
+        name: nvidia-container-toolkit
+        state: present
+        update_cache: true
+      notify: Restart docker
+
+- name: Create the model cache directory
+  ansible.builtin.file:
+    path: "{{ gpu_host_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+# Ollama binds to loopback only. Everything the cluster sees goes through the
+# proxy, because Ollama has no authentication and its API includes model
+# management: anything that can reach it can POST /api/pull and DELETE
+# /api/delete, not merely run inference. Exposing the port would expose the
+# admin surface with it.
+- name: Run Ollama, bound to loopback
+  community.docker.docker_container:
+    name: ollama
+    image: "{{ gpu_host_ollama_image }}"
+    state: started
+    restart_policy: unless-stopped
+    device_requests:
+      - driver: nvidia
+        count: -1
+        capabilities: [[gpu]]
+    published_ports:
+      - "127.0.0.1:{{ gpu_host_ollama_port }}:11434"
+    volumes:
+      - "{{ gpu_host_data_dir }}:/root/.ollama"
+
+- name: Pull the model
+  ansible.builtin.command:
+    cmd: "docker exec ollama ollama pull {{ gpu_host_model }}"
+  register: gpu_host_model_pull
+  changed_when: "'already exists' not in gpu_host_model_pull.stdout"
+
+- name: Install the proxy configuration
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/ollama-proxy/Caddyfile
+    mode: "0644"
+  notify: Restart ollama proxy
+
+- name: Run the inference proxy
+  community.docker.docker_container:
+    name: ollama-proxy
+    image: "{{ gpu_host_proxy_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    volumes:
+      - /etc/ollama-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+# ⚠️ The host firewall is one of only two controls on this path. The cluster
+# nodes (192.168.20.202-204) and this host (192.168.20.210) are all on VLAN 20,
+# so the traffic is switch-local: OPNsense never sees it and no firewall rule
+# there can constrain it (docs/01-network-validation.md, test 11). The other
+# control is composer's NetworkPolicy. There is no third layer.
+- name: Allow inference only from the cluster nodes
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "{{ gpu_host_proxy_port }}"
+    proto: tcp
+  loop: "{{ gpu_host_allowed_clients }}"
+
+- name: Deny inference from anywhere else
+  community.general.ufw:
+    rule: deny
+    port: "{{ gpu_host_proxy_port }}"
+    proto: tcp

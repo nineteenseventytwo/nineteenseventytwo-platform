@@ -1,0 +1,19 @@
+# Managed by ansible/roles/gpu_host. Edits here are overwritten.
+#
+# Ollama has no authentication and its API includes model management, so this
+# proxy is what makes the port safe to expose: inference endpoints only,
+# everything else refused. It is a config file rather than a service because a
+# service in front of Ollama with one consumer would be a proxy that someone
+# has to maintain — see composer's D-B.
+:{{ gpu_host_proxy_port }} {
+	@inference path /api/chat /api/generate /api/tags
+	handle @inference {
+		reverse_proxy 127.0.0.1:{{ gpu_host_ollama_port }}
+	}
+
+	# /api/pull, /api/create, /api/delete and the rest of the management
+	# surface are unreachable from the cluster by construction.
+	handle {
+		respond "not available" 404
+	}
+}

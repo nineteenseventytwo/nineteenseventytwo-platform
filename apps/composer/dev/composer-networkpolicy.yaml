@@ -1,0 +1,48 @@
+---
+# composer's allow-pair. The tenant baseline (policy/tenants/composer.yaml)
+# already permits DNS and same-namespace traffic; this file carries the two
+# things specific to this workload.
+#
+# The egress rule is the load-bearing one: it leaves the cluster for the GPU
+# host at 192.168.20.210, which the baseline's same-namespace rule does not
+# cover. Same shape as eightbitsaxlounge's midi → PC path (that migration's
+# F9), and the same host.
+#
+# ⚠️ **A NetworkPolicy is the only control on this path.** The cluster nodes
+# (192.168.20.202-204) and the GPU host (192.168.20.210) are both on VLAN 20,
+# so the traffic is switch-local: OPNsense never sees it and no firewall rule
+# can constrain it (docs/01-network-validation.md, test 11). The other end is
+# the host's own firewall. There is no third layer to fall back on, which is
+# why this rule names one address and one port rather than a subnet.
+#
+# It is written now, ahead of the host existing, deliberately. Permitting
+# traffic that cannot yet happen costs nothing, and it means bringing the GPU
+# host online is a ConfigMap edit (COMPOSER_ARRANGER: plan) rather than a
+# policy change — so the thing being tested when the PC arrives is the PC,
+# not this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-composer
+  namespace: composer-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: composer
+      component: api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Nothing in-cluster calls composer yet. Scores are submitted by hand, and
+    # there is no HTTPRoute — adding one is a deliberate act that should come
+    # with its own Gateway listener, certificate and Unbound override.
+    # Monitoring's scrape path is already allowed by the tenant baseline.
+    []
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.168.20.210/32
+      ports:
+        - protocol: TCP
+          port: 11434

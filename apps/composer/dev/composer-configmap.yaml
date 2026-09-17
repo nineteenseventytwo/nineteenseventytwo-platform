@@ -1,0 +1,28 @@
+---
+# Non-secret runtime config.
+#
+# COMPOSER_ARRANGER selects the strategy:
+#   deterministic  derives harmony from the score and renders by rule. No model,
+#                  no network dependency, a complete arrangement.
+#   plan           the model chooses density, bass feel and chord substitutions
+#                  from options the library derived. Needs LLM_BASE_URL to be
+#                  reachable.
+#
+# Held at `deterministic` until the GPU host is online and its NetworkPolicy
+# allow-pair is proven (see composer-networkpolicy.yaml). Flipping it is a
+# one-line change here; nothing about the Deployment needs to move.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: composer-config
+  namespace: composer-dev
+  labels:
+    app: composer
+    component: api
+data:
+  COMPOSER_ARRANGER: "deterministic"
+  # The GPU host's own address, not a Service — inference runs off-cluster
+  # (07's D1(b)). Inert while the arranger is deterministic.
+  LLM_BASE_URL: "http://192.168.20.210:11434"
+  LLM_MODEL: "llama3.1:8b"
+  LOG_LEVEL: "info"

@@ -1,0 +1,35 @@
+---
+# The GPU host: an Ansible-managed Linux box on VLAN 20 that serves inference
+# to the cluster. Not a cluster node — see the inventory's `gpu` group and
+# ADR-0011.
+
+# Pinned by digest, like every other image this repo runs. A tag means
+# something different each week, and the weekly vulnerability scan cannot say
+# anything useful about a moving target.
+gpu_host_ollama_image: "docker.io/ollama/ollama@sha256:REPLACE_ME"
+
+# The model composer asks for. Provisional: D-C defers the choice to a bake-off
+# on this hardware, because the 8 GB card is the binding constraint and a
+# laptop's unified memory cannot stand in for it.
+gpu_host_model: "llama3.1:8b"
+
+# Where model weights live. Several at 4–8 GB each, so not on the root
+# filesystem by accident.
+gpu_host_data_dir: /var/lib/ollama
+
+# Ollama's own port, bound to loopback. Nothing reaches it directly — see the
+# proxy below.
+gpu_host_ollama_port: 11434
+
+# The port the cluster actually talks to.
+gpu_host_proxy_port: 11434
+gpu_host_proxy_image: "docker.io/library/caddy@sha256:REPLACE_ME"
+
+# Only the cluster nodes may ask for inference. Narrow by address rather than
+# by subnet: this path has no firewall in front of it (see tasks/main.yml).
+gpu_host_allowed_clients:
+  - 192.168.20.202
+  - 192.168.20.203
+  - 192.168.20.204
+
+gpu_host_nvidia_ctk_keyring: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
