@@ -78,6 +78,28 @@ CONFIG_ARGS=(
 [ "${EPHEMERAL:-false}" = "true" ] && CONFIG_ARGS+=(--ephemeral)
 [ "${DISABLE_AUTO_UPDATE:-false}" = "true" ] && CONFIG_ARGS+=(--disableupdate)
 
+# Clear any registration left in this container's writable layer before
+# configuring. `restart: always` restarts the *same* container rather than
+# replacing it, so after the first job `.runner` is still on disk and
+# config.sh refuses:
+#
+#   Cannot configure the runner because it is already configured.
+#
+# The container then exits 1, is restarted, and fails identically forever — so
+# each runner served exactly one job and then crash-looped. ADR-0006 lists
+# "one job, then the container is replaced" as a mitigation; this is what
+# makes that true in practice rather than only on paper.
+#
+# `--replace` does not cover this: it resolves a name collision on GitHub's
+# side, not local state. An --ephemeral runner has already deregistered itself
+# by the time we get here, so removing the local files is the whole job; the
+# config.sh remove is best-effort for the non-ephemeral case.
+if [ -f .runner ]; then
+  echo "Stale runner registration found; clearing before re-configuring."
+  ./config.sh remove --token "$(mint_registration_token)" || true
+  rm -f .runner .credentials .credentials_rsaparams
+fi
+
 ./config.sh "${CONFIG_ARGS[@]}"
 
 # Not `exec`: staying in bash lets a docker-stop SIGTERM be forwarded to
