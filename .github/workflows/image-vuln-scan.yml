@@ -27,7 +27,25 @@ jobs:
   # weekly automated scan behind a human approval defeats the point of it
   # being automated.
   enumerate:
-    runs-on: [self-hosted, linux, arm64, lab-network]
+    # ARC scale set in-cluster, not the compose stack on 1972-console-1 —
+    # ADR-0006's stated exit, taken for this workflow first. lab-deploy is
+    # containerMode: kubernetes, so there is no docker socket here at all.
+    # That is the whole point, and it is also why the tooling below arrives
+    # as a job container rather than as a sibling container.
+    runs-on: lab-deploy
+    # lab-deploy's own runner image is the stock actions-runner: no kubectl,
+    # no Ansible, no docker. The tools come from ansible-runner instead, run
+    # *as* the job container, and RUNNER_LOCAL=1 tells the Makefile to invoke
+    # them straight off PATH rather than wrapping each one in `docker run`.
+    # Same targets, same image, one less layer of indirection — and no socket.
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
+    env:
+      RUNNER_LOCAL: "1"
+      # Plain `kubectl` reads this from the environment. It matches the
+      # Makefile's own GITHUB_ACTIONS default, so `make` and the staging step
+      # below agree on one path without either hardcoding it twice.
+      KUBECONFIG: ${{ runner.temp }}/kube/config
     outputs:
       images: ${{ steps.list.outputs.images }}
     steps:
@@ -44,15 +62,12 @@ jobs:
       # workload (lab-dind) contributes nothing here, which matches "what
       # do I actually need to worry about right now" rather than "what
       # exists in a manifest somewhere".
-      # This runner has no kubectl of its own - list-running-images shells
-      # out to a sibling ansible-runner container for it, same reasoning as
-      # deploy-cluster.yml's own argocd-sync-wait step just below it in that
-      # file. Confirmed live: a raw `kubectl` call here fails with "command
-      # not found" before ever reaching the cluster.
+      # kubectl, jq and make all come from the job container above, so this
+      # is a direct call now - no sibling container, no docker socket. The
+      # target itself is unchanged, which is the property worth keeping: the
+      # thing CI runs is still the thing you run by hand.
       - name: List every running image, deduplicated
         id: list
-        env:
-          ANSIBLE_RUNNER: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
         run: |
           set -euo pipefail
           images=$(make list-running-images | jq -R -s -c 'split("\n") | map(select(length > 0))')
