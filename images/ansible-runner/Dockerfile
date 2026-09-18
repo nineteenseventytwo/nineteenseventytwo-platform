@@ -80,7 +80,22 @@ ENV ANSIBLE_COLLECTIONS_PATH=/usr/share/ansible/collections
 # ~/.ansible/tmp and retry files. This container is ephemeral (--rm) and never
 # holds a credential beyond one invocation, so a permissive HOME costs nothing
 # a read-only key mount doesn't already cost.
-RUN useradd --create-home --shell /usr/sbin/nologin ansible \
+# uid/gid 1001, not useradd's next-free 1000, to match the GitHub Actions
+# runner's own fixed "runner" user. That only matters in one place, but it is
+# a place the --user override below cannot reach: as an ARC job container
+# under containerMode: kubernetes, this image runs with whatever USER it was
+# built with, and shares the runner's work volume. That volume is owned
+# 1001:1001 (the runner pod's fsGroup), so a 1000:1000 process cannot write
+# its own workspace:
+#
+#   EACCES: permission denied, open '/__w/_temp/_runner_file_commands/...'
+#
+# Everywhere else this is invisible: the Makefile's CONTAINER_RUN macros pass
+# --user explicitly, which overrides this uid entirely. See
+# ansible/roles/runner_host/tasks/main.yml, which already treats 1001 as the
+# base image's fixed value.
+RUN groupadd --gid 1001 ansible \
+ && useradd --uid 1001 --gid 1001 --create-home --shell /usr/sbin/nologin ansible \
  && mkdir -p /home/ansible/.ssh /home/ansible/.config/sops /home/ansible/.kube \
  && chmod -R 0777 /home/ansible
 ENV HOME=/home/ansible
