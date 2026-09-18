@@ -45,6 +45,19 @@ containerMode:
 
 template:
   spec:
+    # The work volume is a Longhorn PVC, and a freshly provisioned filesystem
+    # comes up root-owned. The stock actions-runner image runs as uid 1001, so
+    # without this the runner cannot create its own _work tree and every job
+    # dies in setup, before any step or job container exists:
+    #
+    #   System.UnauthorizedAccessException: Access to the path
+    #   '/home/runner/_work/_tool' is denied.
+    #
+    # fsGroup makes the kubelet hand the mount to that group on the way in.
+    # lab-dind does not need this: containerMode dind backs _work with an
+    # emptyDir, which is world-writable already.
+    securityContext:
+      fsGroup: 1001
     containers:
       - name: runner
         image: ghcr.io/actions/actions-runner:2.336.0
