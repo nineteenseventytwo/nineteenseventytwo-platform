@@ -36,9 +36,27 @@ defaultBackupStore:
   pollInterval: 300
 
 longhornManager:
+  # 256Mi was not enough: longhorn-manager on 1972-worker-1 was OOMKilled
+  # (exit 137), and when the manager dies its volumes' engines go with it —
+  # six faulted at once on 2026-09-18, replica rebuilds then failing with
+  # connection-refused. Downstream that surfaces as a volume going read-only
+  # *mid-write*, which is how it was found: a job wrote to its PVC fine, then
+  # hit EROFS partway through copying a directory into it.
+  #
+  # Only the limit moves. The request stays at 128Mi deliberately: both
+  # workers sit at ~91-93% of allocatable memory in requests already
+  # (3056Mi and 3104Mi of ~3322Mi), so raising the request would eat most of
+  # the remaining headroom and start costing scheduling. Raising the ceiling
+  # alone lets the manager survive a spike without reserving more.
+  #
+  # The honest caveat: node limits are already ~300% of allocatable, so this
+  # trades a predictable cgroup kill for a less predictable node-level one.
+  # That is still the better trade while the manager is the thing dying and
+  # taking volumes with it — but the real fix is less memory pressure on these
+  # nodes, not a bigger ceiling. See ../README.md for what lives here.
   resources:
     requests: {cpu: 50m, memory: 128Mi}
-    limits: {memory: 256Mi}
+    limits: {memory: 512Mi}
 longhornUI:
   replicas: 1
   # 1972-master-1 carries the standard control-plane NoSchedule taint and
