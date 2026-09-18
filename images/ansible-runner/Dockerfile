@@ -26,7 +26,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update \
  && apt-get install --no-install-recommends -y \
       ca-certificates curl git openssh-client rsync \
-      sshpass jq shellcheck \
+      sshpass jq make shellcheck \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \

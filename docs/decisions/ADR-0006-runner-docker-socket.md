@@ -73,3 +73,31 @@ and the cluster path (which removes the problem entirely) arrives sooner.
 > was; the isolation argument is not, and is now the sole reason dind is
 > rejected here specifically. The overall decision (mount the socket, exit via
 > ARC) is unchanged.
+
+> **Amendment (2026-09-18):** the exit has started. `image-vuln-scan`'s
+> `enumerate` job is the first to move to the `lab-deploy` scale set, chosen
+> because it is read-only and ungated — a cheap place to prove the pattern.
+>
+> Moving it was not a label swap, and the reason is worth recording: every
+> self-hosted job in both repos reaches the socket *through the Makefile*,
+> whose tool layer is defined as `docker run ansible-runner <tool>` for
+> `KUBECTL`, `ANSIBLE` and `HELM` alike. `lab-deploy` has no socket by design,
+> and its stock runner image carries none of those tools itself, so neither
+> half of the old arrangement survives the move. What works is `RUNNER_LOCAL=1`
+> — the Makefile's existing non-container branch — with the tooling image as
+> the job's own `container:`. No socket anywhere in the chain, and the make
+> targets are untouched.
+>
+> Also corrected here: the `--ephemeral` mitigation above says "one job, then
+> the container is replaced". Until 2026-09-17 that was true only because a
+> second job was impossible — `restart: always` restarted the same container,
+> whose stale registration then made `config.sh` refuse, so each runner served
+> exactly one job and crash-looped. Nothing persisted between jobs, but not for
+> the reason claimed. gha-runner 1.2.0 clears that state on start, which makes
+> the mitigation true as written rather than by accident.
+>
+> Still on the compose stack: `deploy-cluster` and `deploy-nodes`, deliberately
+> — they are the break-glass path that rebuilds the cluster ARC itself runs in.
+> Not yet moved: eightbitsaxlounge's five self-hosted workflows, which need the
+> same `container:` treatment and are what actually ends one Pi being a
+> single point of failure for the whole org's CI.

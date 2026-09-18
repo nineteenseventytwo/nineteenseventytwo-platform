@@ -289,6 +289,7 @@ the shell once after logging in and every `make sign-ws` in that session
 skips the prompt:
 
 ```bash
+export VAULT_ADDR=https://vault.eightbitsaxlounge.com
 vault login -method=userpass username=mchellmer
 export VAULT_TOKEN=$(cat ~/.vault-token)
 make sign-ws

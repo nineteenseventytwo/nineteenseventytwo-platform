@@ -5,8 +5,15 @@
 # repo is queueing" is a non-problem once registration is org-scoped — that is
 # the whole point of ADR-0001.
 #
-# lab-deploy: Ansible and kubectl. No docker socket, no dind. This is the
-# common case and the least privileged one.
+# lab-deploy: no docker socket, no dind. This is the common case and the
+# least privileged one.
+#
+# The runner image below is the stock actions-runner and deliberately carries
+# no tooling of its own — no Ansible, no kubectl, no docker. Jobs that need
+# those declare `container: ansible-runner` and set RUNNER_LOCAL=1, which is
+# what the Makefile's non-container branch exists for. Baking the tools in
+# here instead would re-couple a collection bump to a runner rebuild, which is
+# the exact split images/ansible-runner/Dockerfile calls out.
 githubConfigUrl: "https://github.com/nineteenseventytwo"
 githubConfigSecret: arc-github-app
 
