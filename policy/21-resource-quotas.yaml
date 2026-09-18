@@ -98,44 +98,22 @@ spec:
     requests.memory: 256Mi
     limits.memory: 512Mi
 ---
-# longhorn-system runs many CSI/webhook sidecar containers with no
-# requests/limits of their own today (24/28 live containers at time of
-# writing). Worst case if every one of those 24 restarts and picks up the
-# new 50m/64Mi LimitRange default at once: ~900m existing + 24*50m = ~2.1
-# CPU, ~256Mi existing + 24*64Mi = ~1.8Gi - requests.cpu is sized above that
-# worst case, not just today's ~900m actually requested, plus Longhorn's own
-# manager/engine/instance-manager DaemonSets, which are legitimately the
-# heaviest thing in this cluster.
-# Raised from 4Gi (PR #106's original sizing) after a from-scratch build 0002
-# confirmed it was too tight: none of the DaemonSet/Deployment CSI sidecar
-# containers here (csi-attacher/provisioner/resizer/snapshotter,
-# longhorn-csi-plugin, engine-image) carry an explicit resources block, so
-# every one of them falls back to this namespace's LimitRange default
-# (256Mi/container) rather than the small requests longhornManager's own
-# explicit resources use. 16 already-running containers alone == 4Gi, exactly
-# the old hard cap - so longhorn-csi-plugin (2 pods x 3 containers, +1.5Gi)
-# could never even be admitted: FailedCreate, exceeded quota. Confirmed live:
-# that DaemonSet never having a single running pod is what starved every CSI
-# sidecar of the unix socket it polls at startup (Still connecting ->
-# context deadline exceeded, on an endless crash loop), which in turn left
-# every PVC in the cluster Pending forever - vault and monitoring both.
+# longhorn-system deliberately has no quota either, for the reason the
+# LimitRange next door is gone (policy/20-limitrange-default.yaml).
 #
-# 8Gi leaves headroom PR #106's steady-state snapshot never had to account
-# for: Longhorn creates instance-manager pods dynamically, per volume, once
-# PVCs actually provision - none exist yet on this build precisely because
-# this quota was blocking the chain that creates them. Watch actual usage
-# once vault's and monitoring's volumes are live; raise again, same as this
-# PR, if instance-manager pods get admission-rejected in turn.
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: infra-quota
-  namespace: longhorn-system
-spec:
-  hard:
-    requests.cpu: "3"
-    requests.memory: 3Gi
-    limits.memory: 8Gi
+# A quota on limits.memory forces every container to carry a limit, which is
+# what made the LimitRange default load-bearing in the first place - and that
+# default is what OOMKilled instance-manager and faulted the storage layer on
+# 2026-09-18. Keeping the quota while dropping the LimitRange would just
+# reintroduce the cap by another route: pods with no limits of their own would
+# be rejected at admission instead.
+#
+# This quota was raised once before, 4Gi -> 8Gi (PR #118), and its own comment
+# predicted the next problem - "raise again if instance-manager pods get
+# admission-rejected in turn". They were not rejected; they were admitted and
+# then killed, which is why the prediction did not catch it. Sizing a cap for
+# a component whose footprint scales with volume count is the wrong move to
+# keep repeating.
 ---
 apiVersion: v1
 kind: ResourceQuota

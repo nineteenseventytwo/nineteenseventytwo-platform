@@ -117,38 +117,28 @@ spec:
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 256Mi}
 ---
-# default.cpu was 200m; raised to 500m after a from-scratch build 0002 hit an
-# outright-invalid pod spec, not a quota rejection: Longhorn's own
-# defaultSettings.guaranteedInstanceManagerCPU (cluster/longhorn/values.yaml,
-# a percentage of node allocatable CPU) computes an explicit 400m CPU
-# *request* on every instance-manager pod, but instance-manager sets no CPU
-# *limit* of its own - so this default filled that in, and a request above
-# the limit is invalid at admission, full stop, no retry ever succeeds:
+# longhorn-system deliberately has no LimitRange, on the same grounds as
+# kube-system: it is too critical to constrain with a namespace default.
 #
-#   spec.containers[0].resources.requests: Invalid value: "400m": must be
-#   less than or equal to cpu limit of 200m
+# This block used to live here, and it was patched once already - default.cpu
+# 200m -> 500m, because guaranteedInstanceManagerCPU computes an explicit 400m
+# request on instance-manager while instance-manager sets no limit of its own,
+# and a request above the limit is invalid at admission. That was the CPU
+# dimension of the problem. On 2026-09-18 the memory dimension arrived: the
+# 256Mi default capped instance-manager, which holds every engine and replica
+# process on its node, so it was OOMKilled at runtime and took every volume
+# engine down with it. Six volumes faulted at once, repeatedly, on a ~7-minute
+# cycle - and unlike the CPU case this failed *silently*, because a 64Mi
+# request is admitted happily and only the ceiling is wrong.
 #
-# Confirmed live: longhorn-manager's own InstanceManagerController logged
-# this and retried on a 2-minute backoff forever, with no instance-manager
-# pod ever created - which meant every volume stayed "detached" with
-# "un-schedulable replicas" and every dependent pod (vault-0, every
-# monitoring PVC-backed pod) sat stuck regardless of storage otherwise being
-# healthy. This existed before PR #106 too (guaranteedInstanceManagerCPU has
-# been 10 since early in build 0001) but had nothing to conflict with until
-# this LimitRange gave instance-manager's un-set limit a value for the first
-# time. 500m leaves real headroom above the 400m this setting computes at
-# this node size, not just enough to clear it exactly.
-apiVersion: v1
-kind: LimitRange
-metadata:
-  name: default-limits
-  namespace: longhorn-system
-spec:
-  limits:
-    - type: Container
-      default: {cpu: 500m, memory: 256Mi}
-      defaultRequest: {cpu: 50m, memory: 64Mi}
-      max: {memory: 1Gi}
+# Patching the number a third time would just move the next collision. The
+# shape is wrong: instance-manager's memory scales with how many volumes a
+# node serves, so no fixed namespace default is correct for it. Longhorn's own
+# chart sets explicit resources where they belong (longhornManager, longhornUI
+# in cluster/longhorn/values.yaml); what is left here is the components that
+# must not be capped.
+#
+# tests/verify-limitrange.sh carries the matching EXEMPT_DELIBERATE entry.
 ---
 apiVersion: v1
 kind: LimitRange

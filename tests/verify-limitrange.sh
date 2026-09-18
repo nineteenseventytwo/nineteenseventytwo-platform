@@ -26,6 +26,15 @@ UNREACHABLE=125
 #                    header of policy/21-resource-quotas.yaml. Static pods and
 #                    the CNI cannot be constrained by a namespace default
 #                    without risking the control plane.
+#   longhorn-system  same class of decision, reached the hard way. Longhorn's
+#                    instance-manager holds every engine and replica process
+#                    on its node, so its memory scales with how many volumes
+#                    that node serves — no fixed namespace default is correct
+#                    for it. The 256Mi default OOMKilled it on 2026-09-18 and
+#                    took six volume engines down with it, repeatedly. The CPU
+#                    dimension of the same conflict had already forced one
+#                    patch (200m -> 500m). See policy/20-limitrange-default.yaml
+#                    where the block used to be.
 #
 # EXEMPT_NO_PODS — exempt *because* no pod ever runs there, so there is nothing
 # for a LimitRange to default. That is a claim about the cluster, not a
@@ -43,6 +52,7 @@ UNREACHABLE=125
 #   kube-public      holds a ConfigMap.
 EXEMPT_DELIBERATE=(
   kube-system
+  longhorn-system
 )
 
 EXEMPT_NO_PODS=(
