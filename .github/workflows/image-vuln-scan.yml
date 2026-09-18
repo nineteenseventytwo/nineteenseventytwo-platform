@@ -125,6 +125,23 @@ jobs:
 
       - name: Trivy scan
         uses: aquasecurity/trivy-action@v0.36.0
+        # Scan the architecture the cluster actually runs. Trivy resolves a
+        # multi-arch index through go-containerregistry, whose default
+        # platform is linux/amd64 regardless of what the runner is - so
+        # without this the scan was answering the wrong question twice over:
+        #
+        #  - the lab's own images are built arm64-only, so there is no amd64
+        #    child to select and the scan failed outright. Confirmed live
+        #    2026-09-18: all 8 ghcr.io/nineteenseventytwo/* images failed with
+        #    "no child with platform linux/amd64 in index", while all 41
+        #    multi-arch third-party images passed.
+        #  - those 41 passed by scanning their amd64 layers, which is not what
+        #    runs here. Different base layers, different CVEs.
+        #
+        # exit-code 0 does not mask this: those were image-resolution errors,
+        # not findings.
+        env:
+          TRIVY_PLATFORM: linux/arm64
         with:
           scan-type: image
           image-ref: ${{ matrix.image }}
