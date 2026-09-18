@@ -19,6 +19,38 @@ permissions:
   contents: read
 
 jobs:
+  # Resolves the tag rather than letting `enumerate` float on :stable.
+  #
+  # :stable is mutable, and a job container is pulled with the default
+  # IfNotPresent policy - so a node that already holds :stable keeps serving
+  # the old layers after a promote, indefinitely. Confirmed live on
+  # 2026-09-18: after a promote moved :stable to sha256:3b99cfba, the node's
+  # cache still resolved that tag to sha256:b2255eea and kept running it. The
+  # image was not missing - the tag simply meant two different things in two
+  # places, which is the failure mode a mutable tag always has.
+  #
+  # imagePullPolicy: Always would fix it too, and is the wrong trade here: it
+  # re-pulls ~1GB per job across the lab's single 1GbE link, on a cluster
+  # whose storage and network are already the binding constraint. An
+  # immutable tag pulls once per version and is cached correctly thereafter.
+  #
+  # Read from version.txt rather than hardcoded, for the reason
+  # ansible/roles/runner_host/defaults/main.yml gives for doing the same: a
+  # hardcoded copy drifted once already and shipped a runner missing a tool.
+  resolve-runner-image:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      image: ${{ steps.tag.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < images/ansible-runner/version.txt)
+          [ -n "$version" ] || { echo "version.txt is empty" >&2; exit 1; }
+          echo "image=ghcr.io/${{ github.repository_owner }}/ansible-runner:${version}" >> "$GITHUB_OUTPUT"
+
   # The only step that needs the lab network at all: finding out what's
   # actually running. The scan itself is `trivy image <ref>` against a
   # public registry - it never talks to the cluster, so it doesn't need
@@ -27,6 +59,7 @@ jobs:
   # weekly automated scan behind a human approval defeats the point of it
   # being automated.
   enumerate:
+    needs: resolve-runner-image
     # ARC scale set in-cluster, not the compose stack on 1972-console-1 —
     # ADR-0006's stated exit, taken for this workflow first. lab-deploy is
     # containerMode: kubernetes, so there is no docker socket here at all.
@@ -39,7 +72,8 @@ jobs:
     # them straight off PATH rather than wrapping each one in `docker run`.
     # Same targets, same image, one less layer of indirection — and no socket.
     container:
-      image: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
+      # Pinned, not :stable — see resolve-runner-image above for why.
+      image: ${{ needs.resolve-runner-image.outputs.image }}
     env:
       RUNNER_LOCAL: "1"
     outputs:
