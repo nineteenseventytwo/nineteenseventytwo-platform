@@ -1,0 +1,45 @@
+---
+# Scratch space for CI runners, and nothing else.
+#
+# ARC's containerMode: kubernetes backs every job's _work tree with a fresh
+# PVC, and the runner copies ~100MB of node externals into it before the job
+# starts. On the default `longhorn` class that means each job provisions a
+# 2-replica volume and then immediately writes to it while Longhorn is still
+# building the second replica - across a single 1GbE link, with
+# concurrentReplicaRebuildPerNodeLimit: 1. The rebuild loses, the engine dies,
+# and the volume detaches mid-write. The job sees it as:
+#
+#   EROFS: read-only file system, copyfile
+#   '/home/runner/externals/node20/...' -> '/home/runner/_work/externals/...'
+#
+# numberOfReplicas: 1 is not a compromise here, it is the correct value. This
+# volume lives for one job and is deleted with the pod that owns it; there is
+# nothing in it worth replicating, and replicating it is what broke it. A lost
+# replica fails one CI job, which is a retry, not data loss.
+#
+# reclaimPolicy: Delete, unlike the default class's Retain. These are created
+# per job and nothing ever reclaims them by hand - four Released PVs had
+# already accumulated from a handful of test dispatches, each holding 4Gi
+# that Longhorn would never free.
+#
+# WaitForFirstConsumer so the replica is placed where the pod actually lands
+# rather than before the scheduler has chosen, which is what makes
+# dataLocality worth asking for at all.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-ci-scratch
+provisioner: driver.longhorn.io
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  numberOfReplicas: "1"
+  # best-effort, not strict-local: strict-local makes the volume attachable
+  # only on the node holding its replica, which turns a scheduling near-miss
+  # into a stuck pod. Preferring local is the win; requiring it is a risk this
+  # workload has no reason to take.
+  dataLocality: "best-effort"
+  staleReplicaTimeout: "30"
+  fsType: "ext4"
+  dataEngine: "v1"
