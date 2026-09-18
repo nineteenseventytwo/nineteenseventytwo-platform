@@ -47,6 +47,16 @@ jobs:
           sudo apt-get update && sudo apt-get install -y shellcheck
           make lint-shell
 
+  actions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          sudo mv actionlint /usr/local/bin/
+          make lint-actions
+
   helm:
     runs-on: ubuntu-24.04
     steps:

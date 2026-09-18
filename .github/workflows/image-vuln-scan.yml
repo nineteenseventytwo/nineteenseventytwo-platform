@@ -42,10 +42,6 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/ansible-runner:stable
     env:
       RUNNER_LOCAL: "1"
-      # Plain `kubectl` reads this from the environment. It matches the
-      # Makefile's own GITHUB_ACTIONS default, so `make` and the staging step
-      # below agree on one path without either hardcoding it twice.
-      KUBECONFIG: ${{ runner.temp }}/kube/config
     outputs:
       images: ${{ steps.list.outputs.images }}
     steps:
@@ -68,6 +64,15 @@ jobs:
       # thing CI runs is still the thing you run by hand.
       - name: List every running image, deduplicated
         id: list
+        # KUBECONFIG belongs here rather than in the job's own `env:`, which
+        # cannot see the `runner` context at all — putting it there makes the
+        # whole file invalid, and GitHub rejects it before any job starts
+        # (a 0s run with no jobs, named after the workflow file). Step-level
+        # env is where `runner` is actually available. The path matches the
+        # Makefile's own GITHUB_ACTIONS default, so `make` and the staging
+        # step above agree without either hardcoding it twice.
+        env:
+          KUBECONFIG: ${{ runner.temp }}/kube/config
         run: |
           set -euo pipefail
           images=$(make list-running-images | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -159,11 +164,12 @@ jobs:
         run: |
           set -euo pipefail
           total=0
+          count=0
           for f in sarif/*.sarif; do
             n=$(jq '[.runs[].results[]] | length' "$f")
             total=$((total + n))
+            count=$((count + 1))
           done
-          count=$(ls sarif/*.sarif | wc -l | tr -d ' ')
           link="https://github.com/${{ github.repository }}/security/code-scanning"
           if [ "$total" -gt 0 ]; then
             text="Weekly image vulnerability scan: ${total} HIGH/CRITICAL, fixed-available findings across ${count} images. Detail: ${link}"

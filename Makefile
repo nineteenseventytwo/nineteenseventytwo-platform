@@ -480,7 +480,7 @@ apply-policy: ## Apply baseline policy and tenant namespaces (Argo owns these af
 # --------------------------------------------------------------------------
 
 .PHONY: lint
-lint: lint-yaml lint-ansible lint-shell lint-helm ## Run every linter
+lint: lint-yaml lint-ansible lint-shell lint-helm lint-actions ## Run every linter
 
 .PHONY: lint-yaml
 lint-yaml:
@@ -505,6 +505,20 @@ lint-shell:
 .PHONY: lint-helm
 lint-helm: ## Render every pinned chart against its values file
 	$(LINT) tests/helm-template-check.sh
+
+# actionlint, not yamllint, is what catches a workflow GitHub will reject:
+# yamllint only proves the file is YAML. An invalid `runs-on:`, a context used
+# where it is not available, a typo'd `needs:` — all parse fine as YAML and all
+# fail at dispatch as a 0s run with no jobs and no annotation to read.
+# Confirmed live: `KUBECONFIG: ${{ runner.temp }}/...` in a job-level `env:`
+# reached main through a fully green lint gate and broke image-vuln-scan.yml.
+# No $(LINT) wrapper: this is a single static binary, and the ansible-runner
+# image has no reason to carry it.
+.PHONY: lint-actions
+lint-actions: ## Check every workflow against what GitHub will actually accept
+	@command -v actionlint >/dev/null || { \
+	  echo "actionlint not found — https://github.com/rhysd/actionlint" >&2; exit 1; }
+	actionlint
 
 .PHONY: clean
 clean: ## Remove rendered artefacts

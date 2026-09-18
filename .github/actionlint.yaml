@@ -1,0 +1,13 @@
+---
+# Labels actionlint cannot know about on its own: they are ARC scale set names
+# (cluster/arc/values-*.yaml) and the compose stack's own labels
+# (ansible/roles/runner_host/defaults/main.yml), not GitHub-hosted runners.
+# Without this, every self-hosted `runs-on:` in this repo is a lint error and
+# the real findings drown in it.
+self-hosted-runner:
+  labels:
+    # ARC scale sets, in-cluster. ADR-0006's exit.
+    - lab-deploy
+    - lab-dind
+    # The compose stack on 1972-console-1. Break-glass, deliberately kept.
+    - lab-network
