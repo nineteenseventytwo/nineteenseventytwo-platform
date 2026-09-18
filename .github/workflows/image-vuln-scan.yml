@@ -64,17 +64,23 @@ jobs:
       # thing CI runs is still the thing you run by hand.
       - name: List every running image, deduplicated
         id: list
-        # KUBECONFIG belongs here rather than in the job's own `env:`, which
-        # cannot see the `runner` context at all — putting it there makes the
-        # whole file invalid, and GitHub rejects it before any job starts
-        # (a 0s run with no jobs, named after the workflow file). Step-level
-        # env is where `runner` is actually available. The path matches the
-        # Makefile's own GITHUB_ACTIONS default, so `make` and the staging
-        # step above agree without either hardcoding it twice.
-        env:
-          KUBECONFIG: ${{ runner.temp }}/kube/config
+        # Explicit bash. In a job container the runner picks the shell by
+        # probing the image, and it settled on `sh -e` here even though bash
+        # is installed — which made `set -o pipefail` a hard error under dash:
+        #
+        #   set: Illegal option -o pipefail
+        #
+        # Naming the shell is cheaper than depending on that probe.
+        shell: bash
         run: |
           set -euo pipefail
+          # $RUNNER_TEMP, not the runner.temp expression: an expression is
+          # evaluated by the runner and yields the *runner's* path
+          # (/home/runner/_work/_temp), while inside this container the same
+          # directory is mounted at /__w/_temp. The env var is the one the
+          # runner rewrites per container, so it is what agrees with the
+          # staging step above — which writes through $RUNNER_TEMP too.
+          export KUBECONFIG="$RUNNER_TEMP/kube/config"
           images=$(make list-running-images | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "images=$images" >> "$GITHUB_OUTPUT"
 
