@@ -38,7 +38,12 @@ containerMode:
   type: "kubernetes"
   kubernetesModeWorkVolumeClaim:
     accessModes: [ReadWriteOnce]
-    storageClassName: longhorn
+    # Not the default `longhorn` class: that one is 2-replica with
+    # reclaimPolicy Retain, and neither suits a volume that exists for exactly
+    # one job. Replicating it while the job writes 100MB into it is what made
+    # these volumes detach mid-write, and Retain leaked a 4Gi PV per job.
+    # See cluster/longhorn/storageclass-ci-scratch.yaml.
+    storageClassName: longhorn-ci-scratch
     resources:
       requests:
         storage: 4Gi
