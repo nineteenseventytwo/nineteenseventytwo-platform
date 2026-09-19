@@ -38,6 +38,20 @@ if [[ -z "${VAULT_ADDR:-}" ]]; then
   exit 1
 fi
 
+# Reachability first, and separately. `kubectl get secret` failing is not
+# evidence the secret is missing - an unset KUBECONFIG fails it exactly the
+# same way, and then reports a perfectly healthy cluster as an unapplied
+# policy. Confirmed live: this script was run with no KUBECONFIG set and no
+# ~/.kube/config present, and blamed policy/tenants/<tenant>.yaml for a
+# ServiceAccount token that had been sitting in the namespace for two weeks.
+# Same reasoning, and the same separation, as tests/verify-limitrange.sh's
+# own unreachable-cluster guard.
+if ! kubectl version -o json >/dev/null 2>&1; then
+  echo "error: cannot reach a cluster - is KUBECONFIG set?" >&2
+  echo "       (KUBECONFIG=${KUBECONFIG:-unset}; this repo's own is ./build/kubeconfig)" >&2
+  exit 2
+fi
+
 if ! kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
   echo "error: secret ${NAMESPACE}/${SECRET_NAME} not found - is policy/tenants/${TENANT}.yaml applied?" >&2
   exit 1
