@@ -23,7 +23,7 @@
       ansible.builtin.command:
         cmd: ubuntu-drivers autoinstall
       register: gpu_host_driver_install
-      changed_when: "'already installed' not in gpu_host_gpu_host_driver_install.stdout"
+      changed_when: "'already installed' not in gpu_host_driver_install.stdout"
 
     - name: Check whether the driver install needs a reboot
       ansible.builtin.stat:
@@ -97,11 +97,35 @@
     volumes:
       - "{{ gpu_host_data_dir }}:/root/.ollama"
 
+# The container being "started" is not the same as Ollama's HTTP server
+# answering, and the pull below goes through that server. On a fresh host the
+# gap is real, and losing the race surfaces as a connection refused from inside
+# `docker exec` — which reads like a broken image rather than a timing problem.
+- name: Wait for Ollama to answer
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ gpu_host_ollama_port }}"
+    timeout: 60
+
+# `ollama pull` prints per-layer progress whether or not it had to fetch
+# anything, so its output cannot distinguish a no-op from a 5 GB download — the
+# previous `'already exists' not in stdout` test reported changed on every
+# converge, which is the signal that would otherwise show real drift. Ask what
+# is already resident instead. check_mode: false because this reads and changes
+# nothing, and without it a dry run leaves the register undefined and fails the
+# next task's `when` rather than the task it was asking about.
+- name: List the models already present
+  ansible.builtin.command:
+    cmd: docker exec ollama ollama list
+  register: gpu_host_model_list
+  changed_when: false
+  check_mode: false
+
 - name: Pull the model
   ansible.builtin.command:
     cmd: "docker exec ollama ollama pull {{ gpu_host_model }}"
-  register: gpu_host_model_pull
-  changed_when: "'already exists' not in gpu_host_model_pull.stdout"
+  when: gpu_host_model not in gpu_host_model_list.stdout
+  changed_when: true
 
 - name: Install the proxy configuration
   ansible.builtin.template:
@@ -125,6 +149,60 @@
 # so the traffic is switch-local: OPNsense never sees it and no firewall rule
 # there can constrain it (docs/01-network-validation.md, test 11). The other
 # control is composer's NetworkPolicy. There is no third layer.
+#
+# Which is why the install and the enable below are not housekeeping. Ubuntu
+# ships ufw but leaves it inactive, and adding a rule does not activate it — so
+# without these, the deny at the end of this block was written to /etc/ufw and
+# never enforced. The claim above would have been false in exactly the
+# direction that matters: one control, not two, and nothing to say so.
+#
+# The `hardening` role does this for cluster nodes, and the composer standup
+# plan's P2 said to apply it here too. It is deliberately not in
+# 40-gpu-host.yml: it also reconciles authorized_keys to
+# hardening_ssh_authorized_keys, which is empty, leaving the Vault SSH CA as
+# the only way in. That is right for a headless Pi Ansible owns outright. On a
+# dual-boot desktop that spends half its life in Windows it is a lockout
+# waiting for the next CA rotation, and the machine is not always sitting where
+# someone can walk to it. So this role owns its own firewall, narrowly.
+#
+# This filters what it is meant to only because the proxy runs with
+# `network_mode: host` — its listener is an ordinary host socket and traverses
+# ufw's INPUT chain. Docker's own iptables rules bypass ufw for *published*
+# ports, so moving the proxy to `published_ports` would silently take this
+# whole block off the path.
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Set default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - {direction: incoming, policy: deny}
+    - {direction: outgoing, policy: allow}
+
+# Before `Enable ufw`, not after. Default-deny incoming takes effect the moment
+# ufw comes up, and Ansible is connected over this very port — enabling first
+# would cut the play's own transport and leave the host unreachable until
+# someone booted it to Windows or attached a keyboard.
+- name: Allow SSH from the workstation subnet
+  community.general.ufw:
+    rule: allow
+    src: "{{ workstation_subnet }}"
+    port: "22"
+    proto: tcp
+    comment: "ssh from VLAN 10"
+
+- name: Allow SSH from the console node
+  community.general.ufw:
+    rule: allow
+    src: "{{ hostvars['1972-console-1'].ansible_host }}"
+    port: "22"
+    proto: tcp
+    comment: "ansible from 1972-console-1"
+
 - name: Allow inference only from the cluster nodes
   community.general.ufw:
     rule: allow
@@ -138,3 +216,7 @@
     rule: deny
     port: "{{ gpu_host_proxy_port }}"
     proto: tcp
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled

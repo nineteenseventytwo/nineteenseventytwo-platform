@@ -6,7 +6,10 @@
 # Pinned by digest, like every other image this repo runs. A tag means
 # something different each week, and the weekly vulnerability scan cannot say
 # anything useful about a moving target.
-gpu_host_ollama_image: "docker.io/ollama/ollama@sha256:REPLACE_ME"
+#
+# ollama/ollama 0.34.4, resolved 2026-09-24. The index carries linux/amd64 and
+# linux/arm64; this host is amd64.
+gpu_host_ollama_image: "docker.io/ollama/ollama@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551"
 
 # The model composer asks for. Provisional: D-C defers the choice to a bake-off
 # on this hardware, because the 8 GB card is the binding constraint and a
@@ -17,13 +20,21 @@ gpu_host_model: "llama3.1:8b"
 # filesystem by accident.
 gpu_host_data_dir: /var/lib/ollama
 
-# Ollama's own port, bound to loopback. Nothing reaches it directly — see the
-# proxy below.
-gpu_host_ollama_port: 11434
+# Ollama's own port, published on loopback only — and deliberately **not**
+# 11434. The proxy below is what owns 11434, on every interface, because that
+# is the port the cluster is already configured to call (composer's
+# LLM_BASE_URL and its NetworkPolicy egress rule both name it). Giving Ollama
+# the same number put two listeners on it: docker-proxy on 127.0.0.1:11434 and
+# Caddy on 0.0.0.0:11434. Linux resolves that by most-specific match, so a
+# loopback request reached Ollama *directly* and skipped the proxy entirely —
+# which is what this playbook's own verification tasks do, so the control they
+# exist to prove was never on the path being tested.
+gpu_host_ollama_port: 11435
 
 # The port the cluster actually talks to.
 gpu_host_proxy_port: 11434
-gpu_host_proxy_image: "docker.io/library/caddy@sha256:REPLACE_ME"
+# caddy 2.11.4-alpine, resolved 2026-09-24.
+gpu_host_proxy_image: "docker.io/library/caddy@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b"
 
 # Only the cluster nodes may ask for inference. Narrow by address rather than
 # by subnet: this path has no firewall in front of it (see tasks/main.yml).
