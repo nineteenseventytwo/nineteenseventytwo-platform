@@ -5,14 +5,24 @@
 #   make known-hosts
 #
 # hosts.yml is the single source of truth for hostnames and addresses (see its
-# own header comment), so this resolves the cicd:cluster host list through
+# own header comment), so this resolves the cicd:cluster:gpu host list through
 # Ansible's inventory rather than hardcoding IPs — the same reason
 # bootstrap/cloud-init/render.sh shells out instead of re-deriving. `-c local`
 # means no SSH connection is attempted just to read each host's own
 # ansible_host; ssh-keyscan is the only thing that actually touches a node.
 #
 # Run this after reimaging a node (cloud-init generates fresh host keys on
-# first boot) or when a node is added to hosts.yml. Always podman, not
+# first boot) or when a node is added to hosts.yml.
+#
+# The `gpu` host is in scope but is the one host that is legitimately absent
+# much of the time: it is a dual-boot PC, and in its Windows boot it serves
+# eightbitsaxlounge's midi device service with no sshd at all. An unreachable
+# host therefore keeps whatever key is already committed for it rather than
+# failing the run — otherwise regenerating known_hosts for the Pis would
+# depend on which operating system a desktop happened to be in. It is still a
+# hard error if there is no committed key either, because then the omission
+# would be silent and the next converge would fail on host key verification
+# with nothing to explain why. Always podman, not
 # ENGINE-conditional like the Makefile's CONTAINER_RUN: this is a manual
 # workstation step, never run by CI, same as render.sh.
 #
@@ -54,13 +64,13 @@ run_keyscan() {
   fi
 }
 
-echo "Resolving cicd:cluster hosts from ${OUT%/*}/../inventory/lab/hosts.yml..." >&2
-PAIRS=$(run_ansible -i ansible/inventory/lab 'cicd:cluster' -c local \
+echo "Resolving cicd:cluster:gpu hosts from ${OUT%/*}/../inventory/lab/hosts.yml..." >&2
+PAIRS=$(run_ansible -i ansible/inventory/lab 'cicd:cluster:gpu' -c local \
   -m debug -a 'msg={{ inventory_hostname }},{{ ansible_host }}' \
   | awk -F': ' '/^ *msg:/ {print $2}')
 
 if [[ -z "$PAIRS" ]]; then
-  echo "error: no hosts resolved from cicd:cluster — check ansible/inventory/lab/hosts.yml" >&2
+  echo "error: no hosts resolved from cicd:cluster:gpu — check ansible/inventory/lab/hosts.yml" >&2
   exit 1
 fi
 
@@ -84,7 +94,16 @@ trap 'rm -f "$TMP"' EXIT
     echo "Scanning ${NAME} (${IP})..." >&2
     KEY=$(run_keyscan -t ed25519 -T 5 "$IP" 2>/dev/null | grep -v '^#') || true
     if [[ -z "$KEY" ]]; then
-      echo "error: no ed25519 host key returned for ${NAME} (${IP}) — is it up?" >&2
+      # Fall back to the committed key before giving up. Matches on the exact
+      # "name,ip " prefix so a host that moved address is treated as new
+      # rather than silently keeping a key scanned at its old one.
+      PREVIOUS=$(grep "^${NAME},${IP} " "$OUT" 2>/dev/null || true)
+      if [[ -n "$PREVIOUS" ]]; then
+        echo "warning: ${NAME} (${IP}) did not answer — keeping its committed key" >&2
+        echo "$PREVIOUS"
+        continue
+      fi
+      echo "error: no ed25519 host key returned for ${NAME} (${IP}), and none is committed — is it up?" >&2
       exit 1
     fi
     echo "${KEY/#${IP} /${NAME},${IP} }"
