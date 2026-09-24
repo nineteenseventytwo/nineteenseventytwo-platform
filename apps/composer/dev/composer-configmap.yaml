@@ -8,9 +8,18 @@
 #                  from options the library derived. Needs LLM_BASE_URL to be
 #                  reachable.
 #
-# Held at `deterministic` until the GPU host is online and its NetworkPolicy
-# allow-pair is proven (see composer-networkpolicy.yaml). Flipping it is a
-# one-line change here; nothing about the Deployment needs to move.
+# Held at `deterministic` until the GPU host was online and its NetworkPolicy
+# allow-pair proven. Both happened on 2026-09-24: 1972-gpu-1 serves inference
+# through the Caddy proxy on 11434, and a pod in this namespace got a
+# completion from it over the egress rule in composer-networkpolicy.yaml.
+#
+# So this is now `plan`, which is the flip the comment above always
+# anticipated — a ConfigMap edit, with nothing about the Deployment moving.
+#
+# A ConfigMap change does not restart a Deployment that consumes it via
+# envFrom, and nothing in this repo hashes ConfigMaps into the pod template to
+# make it. Deleting the pod is what picks this up; the ReplicaSet replaces it
+# and Argo does not manage pods directly, so nothing fights it.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -20,9 +29,22 @@ metadata:
     app: composer
     component: api
 data:
-  COMPOSER_ARRANGER: "deterministic"
+  COMPOSER_ARRANGER: "plan"
   # The GPU host's own address, not a Service — inference runs off-cluster
   # (07's D1(b)). Inert while the arranger is deterministic.
   LLM_BASE_URL: "http://192.168.20.210:11434"
   LLM_MODEL: "llama3.1:8b"
+  # Set explicitly rather than left to composer's 8192 default, because the
+  # number it has to fit inside is now measured rather than assumed. On the
+  # RTX 4060's 8188 MiB, with the model pinned resident:
+  #
+  #   num_ctx  4096 -> 5.3 GB, 100% GPU
+  #   num_ctx  8192 -> 5.8 GB, 100% GPU
+  #   num_ctx 16384 -> 6.9 GB, 100% GPU
+  #
+  # All three stay entirely on the GPU; none spills to CPU, which is the
+  # failure that would show up as inference being mysteriously slow rather
+  # than as an error. 8192 is composer's default and leaves the most headroom
+  # of the sizes that comfortably hold an eight-bar chunk.
+  LLM_NUM_CTX: "8192"
   LOG_LEVEL: "info"
