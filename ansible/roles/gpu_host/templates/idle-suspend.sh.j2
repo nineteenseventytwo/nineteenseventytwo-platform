@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Managed by ansible/roles/gpu_host. Edits here are overwritten.
+#
+# Suspend the GPU host when nothing has asked it for inference recently.
+#
+# The idle signal is the proxy's access log, because the proxy is the one
+# thing that sees every inference request by definition. The alternatives are
+# all worse: `ollama ps` reports the model as resident forever now that
+# OLLAMA_KEEP_ALIVE is -1, and GPU utilisation is 0% on a loaded-but-idle
+# model, so neither can say *when* the last request was.
+#
+# Only /api/generate and /api/chat count. /api/tags is the shape a health
+# check takes — nothing polls it today, but if something ever does, a host
+# that counted it would never sleep again and the reason would be invisible.
+set -euo pipefail
+
+IDLE_SECONDS={{ gpu_host_idle_suspend_minutes * 60 }}
+LOG={{ gpu_host_proxy_log_dir }}/access.log
+NOW=$(date +%s)
+
+# Someone is on the box: a shell, a converge, a debugging session. Suspending
+# under them is never what they wanted.
+if [ -n "$(who)" ]; then
+  exit 0
+fi
+
+# Caddy writes one JSON object per line with a float `ts`. jq is in
+# common_packages, so it is present on every host this repo manages.
+LAST=""
+if [ -s "$LOG" ]; then
+  LAST=$(jq -r 'select(.request.uri | test("^/api/(generate|chat)")) | .ts' "$LOG" 2>/dev/null | tail -1 || true)
+fi
+
+# No inference since the log began — which is the normal state of a host that
+# has just booted. Measure from boot instead, so a machine nobody ever used
+# still eventually sleeps, rather than staying awake forever for want of a
+# log line.
+if [ -z "$LAST" ]; then
+  LAST=$(( NOW - $(cut -d. -f1 /proc/uptime) ))
+fi
+
+IDLE=$(( NOW - ${LAST%.*} ))
+if [ "$IDLE" -lt "$IDLE_SECONDS" ]; then
+  exit 0
+fi
+
+logger -t gpu-host-idle-suspend "no inference for ${IDLE}s (threshold ${IDLE_SECONDS}s) - suspending"
+
+# systemctl suspend, not `rtcwake -m mem`. rtcwake insists on the
+# /sys/power/wakeup_count handshake and on this host it loses that race every
+# time: it exits with `write error` and the journal shows `PM: suspend entry
+# (deep)` followed immediately by `PM: suspend exit`, with no device ever
+# suspended. Verified 2026-09-24. Arming /sys/class/rtc/rtc0/wakealarm
+# directly does work, and is a good debugging safety net, but it is
+# deliberately not used here: a timed wake on a host that is asleep precisely
+# because nobody wants it would wake up to do nothing.
+exec systemctl suspend
