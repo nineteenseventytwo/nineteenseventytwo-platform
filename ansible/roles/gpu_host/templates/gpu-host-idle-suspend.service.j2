@@ -1,0 +1,11 @@
+# Managed by ansible/roles/gpu_host. Edits here are overwritten.
+[Unit]
+Description=Suspend the GPU host when it has served no inference recently
+# Nothing to decide while the machine is on its way down.
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gpu-host-idle-suspend

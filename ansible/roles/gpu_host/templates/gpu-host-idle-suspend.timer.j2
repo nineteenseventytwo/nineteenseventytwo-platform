@@ -1,0 +1,13 @@
+# Managed by ansible/roles/gpu_host. Edits here are overwritten.
+[Unit]
+Description=Check periodically whether the GPU host should suspend
+
+[Timer]
+# Every 5 minutes. The check is a jq over one file, so the interval costs
+# nothing; it only bounds how long past the threshold the host can linger.
+OnBootSec=10min
+OnUnitActiveSec=5min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

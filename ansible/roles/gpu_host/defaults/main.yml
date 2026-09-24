@@ -62,4 +62,17 @@ gpu_host_allowed_clients:
 # the default route, which is the one that has to land on 192.168.20.210.
 gpu_host_dhcp_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
 
+# Suspend the host when it has served no inference for this long. Waking it
+# again costs ~7s over wake-on-LAN and the model survives in VRAM across the
+# cycle, so guessing low is cheap; the machine draws roughly 50-60W awake and
+# a few watts asleep, so guessing high is not.
+#
+# 30 minutes is long enough that a working session never trips it and short
+# enough to catch an evening.
+gpu_host_idle_suspend_minutes: 30
+
+# Where the proxy writes its access log, on the host. Bind-mounted into the
+# proxy container at /var/log/caddy.
+gpu_host_proxy_log_dir: /var/log/ollama-proxy
+
 gpu_host_nvidia_ctk_keyring: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
