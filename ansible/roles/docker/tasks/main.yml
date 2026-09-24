@@ -37,6 +37,34 @@
     state: absent
   become: true
 
+# apt speaks dpkg architecture names — amd64, arm64, armhf — while
+# ansible_facts.architecture reports the kernel's: x86_64, aarch64. The
+# expression here used to special-case aarch64 -> arm64 and pass everything
+# else through unchanged, which was right for every host this estate had,
+# because all of them are arm64 (ADR-0011).
+#
+# The first x86_64 host it met was the GPU host, and it wrote
+# `Architectures: x86_64` into docker.sources. apt has no such architecture,
+# matched nothing in the repository, and said so as:
+#
+#     No package matching 'docker-ce' is available
+#
+# which reads like a missing package rather than a malformed source — the
+# repository was added successfully, it just described an architecture that
+# does not exist.
+#
+# Ask dpkg instead of extending the mapping. It is the tool that consumes the
+# answer, so it cannot disagree with it, and a lookup table would need a new
+# entry for the next architecture rather than already being correct. arm64
+# hosts are unaffected: dpkg returns arm64 there, which is what the old
+# expression produced.
+- name: Read the dpkg architecture
+  ansible.builtin.command:
+    cmd: dpkg --print-architecture
+  register: docker_dpkg_architecture
+  changed_when: false
+  check_mode: false
+
 - name: Add the Docker apt repository
   ansible.builtin.deb822_repository:
     name: docker
@@ -44,7 +72,7 @@
     uris: "https://download.docker.com/linux/ubuntu"
     suites: ["{{ ansible_facts.distribution_release }}"]
     components: [stable]
-    architectures: ["{{ 'arm64' if ansible_facts.architecture == 'aarch64' else ansible_facts.architecture }}"]
+    architectures: ["{{ docker_dpkg_architecture.stdout }}"]
     signed_by: /etc/apt/keyrings/docker.asc
   become: true
 
@@ -55,9 +83,14 @@
     update_cache: true
   become: true
 
+# The conditional combine matters: an unconditional one would write
+# `"runtimes": {}` on every host that has no extra runtimes, marking this task
+# changed and restarting docker across the whole cluster to add an empty
+# object. Written this way, a host with no extras gets exactly what it got
+# before.
 - name: Configure the Docker daemon
   ansible.builtin.copy:
-    content: "{{ docker_daemon_options | to_nice_json }}\n"
+    content: "{{ docker_daemon_options | combine({'runtimes': docker_extra_runtimes} if docker_extra_runtimes else {}) | to_nice_json }}\n"
     dest: /etc/docker/daemon.json
     owner: root
     group: root
