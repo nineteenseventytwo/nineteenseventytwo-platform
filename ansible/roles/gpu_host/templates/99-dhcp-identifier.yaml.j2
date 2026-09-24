@@ -1,0 +1,21 @@
+# Managed by ansible/roles/gpu_host. Edits here are overwritten.
+#
+# systemd-networkd defaults to ClientIdentifier=duid: it sends an RFC 4361
+# IAID+DUID derived from /etc/machine-id as DHCP option 61, not the hardware
+# address. Windows sends the RFC 2132 form — type 01 followed by the MAC.
+#
+# One NIC, two boots, two identities. Kea matched the 192.168.20.210
+# reservation for the Windows boot and dropped the Linux boot into the pool at
+# 192.168.20.100, which is not where the inventory, composer's LLM_BASE_URL,
+# its NetworkPolicy egress rule or the eightbitsaxlounge midi manifests expect
+# this host to be. Nothing was broken enough to notice: the machine was up,
+# answering SSH, and simply somewhere else.
+#
+# `mac` makes networkd send 01 + MAC, byte for byte what the Windows boot
+# sends, so one reservation now covers both.
+network:
+  version: 2
+  ethernets:
+    {{ gpu_host_dhcp_interface }}:
+      dhcp4: true
+      dhcp-identifier: mac

@@ -128,6 +128,27 @@
         update_cache: true
       notify: Restart docker
 
+# Written, deliberately not applied. `netplan apply` renews the lease, and the
+# address it renews *to* is the one this play is connected over — so applying
+# it here would cut the connection mid-converge, on the one task whose whole
+# purpose is to change which address the host answers on. It takes effect on
+# the next boot, which for a host that is rebooted for the driver install a few
+# tasks from now is not a wait.
+#
+# This cannot fix a host that is currently in the pool, because Ansible reaches
+# it at the address it is not yet using. Getting there the first time is a
+# manual step. What this does is stop it drifting back after a reinstall, and
+# say in the tree why the setting exists at all.
+- name: Send the MAC as the DHCP client identifier
+  ansible.builtin.template:
+    src: 99-dhcp-identifier.yaml.j2
+    dest: /etc/netplan/99-dhcp-identifier.yaml
+    owner: root
+    group: root
+    # netplan warns, loudly and on every invocation, about world-readable
+    # configuration.
+    mode: "0600"
+
 - name: Create the model cache directory
   ansible.builtin.file:
     path: "{{ gpu_host_data_dir }}"
