@@ -202,6 +202,8 @@
         capabilities: [[gpu]]
     published_ports:
       - "127.0.0.1:{{ gpu_host_ollama_port }}:11434"
+    env:
+      OLLAMA_KEEP_ALIVE: "{{ gpu_host_keep_alive }}"
     volumes:
       - "{{ gpu_host_data_dir }}:/root/.ollama"
 

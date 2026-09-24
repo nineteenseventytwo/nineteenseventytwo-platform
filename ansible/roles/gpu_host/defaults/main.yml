@@ -16,6 +16,21 @@ gpu_host_ollama_image: "docker.io/ollama/ollama@sha256:8262851b2846b87c649eddf3e
 # laptop's unified memory cannot stand in for it.
 gpu_host_model: "llama3.1:8b"
 
+# How long Ollama keeps a model in VRAM after its last request. -1 pins it
+# there indefinitely.
+#
+# The default is 5 minutes, and the cost of letting it expire was measured
+# from a pod in the cluster: the first request after an idle spell took 11.7s
+# against 2.2-3.9s warm, all of that difference being the model being read
+# back into VRAM rather than anything to do with inference. composer sends one
+# request per eight-bar chunk, so an arrangement that starts cold pays that
+# once and then runs at ~51 tok/s.
+#
+# This host exists to serve inference and nothing else — D-A chose a dedicated
+# Linux boot precisely so the GPU is not shared with a desktop — so there is
+# nothing else here that wants the 5 GB back.
+gpu_host_keep_alive: "-1"
+
 # Where model weights live. Several at 4–8 GB each, so not on the root
 # filesystem by accident.
 gpu_host_data_dir: /var/lib/ollama
