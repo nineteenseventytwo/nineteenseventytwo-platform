@@ -55,6 +55,38 @@
         status_code: 200
       tags: [gpu]
 
+    # /api/tags above proves the proxy routes. It does not prove the GPU can
+    # run anything — it answers identically on a host whose driver is broken,
+    # whose VRAM is too small for the model, or which has quietly fallen back
+    # to CPU. This asks for one token, which is the cheapest request that
+    # cannot pass without the whole path working.
+    #
+    # It also leaves the model resident. OLLAMA_KEEP_ALIVE=-1 means "never
+    # evict once loaded", not "load at startup", so a freshly rebooted host
+    # sits with an empty `ollama ps` until something asks. Without this, a
+    # converge finishes reporting success while the first real arrangement
+    # still pays ~10s to read 5.3 GB into VRAM. With it, "the converge is
+    # done" and "the host is ready to serve" mean the same thing.
+    - name: Check the model actually runs, and leave it resident
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ gpu_host_proxy_port }}/api/generate"
+        method: POST
+        body_format: json
+        body:
+          model: "{{ gpu_host_model }}"
+          prompt: "ok"
+          stream: false
+          options:
+            num_predict: 1
+        timeout: 300
+        status_code: 200
+      # A POST through the uri module reports changed by default. This one
+      # asks a question and alters nothing, and a gate that claims to change
+      # something on every run is the same false signal the driver task used
+      # to give.
+      changed_when: false
+      tags: [gpu]
+
     # The control that makes the port safe to expose. If this starts
     # succeeding, the proxy is not doing its job and the cluster can delete
     # models.
