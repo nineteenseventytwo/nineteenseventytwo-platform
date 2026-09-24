@@ -13,9 +13,22 @@
 #
 # `mac` makes networkd send 01 + MAC, byte for byte what the Windows boot
 # sends, so one reservation now covers both.
+#
+# `wakeonlan: true` becomes WakeOnLan=magic in networkd, which is the
+# equivalent of `ethtool -s <if> wol g`. The NIC supports it — `Supports
+# Wake-on: pumbg`, the g being magic packet — but ships disabled (`Wake-on:
+# d`) and an ethtool call does not survive a reboot, which is the whole reason
+# this belongs in configuration rather than in a runbook.
+#
+# It is half the story. The driver accepting `g` does not mean the board will
+# wake: the UEFI has its own Wake-on-LAN setting, and with that off the
+# magic packet is received by a NIC nothing is listening to. Windows Fast
+# Startup matters here too and is already disabled — a hibernated Windows can
+# leave the NIC in a state that will not wake at all.
 network:
   version: 2
   ethernets:
     {{ gpu_host_dhcp_interface }}:
       dhcp4: true
       dhcp-identifier: mac
+      wakeonlan: true

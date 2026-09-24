@@ -167,10 +167,19 @@
 # it at the address it is not yet using. Getting there the first time is a
 # manual step. What this does is stop it drifting back after a reinstall, and
 # say in the tree why the setting exists at all.
-- name: Send the MAC as the DHCP client identifier
+# Renamed from 99-dhcp-identifier.yaml once it grew a second setting that has
+# nothing to do with DHCP. netplan reads every file in the directory, so the
+# old one left behind would still be applied — and would still be declaring
+# this interface, from a filename describing only half of what it does.
+- name: Remove the superseded netplan drop-in
+  ansible.builtin.file:
+    path: /etc/netplan/99-dhcp-identifier.yaml
+    state: absent
+
+- name: Configure the interface for DHCP identity and wake-on-LAN
   ansible.builtin.template:
-    src: 99-dhcp-identifier.yaml.j2
-    dest: /etc/netplan/99-dhcp-identifier.yaml
+    src: 99-gpu-host.yaml.j2
+    dest: /etc/netplan/99-gpu-host.yaml
     owner: root
     group: root
     # netplan warns, loudly and on every invocation, about world-readable
