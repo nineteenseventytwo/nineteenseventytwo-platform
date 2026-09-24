@@ -1,0 +1,31 @@
+---
+# The GPU host, and only the GPU host. Not a cluster node — see hosts.yml's
+# `gpu` group and ADR-0011.
+
+# Installing nvidia-container-toolkit does not register the runtime with
+# Docker. It puts nvidia-container-runtime on the host and stops there, so the
+# daemon still knows runc and nothing else, and asking for a GPU fails with:
+#
+#   could not select device driver "nvidia" with capabilities: [[gpu]]
+#
+# which is what the first converge of 1972-gpu-1 hit, five minutes into
+# pulling the Ollama image.
+#
+# The upstream instruction is `nvidia-ctk runtime configure --runtime=docker`,
+# which edits /etc/docker/daemon.json in place. That file is owned by the
+# docker role, which rewrites it from docker_daemon_options on every converge
+# — so the two would take turns: docker restarted twice per run, and
+# `Configure the Docker daemon` reporting changed forever, which is exactly
+# the signal that would otherwise reveal drift. Declared as data instead, so
+# daemon.json keeps one owner.
+#
+# Ordering is safe, and was checked rather than assumed. The docker role runs
+# before gpu_host installs the toolkit, so on a fresh host this names a binary
+# that does not exist yet; dockerd was confirmed on 1972-gpu-1 to start anyway
+# and resolve the path only when a container asks for the runtime. gpu_host's
+# toolkit install notifies a docker restart, so the runtime is live by the
+# time Ollama starts.
+docker_extra_runtimes:
+  nvidia:
+    path: /usr/bin/nvidia-container-runtime
+    args: []

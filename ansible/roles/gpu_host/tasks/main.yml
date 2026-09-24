@@ -78,21 +78,49 @@
         state: present
         update_cache: true
 
+    # Ask whether the driver works, rather than whether apt thinks it is
+    # installed. That is the property this role actually needs, it is
+    # self-healing when a kernel update breaks the module, and it is the only
+    # test that does not reboot a working host.
+    #
+    # `ubuntu-drivers autoinstall` cannot be run unconditionally. It prints no
+    # string meaning "nothing to do" — verified on the host, its output when
+    # the driver is already present is three lines about *not* restarting
+    # anything — so the previous `'already installed' not in stdout` was
+    # always true. Worse, it creates /var/run/reboot-required on every run
+    # whether or not it changed anything, which the next task then acted on.
+    # The two together rebooted the GPU host on every converge: inference down
+    # for ~70s and the model evicted from VRAM, to change a ufw rule.
+    - name: Check whether a working NVIDIA driver is already present
+      ansible.builtin.command:
+        cmd: nvidia-smi --query-gpu=driver_version --format=csv,noheader
+      register: gpu_host_driver_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
     - name: Auto-install the recommended NVIDIA driver
       ansible.builtin.command:
         cmd: ubuntu-drivers autoinstall
-      register: gpu_host_driver_install
-      changed_when: "'already installed' not in gpu_host_driver_install.stdout"
+      when: gpu_host_driver_check.rc != 0
+      changed_when: true
 
     - name: Check whether the driver install needs a reboot
       ansible.builtin.stat:
         path: /var/run/reboot-required
       register: gpu_host_reboot_required
+      when: gpu_host_driver_check.rc != 0
 
+    # Both conditions, not just the flag. /var/run/reboot-required is written
+    # by unattended-upgrades and any other package that wants one, so acting
+    # on it alone would let an unrelated kernel update reboot an inference
+    # host in the middle of a converge that had no business touching it.
     - name: Reboot if the driver install requires it
       ansible.builtin.reboot:
         reboot_timeout: 300
-      when: gpu_host_reboot_required.stat.exists
+      when:
+        - gpu_host_driver_check.rc != 0
+        - gpu_host_reboot_required.stat.exists | default(false)
 
 - name: Install the NVIDIA container toolkit
   when: ansible_os_family == "Debian"
@@ -206,6 +234,18 @@
     cmd: "docker exec ollama ollama pull {{ gpu_host_model }}"
   when: gpu_host_model not in gpu_host_model_list.stdout
   changed_when: true
+
+# The template task below writes into this directory and will not create it
+# — ansible.builtin.template fails outright on a missing parent rather than
+# creating one, which is the behaviour you want from it and the reason this
+# task has to exist.
+- name: Create the proxy configuration directory
+  ansible.builtin.file:
+    path: /etc/ollama-proxy
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Install the proxy configuration
   ansible.builtin.template:

@@ -45,6 +45,6 @@ gpu_host_allowed_clients:
 
 # The interface the DHCP reservation is keyed on. Defaults to whatever carries
 # the default route, which is the one that has to land on 192.168.20.210.
-gpu_host_dhcp_interface: "{{ ansible_default_ipv4.interface }}"
+gpu_host_dhcp_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
 
 gpu_host_nvidia_ctk_keyring: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg

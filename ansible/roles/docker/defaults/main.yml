@@ -6,6 +6,13 @@ docker_packages:
   - docker-buildx-plugin
   - docker-compose-plugin
 
+# Extra container runtimes to register with the daemon. Empty everywhere but
+# the GPU host, which needs nvidia — see group_vars/gpu.yml for why it is
+# declared as data here rather than applied with `nvidia-ctk runtime
+# configure`. An empty dict produces byte-identical daemon.json to before, so
+# no existing host sees a change.
+docker_extra_runtimes: {}
+
 docker_users:
   - "{{ admin_user }}"
 
