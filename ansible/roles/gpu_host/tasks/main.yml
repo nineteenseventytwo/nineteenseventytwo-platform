@@ -10,6 +10,65 @@
 # device plugin, the node label — because D1(b) decided the host stays outside
 # it and ADR-0011 depends on that staying true.
 
+# ADR-0011 and D-A both turn on this host not being a cluster node, and the
+# role was written for that: the salvaged playbook's kubeadm, kubelet, device
+# plugin and node label were all dropped. But *not joining* is not the same as
+# *undoing*, and the host was surveyed on 2026-09-24 still carrying the remains
+# of the abandoned GPU-worker attempt — kubelet, kubeadm, kubectl and cri-tools
+# installed, the kubelet unit enabled, and the pkgs.k8s.io v1.35 apt repo still
+# configured while the cluster runs 1.37.
+#
+# It had never joined anything: /etc/kubernetes held nothing but an empty
+# manifests/, so the kubelet sat in `activating (auto-restart)` failing with
+# exit 1 every few seconds, and had done since boot. Harmless in effect, wrong
+# in kind. The single property this host must have is that it is provably not a
+# node, and "there is a kubelet, it is enabled, and it is trying" is not that.
+# Nor is the stale apt repo, which puts node packages back on the next
+# `apt upgrade`. Removing them is part of preparing the host, not tidying it.
+- name: Remove the remains of any cluster-join attempt
+  when: ansible_os_family == "Debian"
+  block:
+    # Guarded rather than `failed_when: false`: on a host that never had a
+    # kubelet the systemd module errors on the unit not existing, and
+    # swallowing that would also swallow a genuine failure to stop a running
+    # one — which is the case that matters here.
+    - name: Check for a kubelet unit
+      ansible.builtin.stat:
+        path: /usr/lib/systemd/system/kubelet.service
+      register: gpu_host_kubelet_unit
+
+    - name: Stop and disable the kubelet
+      ansible.builtin.systemd:
+        name: kubelet
+        state: stopped
+        enabled: false
+      when: gpu_host_kubelet_unit.stat.exists
+
+    # autoremove is deliberately off. With `state: absent` the apt module
+    # applies it system-wide, not just to these packages' own dependencies,
+    # and this is a desktop with a graphical session — cri-tools is named
+    # explicitly instead so the removal stays exactly as wide as it says.
+    - name: Purge the cluster-node packages
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+          - cri-tools
+        state: absent
+        purge: true
+        autoremove: false
+
+    - name: Remove the kubernetes apt repository
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        state: absent
+
+    - name: Remove the kubernetes configuration directory
+      ansible.builtin.file:
+        path: /etc/kubernetes
+        state: absent
+
 - name: Install the NVIDIA driver
   when: ansible_os_family == "Debian"
   block:
