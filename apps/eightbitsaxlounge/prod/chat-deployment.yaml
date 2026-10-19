@@ -64,7 +64,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: twitch-bot
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:ead81c9b76dce0763efdcddfc55a4438acc3dc588b1dd168f403e7a0faf80f67
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:94d4637ebbc21a1dc3cdb70efeba74dae34c4f527c396eb5955c584e4ad04422
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

@@ -92,7 +92,7 @@ spec:
           # 2.0.4, pinned by digest (CKV_K8S_43) rather than tag — belt and
           # braces given the tag is already immutable in this repo's
           # release model (skip8 above).
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:93d5cc97589b9f9185cbc1b98c8b84afb2b27528c51c8f0c90710ff870b3d28b
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:7be893b0f92023b859f014849763febcc26ab0bcd26ab6d5b96ccc9467ac018b
           imagePullPolicy: IfNotPresent
           # PSS `restricted` (prod enforces it; dev only warns, but the
           # image already runs non-root so there is no reason for the two

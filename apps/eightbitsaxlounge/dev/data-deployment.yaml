@@ -49,7 +49,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: data
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:b1f35ef3396bedd407866874842828a4f5cafab6981dca7c8056a79db0c6bc54
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:9c3bff4773cd27489222b66fb68e12eafc6588528f7f8318c0d132a230c02560
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
