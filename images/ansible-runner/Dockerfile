@@ -7,7 +7,12 @@
 # Pinned by digest: a moving tag means the weekly scan describes whatever the
 # last build happened to pull, and nothing is rebuilt when Debian ships a fix.
 # Bump the digest deliberately, with version.txt, so the fix is published.
-FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83
+#
+# trixie (Debian 13), not bookworm. bookworm carries critical CVEs Debian has
+# marked will-not-fix there (zlib CVE-2023-45853, sqlite CVE-2025-7458), and
+# image-vuln-scan.yml runs with ignore-unfixed — so they were real and
+# invisible. Nothing here depended on bookworm; it was the init default.
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
 # Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
 ARG ANSIBLE_CORE_VERSION=2.21.3
