@@ -103,6 +103,13 @@ alertmanager:
 grafana:
   enabled: true
   replicas: 1
+  # Ahead of the chart: 88.6.2 ships 13.2.0, whose Go stdlib, grpc and
+  # x/net carry 273 fixable highs in the image scan; 13.2.4 carries 61.
+  # A patch release on the same minor, so no migration. Drop this override
+  # when the chart bump catches up (92.x ships 13.2.4) — leaving it would
+  # silently pin grafana behind every later chart.
+  image:
+    tag: "13.2.4"
   # 256Mi OOMKilled under real interactive use (exitCode 137, confirmed live
   # on build 0003) - ran fine for ~10 hours at idle/scrape-only load, then
   # crashed once someone actually opened the UI and browsed dashboards.
