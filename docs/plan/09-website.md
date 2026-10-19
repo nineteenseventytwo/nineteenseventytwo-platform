@@ -234,9 +234,9 @@ cheapest possible excuse to use CloudFront Functions.)*
 
 All five. Nothing here is waiting on an answer.
 
-### W1 — The hostnames. **Decided: `mark.` and `dash.`**
+### W1 — The hostnames. **Decided: `sev.` and `dash.`**
 
-- Public site: **`mark.eightbitsaxlounge.com`**
+- Public site: **`sev.eightbitsaxlounge.com`**
 - Private dashboard: **`dash.eightbitsaxlounge.com`**
 
 A subdomain of `eightbitsaxlounge.com` rather than a new zone, since that is
@@ -244,12 +244,13 @@ the only zone in the estate — the registrar, DNS, DNS-01 issuance and the JWKS
 Worker all sit on it, and a second zone buys nothing but a renewal date. Both
 names are flat, matching the existing `oidc.` convention.
 
-`mark.` over the alternative `home.` because the site is yours, not the
-project's, and the name should say so even while the zone cannot.
+**Changed 2026-10-19:** the public name is `sev.`, replacing the `mark.`
+first chosen here (itself picked over `home.`). Nothing had been built against
+`mark.` beyond the `site` block in `config/aws.json`, which changes with it.
 
 Worth naming the cost plainly, since it is the one thing the name cannot fix:
 a personal site at a subdomain of a project's domain still reads as a sub-page
-of that project, and `mark.eightbitsaxlounge.com` makes that relationship more
+of that project, and `sev.eightbitsaxlounge.com` makes that relationship more
 visible rather than less. Accepted deliberately. If the site ever becomes
 something you hand to someone, revisit it then — it is a DNS record and a
 certificate, not a rebuild, and the whole site is portable to an apex on a day's
@@ -337,15 +338,15 @@ and the estimate says so rather than absorbing them silently.
       distribution, plus deny `aws:SecureTransport=false`
 - [ ] Note in the file header that the RCP's `PrincipalIsAWSService` condition
       is what makes this work (F1)
-- [ ] ACM certificate for `mark.eightbitsaxlounge.com` in `us-east-1`, DNS-01
+- [ ] ACM certificate for `sev.eightbitsaxlounge.com` in `us-east-1`, DNS-01
       through the existing Cloudflare setup
 - [ ] CloudFront: OAC, default root object, SPA-safe 404 handling, and a
       response-headers policy — HSTS, CSP per F10, `X-Content-Type-Options`,
       `Referrer-Policy`, `Permissions-Policy`
 - [ ] The scoped deploy role (F5)
-- [ ] `mark` DNS record, CNAME to the distribution, proxied (W4)
+- [ ] `sev` DNS record, CNAME to the distribution, proxied (W4)
 
-**Gate:** `curl https://mark.eightbitsaxlounge.com` from outside the lab and
+**Gate:** `curl https://sev.eightbitsaxlounge.com` from outside the lab and
 get a 200; `curl` the S3 REST endpoint directly and get a 403.
 
 ### W.2 — Site skeleton and the public shell _(~8h, web repo)_
@@ -358,7 +359,7 @@ get a 200; `curl` the S3 REST endpoint directly and get a 403.
 - [ ] Deploy workflow: build, sync to S3, invalidate CloudFront, purge
       Cloudflare (W4)
 
-**Gate:** a commit to `main` is live on `mark.eightbitsaxlounge.com` within a
+**Gate:** a commit to `main` is live on `sev.eightbitsaxlounge.com` within a
 minute, and the CSP reports no violations in the browser console.
 
 ### W.3 — The content pages _(~8h)_

@@ -37,14 +37,14 @@ The surviving half of the tiebreak is enough on its own: OAC, a deny-non-TLS
 bucket policy, a response-headers policy and an OIDC deploy are four real
 controls whatever the site's subject, and cost is still a wash. Within that:
 
-- **W1** — the public site is `mark.eightbitsaxlounge.com`; the private
+- **W1** — the public site is `sev.eightbitsaxlounge.com`; the private
   dashboard is `dash.eightbitsaxlounge.com`. No new zone.
 - **W2** — Astro, with external CSS and JS only and `script-src 'self'` with no
   `unsafe-inline` from the first commit.
 - **W3** — the weekly events job runs in GitHub Actions, rules-first behind a
   `Scorer` interface, and writes `events.json` to the site bucket. It does not
   rebuild the site and does not run in the cluster.
-- **W4** — the `mark` record is Cloudflare-proxied, CNAME to the distribution,
+- **W4** — the `sev` record is Cloudflare-proxied, CNAME to the distribution,
   Full (strict). The deploy purges both caches in one step.
 - **W5** — the dashboard is an in-cluster app behind Cloudflare Access →
   Tunnel, reading pod and deployment state in the two 8bsl namespaces only.
@@ -77,7 +77,7 @@ Terraform.
   in-cluster, it goes through the proxy.
 - The 1996 aesthetic costs more effort than it would with inline attributes.
   That is the price of a CSP that is a control rather than a header.
-- `mark.eightbitsaxlounge.com` reads as a sub-page of 8bsl. Accepted; moving
+- `sev.eightbitsaxlounge.com` reads as a sub-page of 8bsl. Accepted; moving
   to an apex later is a DNS record and a certificate, not a rebuild.
 - `nineteenseventytwo-web` is public, in the org, with signed commits and PRs
   required on `main` from its first commit. Its required status check is added
@@ -103,5 +103,6 @@ Terraform.
   rights over the account.
 - **A static dashboard from a published JSON.** Survives the cluster, but stale
   health data misleads in a way stale gig listings do not.
-- **A new zone, or `home.`** A second zone buys nothing but a renewal date;
-  `home.` names the project, not the person.
+- **A new zone.** A second zone buys nothing but a renewal date.
+- **`mark.` or `home.`** 09 first chose `mark.` over `home.`; it was changed
+  to `sev.` on 2026-10-19, before anything was built against it.
