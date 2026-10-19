@@ -9,3 +9,7 @@
     name: ollama-proxy
     state: started
     restart: true
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

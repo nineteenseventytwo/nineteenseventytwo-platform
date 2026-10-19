@@ -265,6 +265,14 @@
     mode: "0644"
   notify: Restart ollama proxy
 
+- name: Create the proxy log directory
+  ansible.builtin.file:
+    path: "{{ gpu_host_proxy_log_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Run the inference proxy
   community.docker.docker_container:
     name: ollama-proxy
@@ -274,6 +282,7 @@
     network_mode: host
     volumes:
       - /etc/ollama-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - "{{ gpu_host_proxy_log_dir }}:/var/log/caddy"
 
 # ⚠️ The host firewall is one of only two controls on this path. The cluster
 # nodes (192.168.20.202-204) and this host (192.168.20.210) are all on VLAN 20,
@@ -351,3 +360,41 @@
 - name: Enable ufw
   community.general.ufw:
     state: enabled
+
+# Power management. The host draws roughly 50-60W awake and a few watts
+# asleep, and it spends most of its life waiting for a score somebody has not
+# uploaded yet.
+#
+# Suspend is safe to do here in a way it would not be on most machines:
+# verified on 2026-09-24 that the Ollama process survives S3 with its model
+# still resident — Ubuntu sets NVreg_PreserveVideoMemoryAllocations=1 and
+# enables nvidia-suspend/nvidia-resume, so the 5.3 GB is written to system RAM
+# and restored. A woken host answers inference immediately; a rebooted one
+# owes ~11s reading the model back off disk. That asymmetry is the argument
+# for sleeping this host rather than shutting it down.
+- name: Install the idle-suspend check
+  ansible.builtin.template:
+    src: idle-suspend.sh.j2
+    dest: /usr/local/bin/gpu-host-idle-suspend
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the idle-suspend units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - gpu-host-idle-suspend.service
+    - gpu-host-idle-suspend.timer
+  notify: Reload systemd
+
+- name: Enable the idle-suspend timer
+  ansible.builtin.systemd:
+    name: gpu-host-idle-suspend.timer
+    enabled: true
+    state: started
+    daemon_reload: true

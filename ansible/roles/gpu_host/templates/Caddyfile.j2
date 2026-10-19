@@ -6,6 +6,19 @@
 # service in front of Ollama with one consumer would be a proxy that someone
 # has to maintain — see composer's D-B.
 :{{ gpu_host_proxy_port }} {
+	# The access log is what tells the idle-suspend timer when inference was
+	# last asked for. Nothing else on the host knows: with
+	# OLLAMA_KEEP_ALIVE=-1 the model is resident forever, and GPU utilisation
+	# on a loaded-but-idle model is 0%, so neither can date the last request.
+	# The proxy sees every one of them by construction.
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 2
+		}
+		format json
+	}
+
 	@inference path /api/chat /api/generate /api/tags
 	handle @inference {
 		reverse_proxy 127.0.0.1:{{ gpu_host_ollama_port }}
