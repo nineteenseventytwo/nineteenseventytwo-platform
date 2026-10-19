@@ -34,6 +34,22 @@ spec:
   # the tenant's memory request to serve a workload with no concurrency
   # pressure.
   replicas: 1
+  # Stop the old pod before starting the new one. The tenant quota
+  # (requests.memory 256Mi) fits one 192Mi pod, not the two a default rolling
+  # update runs side by side — so the 0.1.2 rollout (#200) sat for hours with
+  # its new ReplicaSet forbidden by the quota and the old image still serving.
+  #
+  # maxSurge 0 rather than `type: Recreate`, which is what the eightbitsaxlounge
+  # workloads use: switching an existing Deployment's type under server-side
+  # apply leaves the apiserver-defaulted rollingUpdate block behind, which no
+  # field manager owns, and the apply is then rejected. That is what stalled
+  # the monitoring app from 2026-09-11 to 2026-10-19. Same effect at one
+  # replica, no type change.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: composer
