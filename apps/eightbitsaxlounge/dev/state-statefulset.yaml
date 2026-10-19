@@ -83,7 +83,7 @@ spec:
           # mounted), 0.0.22 for a pre-existing smoke-test gap unrelated
           # to this migration (the runner's own network topology). See
           # eightbitsaxlounge#69, #70, #71.
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:5534417469f442015b895e218fb75558223e881dc562b8e3c2d0ff621b2011d8
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:e59fc13e002f60076f2e4f1036c71895a42066b994e03a44a3f3a32f871cb612
           imagePullPolicy: IfNotPresent
           args: ["-c", "/etc/nats/nats.conf"]
           securityContext:
