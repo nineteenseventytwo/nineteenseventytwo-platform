@@ -85,7 +85,7 @@ containerd_version: "latest"
 # Must match cluster/cilium/values.yaml's `# chart:` and 00-cilium.yaml's
 # targetRevision. This one is what 30-cluster.yml installs pre-Argo.
 # See ../../../../README.md#ciliums-version-lives-in-three-places-and-they-must-agree
-cilium_version: "1.20.1"
+cilium_version: "1.20.3"
 
 # Cilium replaces Flannel, so pick a pod CIDR that does not collide with the
 # lab subnet or with Cilium's default cluster-pool.
