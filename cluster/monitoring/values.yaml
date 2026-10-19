@@ -9,18 +9,38 @@ prometheus:
   prometheusSpec:
     replicas: 1
     retention: 7d
-    retentionSize: 8GB
+    # retentionSize is enforced only by deleting whole blocks at compaction.
+    # The WAL is not retention-managed: it is truncated after head
+    # compaction (~2h), so a crash loop or stalled compaction grows it past
+    # this number, and a full disk then stops Prometheus starting at all —
+    # which is what happened: 8GB on 10Gi left ~2.7GB of slack, the volume
+    # filled, and Prometheus crash-looped for about a week on "no space left
+    # on device" (2026-10-12 to 2026-10-19). ~70% of the volume, so the WAL
+    # has ~7GB to grow into before the disk is the limit.
+    retentionSize: 14GB
     resources:
       requests: {cpu: 200m, memory: 512Mi}
       limits: {memory: 1Gi}
+    # The operator's default startup probe allows 15 minutes (60 x 15s). A
+    # large WAL replays slower than that on a Pi — 2026-10-19's took ~12
+    # minutes to reach the halfway point — so the kubelet killed it mid-replay,
+    # it restarted from scratch, and the WAL never got truncated. 30 minutes
+    # lets a long replay finish; a Prometheus that genuinely cannot start
+    # still fails, just later.
+    maximumStartupDurationSeconds: 1800
     storageSpec:
       volumeClaimTemplate:
         spec:
           storageClassName: longhorn
           accessModes: [ReadWriteOnce]
+          # Raised from 10Gi with retentionSize above. The live PVC was
+          # expanded in place first (Longhorn allows expansion); this keeps
+          # a rebuild from recreating the 10Gi volume that filled. The
+          # StatefulSet's volumeClaimTemplate is immutable, so on an
+          # existing cluster this change alone does not resize anything.
           resources:
             requests:
-              storage: 10Gi
+              storage: 20Gi
     # Pick up ServiceMonitors from every namespace, not just this one — the
     # addons each declare their own.
     serviceMonitorSelectorNilUsesHelmValues: false
