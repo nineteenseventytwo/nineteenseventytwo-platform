@@ -1,5 +1,5 @@
 ---
-# chart: 1.12.1
+# chart: 1.13.0
 # repo:  https://charts.longhorn.io
 #
 # Worker SSDs only, two replicas across the two workers, S3 backups via IRSA.
@@ -68,6 +68,33 @@ longhornUI:
   # I/O-heavy storage-serving components "Worker SSDs only" already keeps
   # off this node, for the same reason — replica rebuild traffic sharing a
   # node/disk with etcd is exactly the risk that selector avoids.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+      operator: Exists
+
+# New in 1.13.0: the cluster-wide pod and PV controllers moved out of the
+# longhorn-manager DaemonSet into this Deployment, one elected leader plus
+# standbys. Three things differ from the chart default, for this cluster:
+#
+# replicas 2, not 3. Two workers and a control-plane node; a third standby
+# buys nothing a second does not, and both workers are already at ~92% of
+# allocatable memory in requests (see longhornManager above).
+#
+# Explicit resources. The chart ships `resources: ~` and longhorn-system has
+# no LimitRange (policy/20-limitrange-default.yaml says why), so unset means
+# BestEffort pods with no ceiling. Memory scales with the cluster's pod count
+# (it caches every pod); this cluster runs on the order of a hundred.
+#
+# The control-plane toleration, same reasoning as longhornUI: it is a
+# controller with no data-plane role and no PVC, so it can use
+# 1972-master-1's idle memory instead of the workers'. The preferred
+# anti-affinity in the chart default still spreads the two replicas.
+longhornGlobalManager:
+  replicas: 2
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 256Mi}
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
