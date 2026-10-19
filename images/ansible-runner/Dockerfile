@@ -4,14 +4,17 @@
 # independently of anything GitHub does, which is exactly why it is separate
 # from the gha-runner image: a collection bump should not force a runner
 # rebuild, and a runner CVE should not force an Ansible revalidation.
-FROM python:3.14-slim-bookworm
+# Pinned by digest: a moving tag means the weekly scan describes whatever the
+# last build happened to pull, and nothing is rebuilt when Debian ships a fix.
+# Bump the digest deliberately, with version.txt, so the fix is published.
+FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83
 
 # Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
 ARG ANSIBLE_CORE_VERSION=2.21.3
 ARG KUBECTL_VERSION=v1.36.4
 ARG HELM_VERSION=v4.2.3
 ARG SOPS_VERSION=v3.13.3
-ARG AGE_VERSION=v1.3.1
+ARG AGE_VERSION=v1.3.2
 ARG TARGETARCH=arm64
 
 LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nineteenseventytwo-platform" \
