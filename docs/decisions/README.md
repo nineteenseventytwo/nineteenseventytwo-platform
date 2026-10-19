@@ -23,6 +23,7 @@ inconvenient.
 | [0015](ADR-0015-cilium-gateway-api.md) | Cilium Gateway API replaces ingress-nginx | Accepted |
 | [0016](ADR-0016-cpu-limits-from-limitrange.md) | CPU limits come from the namespace LimitRange, not chart values | Accepted |
 | [0017](ADR-0017-kubescape-accepted-controls.md) | Which Kubescape NSA controls this cluster accepts as failing | Accepted |
+| [0018](ADR-0018-personal-website.md) | The public site is static Astro on S3 + CloudFront; the private dashboard is in-cluster | Accepted |
 
 ## Template
 
