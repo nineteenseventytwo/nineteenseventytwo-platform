@@ -82,6 +82,60 @@ spec:
         - ipBlock:
             cidr: 192.168.20.0/24
 ---
+# The egress above is only half of it. default-deny-all in this namespace
+# also denies *ingress*, and nothing allowed Prometheus back in to its own
+# neighbours - so every alert Prometheus raised was dropped on the way to
+# Alertmanager (9153 dropped, 0 sent, in the first 12h of the recovered
+# Prometheus alone, 2026-10-20), and Grafana, Alertmanager,
+# kube-state-metrics and the operator were all TargetDown. That is why a full
+# Prometheus disk and a week of crash-looping produced no alert at all.
+# Ingress from Prometheus to every pod here, any port: these are its scrape
+# targets and its Alertmanager.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+---
+# The ipBlock 192.168.20.0/24 above never matched the nodes. Cilium
+# classifies node IPs as the `host` / `remote-node` entities, not as CIDRs,
+# unless policy-cidr-match-mode includes "nodes" - and it is unset here
+# (kube-system/cilium-config). So every kubelet (/metrics, /metrics/cadvisor,
+# /metrics/probes), node-exporter, controller-manager and scheduler scrape
+# timed out. Named by entity and scoped to exactly the ports scraped, rather
+# than widening the CIDR mode cluster-wide, which would change the meaning of
+# every ipBlock in this file at once.
+#
+# 2381 (etcd) is listed, but etcd's metrics listener is kubeadm's default,
+# 127.0.0.1 - that target stays down until listen-metrics-urls is set in the
+# kube_control_plane role. Allowing it here means that fix is one change.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scrape-nodes
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  egress:
+    - toEntities: [host, remote-node]
+      toPorts:
+        - ports:
+            - {port: "10250", protocol: TCP}   # kubelet
+            - {port: "9100", protocol: TCP}    # node-exporter
+            - {port: "10257", protocol: TCP}   # kube-controller-manager
+            - {port: "10259", protocol: TCP}   # kube-scheduler
+            - {port: "2381", protocol: TCP}    # etcd metrics (see above)
+---
 # Namespace-wide, not scoped to Prometheus like the rule above: every
 # component the kube-prometheus-stack chart deploys can end up needing the
 # apiserver (the operator watches CRDs; kube-webhook-certgen, a Helm hook Job
