@@ -205,7 +205,16 @@ metadata:
 spec:
   limits:
     - type: Container
-      default: {cpu: 100m, memory: 192Mi}
+      # cpu 500m, not 100m. Vault's chart values set no CPU limit (ADR-0016:
+      # it comes from here), so vault-0 ran capped at 100m - equal to its own
+      # request, i.e. no burst at all. Its readiness probe execs
+      # `vault status`, a fresh Go CLI process with a 3s timeout, and under
+      # that throttling the CLI alone took longer: CPUThrottlingHigh on
+      # vault-0, then the probe failing and Vault NotReady from 2026-10-20
+      # 06:22 - unsealed and healthy, but with no Service endpoints, so
+      # nothing could reach it. Requests are unchanged; this only lets it
+      # burst. Applies at admission, so vault-0 needs a restart to pick it up.
+      default: {cpu: 500m, memory: 192Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 512Mi}
 ---
