@@ -301,9 +301,12 @@
     - name: Decide whether there is anything to do
       ansible.builtin.set_fact:
         etcd_metrics_live: "{{ ('http://' ~ ansible_host ~ ':2381') in (etcd_metrics_manifest.content | b64decode) }}"
+        # Parsed, not regex-matched: the first version used regex_search with
+        # backslash escapes that had to survive YAML and Jinja both, and did
+        # not - it failed safely, before changing anything.
         etcd_metrics_running_tag: >-
-          {{ (etcd_metrics_manifest.content | b64decode)
-             | regex_search('image: \\S+/etcd:(\\S+)', '\\1') | first }}
+          {{ ((etcd_metrics_manifest.content | b64decode | from_yaml).spec.containers
+              | selectattr('name', 'equalto', 'etcd') | first).image.split(':') | last }}
 
     # Regenerating the manifest from config would also move etcd to whatever
     # etcd_version says. That is an etcd upgrade, not a metrics change, and
