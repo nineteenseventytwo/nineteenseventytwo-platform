@@ -186,7 +186,16 @@ spec:
     - type: Container
       default: {cpu: 200m, memory: 256Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
-      max: {memory: 1Gi}
+      # 2Gi, not 1Gi: prowler-scan's own limit is 2Gi (policy/30-prowler.yaml,
+      # raised 2026-08-28 after it OOMKilled), and a max below a workload's
+      # own limit rejects the pod at admission - "maximum memory usage per
+      # Container is 1Gi, but limit is 2Gi". Every nightly scan failed that
+      # way, the Job hitting its deadline with no pod ever created, and the
+      # CronJob has no lastSuccessfulTime at all. Same conflict as argocd's
+      # (ca1b990). Found 2026-10-20 as KubeJobFailed, once alerting worked.
+      # infra-quota's limits.memory (3Gi, policy/21-resource-quotas.yaml)
+      # already has room for it.
+      max: {memory: 2Gi}
 ---
 apiVersion: v1
 kind: LimitRange
