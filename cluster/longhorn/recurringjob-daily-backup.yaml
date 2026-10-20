@@ -1,0 +1,37 @@
+---
+# Daily S3 backup of every volume. Until 2026-10-20 there was none: the
+# bucket, the IRSA role and the backup target were all built and AVAILABLE
+# (see ../README.md#the-s3-backup-credential-secret-is-not-a-credential), but
+# nothing ever scheduled a backup, so Vault's storage, CouchDB and the 8bsl
+# state had never left the cluster. Found while taking the system backup
+# after the 1.13.0 upgrade.
+#
+# group "default": Longhorn applies the default group to every volume that
+# carries no recurring-job labels of its own, which is all of them, so new
+# PVCs are covered without anyone remembering to label them.
+#
+# Daily, 7 kept. The bucket's own lifecycle rule expires backups at 90 days
+# (nineteenseventytwo-cloud, live/aws/platform-prod), so `retain` is the
+# number that actually bounds cost; the README's warning about an hourly
+# schedule is the reason this is not one.
+#
+# concurrency 1 for the same reason as concurrentReplicaRebuildPerNodeLimit:
+# a backup streams the volume over the worker's single 1 GbE link, and two at
+# once starve everything else on it. 02:30 UTC is the quietest point for the
+# 8bsl workloads, which are evenings-and-streams.
+#
+# The ci-scratch volumes (storageclass-ci-scratch.yaml) are in the default
+# group too, and a job running at 02:30 would get its scratch volume backed
+# up once. Accepted: it is rare and cheap, and excluding them needs a label
+# on a volume ARC creates, which this repo does not control.
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: daily-backup
+  namespace: longhorn-system
+spec:
+  task: backup
+  cron: "30 2 * * *"
+  retain: 7
+  concurrency: 1
+  groups: [default]
