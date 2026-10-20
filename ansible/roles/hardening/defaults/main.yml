@@ -43,6 +43,17 @@ hardening_ufw_cluster_rules:
   - { port: "6443", proto: tcp, comment: "kube-apiserver" }
   - { port: "2379:2380", proto: tcp, comment: "etcd" }
   - { port: "10250", proto: tcp, comment: "kubelet API" }
+  # Prometheus scrape ports. Without these the pod-network policy
+  # (policy/10-default-deny.yaml, allow-prometheus-scrape-nodes) lets the
+  # scrape out and ufw drops it at the node: node-exporter, controller-manager
+  # and scheduler sat at TargetDown while the kubelet on 10250, already listed
+  # above, came straight up. 2381 is etcd's metrics listener only (client
+  # traffic is 2379, mTLS) and is live on the node IP once `make etcd-metrics`
+  # has run. Same sources as every rule here: lab subnet and pod CIDR.
+  - { port: "9100", proto: tcp, comment: "node-exporter metrics" }
+  - { port: "10257", proto: tcp, comment: "kube-controller-manager metrics" }
+  - { port: "10259", proto: tcp, comment: "kube-scheduler metrics" }
+  - { port: "2381", proto: tcp, comment: "etcd metrics" }
   - { port: "10256", proto: tcp, comment: "kube-proxy health" }
   - { port: "30000:32767", proto: tcp, comment: "NodePort range" }
   - { port: "4240", proto: tcp, comment: "cilium health" }
