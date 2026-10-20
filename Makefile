@@ -380,6 +380,10 @@ kubeconfig: ## Fetch the admin kubeconfig from the control plane to ./build/kube
 remove-kube-proxy: ## One-time kube-proxy-replacement migration - see 30-cluster.yml's own comment before running this
 	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags kube-proxy-removal
 
+.PHONY: etcd-metrics
+etcd-metrics: ## One-time: expose etcd metrics on the node IP of an existing control plane - restarts etcd, see 30-cluster.yml
+	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags etcd-metrics
+
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
 	# Same adopt-don't-wait pattern as Cilium (cluster/README.md): Argo CD's own

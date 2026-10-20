@@ -267,3 +267,93 @@
         executable: /bin/bash
       become: true
       changed_when: true
+
+# Applies kubeadm-config.yaml.j2's etcd listen-metrics-urls to an EXISTING
+# control plane, where the role skips kubeadm init and the template is inert.
+# A rebuild needs none of this: kubeadm init renders the flag in.
+#
+# `never`-tagged for the same reason as kube-proxy-removal above: run it
+# explicitly, once: `make etcd-metrics`. Re-running is a no-op once the flag
+# is live.
+#
+# Regenerates only the etcd static-pod manifest, from the same template the
+# role renders, then uploads the ClusterConfiguration so a later
+# `kubeadm upgrade` keeps the flag instead of silently dropping it. The
+# kubelet restarts etcd when the manifest changes; this is a single-member
+# etcd, so the apiserver is unavailable for those seconds - pick a quiet
+# moment, not mid-deploy.
+- name: Expose etcd metrics on the node IP
+  hosts: control_plane
+  gather_facts: true
+  tags: [etcd-metrics, never]
+  vars_files:
+    - ../roles/kube_control_plane/defaults/main.yml
+    - ../roles/kube_prereqs/defaults/main.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Read the running etcd manifest
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/manifests/etcd.yaml
+      register: etcd_metrics_manifest
+      become: true
+
+    - name: Decide whether there is anything to do
+      ansible.builtin.set_fact:
+        etcd_metrics_live: "{{ ('http://' ~ ansible_host ~ ':2381') in (etcd_metrics_manifest.content | b64decode) }}"
+        etcd_metrics_running_tag: >-
+          {{ (etcd_metrics_manifest.content | b64decode)
+             | regex_search('image: \\S+/etcd:(\\S+)', '\\1') | first }}
+
+    # Regenerating the manifest from config would also move etcd to whatever
+    # etcd_version says. That is an etcd upgrade, not a metrics change, and
+    # must not ride along unannounced.
+    - name: Refuse if the running etcd does not match etcd_version
+      ansible.builtin.assert:
+        that: etcd_metrics_running_tag == etcd_version
+        fail_msg: >-
+          Running etcd is {{ etcd_metrics_running_tag }} but etcd_version is
+          {{ etcd_version }}. Regenerating the manifest would upgrade etcd too.
+          Reconcile etcd_version with the running cluster first.
+        quiet: true
+      when: not etcd_metrics_live
+
+    - name: Apply the flag
+      when: not etcd_metrics_live
+      become: true
+      block:
+        - name: Render the current kubeadm config
+          ansible.builtin.template:
+            src: ../roles/kube_control_plane/templates/kubeadm-config.yaml.j2
+            dest: /etc/kubernetes/kubeadm-config.yaml
+            owner: root
+            group: root
+            mode: "0600"
+            backup: true
+
+        # Outside manifests/ deliberately: the kubelet runs every file in
+        # that directory as a static pod, a backup included.
+        - name: Keep the current etcd manifest for a manual rollback
+          ansible.builtin.copy:
+            src: /etc/kubernetes/manifests/etcd.yaml
+            dest: /etc/kubernetes/etcd.yaml.pre-metrics
+            remote_src: true
+            mode: "0600"
+
+        - name: Regenerate the etcd static-pod manifest
+          ansible.builtin.command:
+            cmd: kubeadm init phase etcd local --config /etc/kubernetes/kubeadm-config.yaml
+          changed_when: true
+
+        - name: Wait for etcd to answer on the node IP
+          ansible.builtin.uri:
+            url: "http://{{ ansible_host }}:2381/health"
+          register: etcd_metrics_health
+          until: etcd_metrics_health.status == 200
+          retries: 30
+          delay: 5
+
+        - name: Upload the ClusterConfiguration so kubeadm upgrade keeps the flag
+          ansible.builtin.command:
+            cmd: kubeadm init phase upload-config kubeadm --config /etc/kubernetes/kubeadm-config.yaml
+          changed_when: true
