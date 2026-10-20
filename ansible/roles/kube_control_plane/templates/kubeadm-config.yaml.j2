@@ -27,6 +27,14 @@ controlPlaneEndpoint: "{{ hostvars['1972-master-1'].ansible_host }}:6443"
 etcd:
   local:
     imageTag: "{{ etcd_version }}"
+    # Metrics on the node IP as well as loopback, so Prometheus can scrape
+    # them (policy/10-default-deny.yaml's allow-prometheus-scrape-nodes opens
+    # 2381). Metrics only: client traffic stays on 2379, mTLS, loopback. On an
+    # existing control plane this file is inert (kubeadm init is skipped);
+    # `make etcd-metrics` applies it there - see 30-cluster.yml.
+    extraArgs:
+      - name: listen-metrics-urls
+        value: "http://127.0.0.1:2381,http://{{ ansible_host }}:2381"
 networking:
   podSubnet: "{{ kubernetes_pod_cidr }}"
   serviceSubnet: "{{ kubernetes_service_cidr }}"
