@@ -46,7 +46,7 @@ data:
             "s3_account_level_public_access_blocks":
               Regions: ["*"]
               Resources: ["*"]
-              Description: "Account-level block is off so the OIDC bucket's policy can apply; every other bucket sets its own block (cloud platform-prod main.tf)."
+              Description: "Account-level block is off for the OIDC bucket's policy; every other bucket sets its own (cloud platform-prod main.tf)."
 
             # ---- admin roles that are admin roles ----
             "iam_aws_attached_policy_no_administrative_privileges":
@@ -60,7 +60,7 @@ data:
             "iam_inline_policy_allows_privilege_escalation":
               Regions: ["*"]
               Resources: ["gha-tf-apply"]
-              Description: "The Terraform apply role must manage IAM. Bounded by the protected aws-prod environment and its guardrails policy (cloud aws-github-oidc-role)."
+              Description: "The Terraform apply role must manage IAM; bounded by the aws-prod environment and its guardrails policy."
             "iam_inline_policy_no_full_access_to_kms":
               Regions: ["*"]
               Resources: ["gha-tf-apply"]
