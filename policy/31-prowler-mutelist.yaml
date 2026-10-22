@@ -55,8 +55,8 @@ data:
               Description: "Attached to the SSO PlatformAdmin / break-glass permission sets - human admin access through Identity Center."
             "iam_role_administratoraccess_policy":
               Regions: ["*"]
-              Resources: ["AWSReservedSSO_.*"]
-              Description: "SSO-provisioned admin roles - human admin access through Identity Center."
+              Resources: ["AWSReservedSSO_.*", "OrganizationAccountAccessRole"]
+              Description: "SSO admin roles (Identity Center), and OrganizationAccountAccessRole - kept, alarmed on every use (cloud ADR-0007)."
             "iam_inline_policy_allows_privilege_escalation":
               Regions: ["*"]
               Resources: ["gha-tf-apply"]
