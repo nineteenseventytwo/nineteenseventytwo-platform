@@ -85,6 +85,10 @@ spec:
                 # exit 3 means "ran fine, found FAIL results".
                 # See README.md#exit-3-is-success
                 - --ignore-exit-code-3
+                # Decisions, not gaps - see 31-prowler-mutelist.yaml. Muted
+                # findings stay in every output, flagged as suppressed.
+                - --mutelist-file
+                - /home/prowler/mutelist/mutelist.yaml
               resources:
                 requests: {cpu: 250m, memory: 512Mi}
                 # Headroom over the 2-region scan, not the 39-region OOM.
@@ -97,7 +101,13 @@ spec:
               volumeMounts:
                 - name: output
                   mountPath: /home/prowler/findings
+                - name: mutelist
+                  mountPath: /home/prowler/mutelist
+                  readOnly: true
           volumes:
             - name: output
               emptyDir:
                 sizeLimit: 512Mi
+            - name: mutelist
+              configMap:
+                name: prowler-mutelist
