@@ -331,36 +331,73 @@ and the estimate says so rather than absorbing them silently.
 - [x] ADR: the site, the D2 amendment from "What changed since D2", W1–W5.
       **Done 2026-10-19** — [ADR-0018](../decisions/ADR-0018-personal-website.md).
 
-### W.1 — Infrastructure _(~8h, cloud repo)_
+### W.1 — Infrastructure _(~8h, cloud repo)_ — **done 2026-10-20**
 
-- [ ] Site bucket in `platform-prod` (F4): SSE, public access block on, versioning
-- [ ] Bucket policy: OAC service principal with `aws:SourceArn` on the
+- [x] Site bucket in `platform-prod` (F4): SSE, public access block on, versioning
+- [x] Bucket policy: OAC service principal with `aws:SourceArn` on the
       distribution, plus deny `aws:SecureTransport=false`
-- [ ] Note in the file header that the RCP's `PrincipalIsAWSService` condition
+- [x] Note in the file header that the RCP's `PrincipalIsAWSService` condition
       is what makes this work (F1)
-- [ ] ACM certificate for `sev.eightbitsaxlounge.com` in `us-east-1`, DNS-01
+- [x] ACM certificate for `sev.eightbitsaxlounge.com` in `us-east-1`, DNS-01
       through the existing Cloudflare setup
-- [ ] CloudFront: OAC, default root object, SPA-safe 404 handling, and a
+- [x] CloudFront: OAC, default root object, SPA-safe 404 handling, and a
       response-headers policy — HSTS, CSP per F10, `X-Content-Type-Options`,
       `Referrer-Policy`, `Permissions-Policy`
-- [ ] The scoped deploy role (F5)
-- [ ] `sev` DNS record, CNAME to the distribution, proxied (W4)
+- [x] The scoped deploy role (F5)
+- [x] `sev` DNS record, CNAME to the distribution, proxied (W4)
 
-**Gate:** `curl https://sev.eightbitsaxlounge.com` from outside the lab and
-get a 200; `curl` the S3 REST endpoint directly and get a 403.
+**Gate: passed.** `https://sev.eightbitsaxlounge.com` → 200 through Cloudflare
+and CloudFront with every security header intact; the S3 REST endpoint → 403.
 
-### W.2 — Site skeleton and the public shell _(~8h, web repo)_
+As built (nineteenseventytwo-cloud #24–#27), and what differed from the plan:
 
-- [ ] Astro, external CSS/JS only (F10), content collections typed for anime
+- **DNS stayed manual.** Cloudflare is not in Terraform, and adding a provider
+  plus a long-lived token for two records was not worth it. So W.1 was three
+  applies: a bootstrap change (the platform-prod apply role had no
+  `cloudfront:*`/`acm:*`), then bucket + certificate + deploy role, then -
+  after the validation CNAME was added and the cert ISSUED - the distribution.
+  The validation CNAME is DNS-only and permanent (renewals use it).
+- **Directory URLs need a CloudFront Function.** The private S3 REST endpoint
+  serves exact keys only, so `/anime/` → `/anime/index.html` and `/anime` →
+  301 `/anime/` happen at the viewer-request edge.
+- **404s arrive as 403.** OAC has no `ListBucket`, so S3 will not say a key is
+  missing; both 403 and 404 map to `/404.html` with a real 404.
+- **HSTS without includeSubDomains/preload** - `sev` is one host in a shared
+  zone. **No AWS WAF or access logs** - Cloudflare's are in front.
+- **SSL mode is Full, not Full (strict).** Works (no redirect loop); strict for
+  this host alone is a Cloudflare Configuration Rule, worth adding.
+- **The deploy role's grants are attached around the module**, because the
+  bucket and distribution ARNs are unknown at plan time and the module's
+  inline policy is count-gated on its input.
+
+### W.2 — Site skeleton and the public shell _(~8h, web repo)_ — **done 2026-10-20**
+
+- [x] Astro, external CSS/JS only (F10), content collections typed for anime
       and projects
-- [ ] The 90s design system as an actual stylesheet — palette, tiles, bevels,
+- [x] The 90s design system as an actual stylesheet — palette, tiles, bevels,
       dividers — so the pages are content, not styling
-- [ ] Landing page and navigation
-- [ ] Deploy workflow: build, sync to S3, invalidate CloudFront, purge
-      Cloudflare (W4)
+- [x] Landing page and navigation
+- [x] Deploy workflow: build, sync to S3, invalidate CloudFront ~~, purge
+      Cloudflare (W4)~~ - see below
 
-**Gate:** a commit to `main` is live on `sev.eightbitsaxlounge.com` within a
-minute, and the CSP reports no violations in the browser console.
+**Gate: passed.** Merge to live in 33s. Zero CSP violations in headless
+Chrome's console across every page (the detection itself verified against a
+page with planted violations).
+
+As built (nineteenseventytwo-web #2):
+
+- **F10 is enforced at build time too.** `inlineStylesheets: 'never'`,
+  `assetsInlineLimit: 0`, and `scripts/check-no-inline.mjs` fails the build on
+  any inline script/style, `style=`, `on*=`, `javascript:` or `data:` src.
+  Astro's own `security.csp` is deliberately off - a second, hash-based
+  `<meta>` policy to keep in step with the header.
+- **The Cloudflare purge is unnecessary**, so its token was never created.
+  Cloudflare does not cache the HTML (`cf-cache-status: DYNAMIC`) and caches
+  only the content-hashed `_astro/` assets, whose names change on every
+  change. The purge step stays in `deploy.yml`, skipped while
+  `CLOUDFLARE_ZONE_ID` is unset - it matters only if an HTML cache rule is
+  ever added.
+- `build` (ci.yml) is the required status check on `main`.
 
 ### W.3 — The content pages _(~8h)_
 
