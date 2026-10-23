@@ -18,12 +18,13 @@ inconvenient.
 | [0010](ADR-0010-fork-pr-self-hosted-runners.md) | Route `pull_request` jobs to hosted runners | Accepted |
 | [0011](ADR-0011-arm64-only.md) | arm64 only; the GPU node is out of scope for now | Accepted |
 | [0012](ADR-0012-platform-owns-app-workloads.md) | Platform repo owns application workloads, not just namespaces | Accepted |
-| [0013](ADR-0013-platform-repo-public.md) | The platform repo goes public | Accepted |
+| [0013](ADR-0013-platform-repo-public.md) | The platform repo goes public | Superseded by [0019](ADR-0019-org-repos-private.md) |
 | [0014](ADR-0014-pod-identity-webhook.md) | Deploy the EKS pod-identity-webhook for cluster→AWS federation | Accepted |
 | [0015](ADR-0015-cilium-gateway-api.md) | Cilium Gateway API replaces ingress-nginx | Accepted |
 | [0016](ADR-0016-cpu-limits-from-limitrange.md) | CPU limits come from the namespace LimitRange, not chart values | Accepted |
 | [0017](ADR-0017-kubescape-accepted-controls.md) | Which Kubescape NSA controls this cluster accepts as failing | Accepted |
 | [0018](ADR-0018-personal-website.md) | The public site is static Astro on S3 + CloudFront; the private dashboard is in-cluster | Accepted |
+| [0019](ADR-0019-org-repos-private.md) | The org's repositories go private, on GitHub Team | Accepted |
 
 ## Template
 

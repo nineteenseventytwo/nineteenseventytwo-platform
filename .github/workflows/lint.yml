@@ -65,49 +65,63 @@ jobs:
       - name: Values files are valid YAML and charts template cleanly
         run: make lint-helm
 
+  # No code-scanning upload: this repo is private (ADR-0019), and SARIF
+  # upload to a private repo needs GitHub's paid Code Security. What that
+  # upload gave us is replaced here: secrets block outright; the IaC and
+  # vulnerability backlog is advisory, as it was, and lands in the job
+  # summary instead of the Security tab.
   security:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v7
 
-      - name: Checkov (IaC misconfiguration)
+      # Secrets block, at every severity - a secret has no acceptable level.
+      # eightbitsaxlounge carried a live Twitch stream key for seven months
+      # behind an advisory, HIGH-only scan; this is the lesson applied here.
+      - name: Trivy secret scan (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scanners: secret
+          exit-code: "1"
+          format: table
+          trivyignores: .trivyignore
+
+      - name: Checkov (IaC misconfiguration, advisory)
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: .
           framework: kubernetes,dockerfile,github_actions
           quiet: true
           soft_fail: true      # advisory until the backlog is triaged
-          output_format: sarif
-          output_file_path: checkov.sarif
+          output_format: cli
 
-      - name: Trivy filesystem scan - secrets and vulnerable pins
-        # advisory until the backlog is triaged, same stance as Checkov's
-        # soft_fail above. Unlike Checkov, trivy-action has no soft_fail
-        # input - continue-on-error is what keeps a HIGH/CRITICAL misconfig
-        # finding (there are ~100 already open against main, none related
-        # to any one PR) from turning this step, and the SARIF-driven
-        # "Trivy" check GitHub derives from it, red on every future PR that
-        # happens to touch a file carrying one.
+      # Advisory, as before: ~100 findings are already open against main and
+      # none is related to any one PR. continue-on-error keeps them from
+      # failing every PR; the table goes to the job summary.
+      - name: Trivy vulnerabilities and misconfiguration (advisory)
         continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
-          scanners: vuln,secret,misconfig
-          format: sarif
-          output: trivy.sarif
+          scanners: vuln,misconfig
+          format: table
+          output: trivy.txt
           severity: HIGH,CRITICAL
           # `severity` above only filters the vuln scanner - misconfig checks
-          # carry their own fixed severity and ignore it, which is how
-          # LOW-severity KSV-0039/KSV-0040 kept reaching the Security tab
-          # despite this filter. See .trivyignore for why those two specific
-          # checks are excluded outright rather than just severity-filtered.
+          # carry their own fixed severity and ignore it. See .trivyignore for
+          # why KSV-0039/KSV-0040 are excluded outright.
           trivyignores: .trivyignore
 
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Summary
         if: always()
-        with:
-          sarif_file: .
+        run: |
+          {
+            echo "## Trivy - vulnerabilities and misconfiguration (advisory)"
+            echo
+            echo '```'
+            if [ -s trivy.txt ]; then head -c 60000 trivy.txt; else echo "no findings"; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -131,7 +131,6 @@ jobs:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
-      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -190,11 +189,9 @@ jobs:
       # upload (confirmed against the real failure - "does not support
       # uploading multiple SARIF runs with the same category" - since Trivy
       # gives every run the same default category).
-      - name: Upload this image's findings to the Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: "${{ steps.name.outputs.safe }}.sarif"
-          category: ${{ steps.name.outputs.category }}
+      # No Security-tab upload: the repo is private (ADR-0019) and code
+      # scanning there needs GitHub's paid Code Security. Each image's SARIF
+      # is kept as an artifact and summarised by the report job below.
 
       - uses: actions/upload-artifact@v7
         with:
@@ -222,12 +219,28 @@ jobs:
           set -euo pipefail
           total=0
           count=0
+          {
+            echo "## Image vulnerabilities - HIGH/CRITICAL with a fix available"
+            echo
+            echo "| Image | Critical | High |"
+            echo "|---|---:|---:|"
+          } >> "$GITHUB_STEP_SUMMARY"
           for f in sarif/*.sarif; do
             n=$(jq '[.runs[].results[]] | length' "$f")
             total=$((total + n))
             count=$((count + 1))
+            # Trivy tags each rule with its severity; count results by it.
+            read -r crit high < <(jq -r '
+              [.runs[] | (.tool.driver.rules | map({key: .id, value: (.properties.tags // [])}) | from_entries) as $tags
+               | .results[] | $tags[.ruleId] // []] as $all
+              | "\([$all[] | select(index("CRITICAL"))] | length) \([$all[] | select(index("HIGH"))] | length)"' "$f")
+            if [ "$n" -gt 0 ]; then
+              echo "| \`$(basename "$f" .sarif)\` | $crit | $high |" >> "$GITHUB_STEP_SUMMARY"
+            fi
           done
-          link="https://github.com/${{ github.repository }}/security/code-scanning"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "${count} images scanned, ${total} findings. Full SARIF per image: this run's artifacts." >> "$GITHUB_STEP_SUMMARY"
+          link="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           if [ "$total" -gt 0 ]; then
             text="Weekly image vulnerability scan: ${total} HIGH/CRITICAL, fixed-available findings across ${count} images. Detail: ${link}"
           else

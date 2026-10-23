@@ -1,6 +1,6 @@
 # ADR-0013: The platform repo goes public
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0019](ADR-0019-org-repos-private.md)
 **Date:** 2026-08-15
 **Supersedes:** [ADR-0002](ADR-0002-private-repo.md)
 
