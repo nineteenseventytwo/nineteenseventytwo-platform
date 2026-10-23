@@ -101,6 +101,25 @@ alertmanager:
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
+      # Meta-alerts that exist to drive Alertmanager, not to be read. The
+      # chart's own default route sends *everything* to "null", so it never
+      # needed to name them; with slack-alerts as the default receiver, every
+      # alert not routed away lands in Slack - and InfoInhibitor did, once
+      # alerting started working (2026-10-22): it fires per namespace while
+      # any severity=info alert is up there, purely so the chart's inhibit
+      # rules can suppress those info alerts. It is doing that job (the
+      # CPUThrottlingHigh info alerts were inhibited by it); only its own
+      # notification was wrong. The chart's bare inhibit rule meant to silence
+      # it (target InfoInhibitor, no source) matches nothing in Alertmanager
+      # 0.34, so routing is the fix.
+      #
+      # Setting `routes` replaces the chart's list, so Watchdog -> null is
+      # restated here. When the dead-man's switch exists, Watchdog moves to
+      # its receiver instead - it is always firing so that its absence pages.
+      routes:
+        - receiver: "null"
+          matchers:
+            - alertname =~ "Watchdog|InfoInhibitor"
     receivers:
       # The chart's default route.routes (untouched above, since we only set
       # route's top-level keys) still ships a Watchdog -> "null" sub-route.
