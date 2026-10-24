@@ -19,8 +19,9 @@ spec:
       defaultRequest:
         cpu: 50m
         memory: 64Mi
+      # 1Gi -> 1280Mi: Prometheus's limit (cluster/monitoring/values.yaml).
       max:
-        memory: 1Gi
+        memory: 1280Mi
 ---
 # Same rationale as monitoring's LimitRange above, extended to the rest of
 # policy/10-default-deny.yaml's namespaces (minus kube-system - see
@@ -159,8 +160,13 @@ metadata:
   namespace: node-exporter-system
 spec:
   limits:
+    # node-exporter sets no CPU limit (ADR-0016), so this is its limit. At
+    # 100m it was throttled 30-50% of periods on every node (CPUThrottlingHigh,
+    # 2026-10-24): a scrape is a short burst of reading /proc and /sys, which
+    # is exactly what a tight CFS quota punishes. A LimitRange change only
+    # applies to new pods - roll the DaemonSet after this syncs.
     - type: Container
-      default: {cpu: 100m, memory: 128Mi}
+      default: {cpu: 250m, memory: 128Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 256Mi}
 ---
