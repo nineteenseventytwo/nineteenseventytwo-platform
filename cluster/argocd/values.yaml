@@ -51,9 +51,27 @@ controller:
   # trades an OOMKill for a quota-rejected pod - same mistake made twice
   # already this build (metallb-system, longhorn-system); don't make a
   # third here.
+  #
+  # The request is a different question from the limit: it is what the
+  # scheduler plans with. Steady state is ~640Mi and syncs peak ~1.25Gi
+  # (7 days to 2026-10-24); at 384Mi it was placed on worker-2 next to
+  # Prometheus, the node thrashed, and the controller was OOMKilled by the
+  # node rather than by its own 2Gi limit. 1Gi covers steady state with
+  # room; the anti-affinity below keeps it off Prometheus's node when the
+  # other worker has room.
   resources:
-    requests: {cpu: 100m, memory: 384Mi}
+    requests: {cpu: 100m, memory: 1Gi}
     limits: {memory: 2Gi}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            namespaces: [monitoring]
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: prometheus
 
 repoServer:
   replicas: 1

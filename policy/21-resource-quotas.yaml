@@ -136,7 +136,9 @@ metadata:
 spec:
   hard:
     requests.cpu: "1"
-    requests.memory: 1536Mi
+    # 1536Mi -> 2Gi with Prometheus's and Grafana's requests rising to their
+    # observed peaks (cluster/monitoring/values.yaml); ~1.7Gi used after.
+    requests.memory: 2Gi
     limits.memory: 4Gi
 ---
 apiVersion: v1

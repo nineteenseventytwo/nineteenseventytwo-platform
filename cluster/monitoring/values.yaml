@@ -18,9 +18,16 @@ prometheus:
     # on device" (2026-10-12 to 2026-10-19). ~70% of the volume, so the WAL
     # has ~7GB to grow into before the disk is the limit.
     retentionSize: 14GB
+    # Requests are what the scheduler believes; at 512Mi it believed a
+    # Prometheus that really peaks ~820Mi, and put it on worker-2 beside the
+    # Argo CD controller and Grafana - all three under-requested, ~2.4Gi of
+    # real peak on one node. Worker-2 thrashed (1000+ major page faults/s,
+    # NodeMemoryMajorPagesFaults, 2026-10-24) while worker-1 sat 33% free.
+    # Request = observed 7-day peak; the limit keeps ~45% headroom over it.
+    # (Raising the limit needs monitoring's LimitRange max raised with it.)
     resources:
-      requests: {cpu: 200m, memory: 512Mi}
-      limits: {memory: 1Gi}
+      requests: {cpu: 200m, memory: 896Mi}
+      limits: {memory: 1280Mi}
     # The operator's default startup probe allows 15 minutes (60 x 15s). A
     # large WAL replays slower than that on a Pi — 2026-10-19's took ~12
     # minutes to reach the halfway point — so the kubelet killed it mid-replay,
@@ -155,8 +162,11 @@ grafana:
   # 512Mi leaves headroom for real session/rendering load; monitoring's own
   # infra-quota had ~1.25Gi free at the time (2816Mi/4Gi used), so this
   # doesn't need a quota bump alongside it.
+  # Request raised to the observed peak (~320Mi, 2026-10-24) for the same
+  # reason as Prometheus's above: an honest request is what stops the
+  # scheduler stacking the heavy pods on one node.
   resources:
-    requests: {cpu: 50m, memory: 128Mi}
+    requests: {cpu: 50m, memory: 320Mi}
     limits: {memory: 512Mi}
   # No control-plane toleration (see alertmanager's comment above for why:
   # persistence below is a Longhorn-backed PVC, and Longhorn's CSI node
