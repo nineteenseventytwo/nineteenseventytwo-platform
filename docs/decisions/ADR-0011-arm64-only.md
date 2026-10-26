@@ -31,6 +31,9 @@ deliberately empty.
   not mention architecture.
 - The empty `gpu` group in the inventory is the marker. Populating it is a
   deliberate decision requiring a new ADR, not a config edit.
+  **Update:** [ADR-0020](ADR-0020-composer-inference-off-cluster.md)
+  populated it with a host that is *not* a node. The marker for this ADR's
+  trigger is now a kubelet on that host, not membership of the group.
 
 ## What joining it would require
 

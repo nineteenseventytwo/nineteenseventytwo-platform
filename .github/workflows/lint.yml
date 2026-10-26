@@ -86,6 +86,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Secrets block, at every severity (ADR-0019). The advisory Trivy scan
+      # below also looks for secrets, but continue-on-error is right for its
+      # misconfig backlog and wrong for a leaked key - a secret has no backlog.
+      - name: Trivy secret scan (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scanners: secret
+          exit-code: "1"
+          format: table
+
       - name: Checkov (IaC misconfiguration)
         uses: bridgecrewio/checkov-action@v12
         with:
