@@ -47,6 +47,8 @@ jobs:
         run: |
           set -uo pipefail
           IMAGE="${{ needs.build.outputs.image_ref }}"
-          out=$(docker run --rm "$IMAGE" 2>&1); code=$?
+          # `|| code=$?` because the step's shell runs with -e, and the
+          # expected exit 1 would otherwise end the step before the check.
+          code=0; out=$(docker run --rm "$IMAGE" 2>&1) || code=$?
           echo "$out"
           [ "$code" -eq 1 ] && grep -q "KUBERNETES_SERVICE_HOST" <<<"$out"
