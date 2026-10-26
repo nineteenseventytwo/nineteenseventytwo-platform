@@ -26,7 +26,7 @@ metadata:
     checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
     checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
     checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
-    # Same precedent as policy/30-prowler.yaml's own accepted CKV_K8S_40:
+    # Same precedent as the former in-cluster Prowler's accepted CKV_K8S_40:
     # the base image bakes in uid 5984 (couchdb) and the entrypoint's
     # privilege-drop logic is written around that specific uid — not a
     # choice this manifest makes or could raise unilaterally.
