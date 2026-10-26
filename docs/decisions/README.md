@@ -24,6 +24,7 @@ inconvenient.
 | [0016](ADR-0016-cpu-limits-from-limitrange.md) | CPU limits come from the namespace LimitRange, not chart values | Accepted |
 | [0017](ADR-0017-kubescape-accepted-controls.md) | Which Kubescape NSA controls this cluster accepts as failing | Accepted |
 | [0018](ADR-0018-personal-website.md) | The public site is static Astro on S3 + CloudFront; the private dashboard is in-cluster | Accepted |
+| [0021](ADR-0021-private-hostnames-tunnel-only.md) | Private hostnames reach their Service through the tunnel only, not the Gateway | Accepted |
 
 ## Template
 

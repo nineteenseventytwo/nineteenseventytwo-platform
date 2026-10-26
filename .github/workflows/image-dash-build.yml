@@ -1,0 +1,52 @@
+---
+name: image-dash-build
+
+# Same trigger as the other images: publishing is tied to bumping
+# images/dash/version.txt on a branch. The Go tests run here too, inside the
+# Dockerfile's build stage, so an image that fails them is never pushed -
+# lint.yml's `go` job is what runs them on every PR.
+on:
+  push:
+    branches-ignore: [main]
+    paths: ["images/dash/version.txt"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-dash-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # cosign keyless signing in _build-image.yml
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      image: dash
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Distroless has no shell to poke at, so the smoke test is the binary
+      # itself: outside a pod it must start, find no in-cluster config, say so
+      # and exit 1. That proves it is an arm64 binary that runs, which is what
+      # the build cannot prove on its own.
+      - name: Verify the published image
+        run: |
+          set -uo pipefail
+          IMAGE="${{ needs.build.outputs.image_ref }}"
+          out=$(docker run --rm "$IMAGE" 2>&1); code=$?
+          echo "$out"
+          [ "$code" -eq 1 ] && grep -q "KUBERNETES_SERVICE_HOST" <<<"$out"

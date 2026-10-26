@@ -1123,3 +1123,128 @@ spec:
   endpointSelector: {}
   egress:
     - toEntities: [kube-apiserver]
+---
+# cloudflared: the tunnel (07's 8.1, ADR-0021). Outbound only - the connector
+# dials Cloudflare's edge, and nothing on the internet or the LAN ever opens a
+# connection to it, so it has no ingress rule at all. Its one in-cluster
+# destination is the dash pod. A tunnel that can reach everything is a hole,
+# not a control (8.1).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-egress
+  namespace: cloudflared
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflared
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # The edge: 7844 over QUIC (UDP), falling back to HTTP/2 (TCP). 443 is
+    # for fetching the Access team's signing keys, which is how cloudflared
+    # validates the Access JWT before forwarding anything (ADR-0021).
+    # Private ranges excepted, as everywhere else in this file: the internet
+    # is the only thing this rule is for.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: UDP, port: 7844}
+        - {protocol: TCP, port: 7844}
+        - {protocol: TCP, port: 443}
+    # The one origin. Pod port, not Service port: policy is evaluated after
+    # the Service's DNAT.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: dash
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dash
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+# dash: reachable from cloudflared and nothing else - no Gateway listener, no
+# HTTPRoute, no Unbound override. That is what makes Access unbypassable
+# (8.2): there is no origin address to hit around the tunnel, from the
+# internet or from VLAN 20.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: dash
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dash
+  namespace: dash
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dash
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflared
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+# The API server, which is dash's only data source. Same reserved-identity
+# shape as allow-argocd-apiserver above, and unscoped by port for the same
+# confirmed reason. No internet egress: dash does not validate the Access JWT
+# itself (that would mean fetching keys from Cloudflare), it relies on
+# cloudflared having done so and on the ingress rule above (ADR-0021).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-dash-apiserver
+  namespace: dash
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: dash
+  egress:
+    - toEntities: [kube-apiserver]

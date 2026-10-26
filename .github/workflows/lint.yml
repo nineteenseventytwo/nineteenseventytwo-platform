@@ -57,6 +57,19 @@ jobs:
           sudo mv actionlint /usr/local/bin/
           make lint-actions
 
+  go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: images/dash/go.mod
+      - name: vet and test images/dash
+        working-directory: images/dash
+        run: |
+          go vet ./...
+          go test -race ./...
+
   helm:
     runs-on: ubuntu-24.04
     steps:

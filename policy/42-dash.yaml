@@ -1,0 +1,67 @@
+---
+# dash's credential (ADR-0018 W5): read pods, Deployments and StatefulSets in
+# the two eightbitsaxlounge namespaces, and nothing else. Roles, not a
+# ClusterRole - a dashboard with cluster-wide read is a credential worth
+# stealing, one scoped to two namespaces is not (09 W5).
+#
+# No long-lived token Secret, unlike ci-argocd-sync and ci-image-inventory:
+# dash runs in the cluster and uses the projected token the kubelet rotates.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dash
+  namespace: dash
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dash-read
+  namespace: eightbitsaxlounge-prod
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dash-read
+  namespace: eightbitsaxlounge-prod
+subjects:
+  - kind: ServiceAccount
+    name: dash
+    namespace: dash
+roleRef:
+  kind: Role
+  name: dash-read
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dash-read
+  namespace: eightbitsaxlounge-dev
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dash-read
+  namespace: eightbitsaxlounge-dev
+subjects:
+  - kind: ServiceAccount
+    name: dash
+    namespace: dash
+roleRef:
+  kind: Role
+  name: dash-read
+  apiGroup: rbac.authorization.k8s.io

@@ -204,3 +204,27 @@ spec:
     requests.cpu: "2"
     requests.memory: 2Gi
     limits.memory: 4Gi
+---
+# Room for exactly one pod plus its rolling-update surge, in both namespaces
+# below. A second steady-state replica is a quota change in a PR, on purpose.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: cloudflared
+spec:
+  hard:
+    requests.cpu: 50m
+    requests.memory: 96Mi
+    limits.memory: 256Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: dash
+spec:
+  hard:
+    requests.cpu: 25m
+    requests.memory: 48Mi
+    limits.memory: 128Mi
