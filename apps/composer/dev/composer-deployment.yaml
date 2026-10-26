@@ -35,8 +35,9 @@ spec:
   # pressure.
   replicas: 1
   # Stop the old pod before starting the new one. The tenant quota
-  # (requests.memory 256Mi) fits one 192Mi pod, not the two a default rolling
-  # update runs side by side — so the 0.1.2 rollout (#200) sat for hours with
+  # (requests.memory 256Mi) fit one 192Mi pod, not the two a default rolling
+  # update runs side by side (the default request is 96Mi now, but one at a
+  # time is still the right shape for a single-replica API) — so the 0.1.2 rollout (#200) sat for hours with
   # its new ReplicaSet forbidden by the quota and the old image still serving.
   #
   # maxSurge 0 rather than `type: Recreate`, which is what the eightbitsaxlounge

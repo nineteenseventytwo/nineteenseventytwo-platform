@@ -5,9 +5,16 @@
 # The controller only. Scale sets are separate releases — see the values-*.yaml
 # files alongside this one.
 replicaCount: 1
+# 7-day peak ~36Mi (2026-10-26); 64Mi is still generous. Stateless and
+# steady, so it may run on 1972-master-1 like argocd-server does - the
+# workers are where the bursty and PVC-backed pods have to go.
 resources:
-  requests: {cpu: 50m, memory: 128Mi}
+  requests: {cpu: 50m, memory: 64Mi}
   limits: {memory: 256Mi}
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    effect: NoSchedule
+    operator: Exists
 flags:
   logLevel: info
   logFormat: json

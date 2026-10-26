@@ -89,8 +89,12 @@ spec:
                 # findings stay in every output, flagged as suppressed.
                 - --mutelist-file
                 - /home/prowler/mutelist/mutelist.yaml
+              # Request 768Mi: scans peak at 650-840Mi. At 512Mi it was
+              # under-requested, and once the rest of the cluster requested
+              # honestly (2026-10-24) no node had 512Mi left either - every
+              # run sat Pending until the 1h deadline killed it, 25-26 Oct.
               resources:
-                requests: {cpu: 250m, memory: 512Mi}
+                requests: {cpu: 250m, memory: 768Mi}
                 # Headroom over the 2-region scan, not the 39-region OOM.
                 limits: {cpu: "1", memory: 2Gi}
               securityContext:

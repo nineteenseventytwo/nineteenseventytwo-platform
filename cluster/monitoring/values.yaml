@@ -219,8 +219,9 @@ grafana:
     passwordKey: admin-password
 
 prometheusOperator:
+  # 7-day peak ~43Mi (2026-10-26).
   resources:
-    requests: {cpu: 50m, memory: 128Mi}
+    requests: {cpu: 50m, memory: 64Mi}
     limits: {memory: 256Mi}
   # Stateless, no PVC — unlike grafana/alertmanager above, this one has
   # nothing that could hit Longhorn's CSI-driver-absent-on-master-1 wall,

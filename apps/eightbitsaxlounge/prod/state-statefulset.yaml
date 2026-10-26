@@ -137,10 +137,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+          # Memory request at 48Mi, not 128Mi (2026-10-26): NATS's 7-day peak
+          # was ~20Mi. Requests are what the scheduler plans with, and the
+          # unused 80Mi on each was part of why Prowler could not be placed.
           resources:
             requests:
               cpu: "50m"
-              memory: "128Mi"
+              memory: "48Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
