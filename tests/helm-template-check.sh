@@ -29,6 +29,17 @@ add prometheus-community https://prometheus-community.github.io/helm-charts
 add argo                 https://argoproj.github.io/argo-helm
 helm repo update >/dev/null
 
+# Render for the Kubernetes the cluster actually runs. Without --kube-version
+# helm assumes its own built-in default, which is whatever the helm binary on
+# the runner was built against - so a chart with a kubeVersion floor (longhorn
+# 1.13: >=1.34) passes or fails depending on the runner image, not on this
+# repo. That is what broke CI on 2026-10-26 with nothing here changed.
+KUBE_VERSION="$(awk -F'"' '/^kubernetes_version:/ {print $2}' ansible/inventory/lab/group_vars/all/vars.yml)"
+[[ -n "$KUBE_VERSION" ]] || {
+  echo "error: kubernetes_version not found in ansible/inventory/lab/group_vars/all/vars.yml" >&2
+  exit 1
+}
+
 fail=0
 check() { # chart, values path
   local chart="$1" values="$2" version
@@ -39,7 +50,7 @@ check() { # chart, values path
     return
   fi
   echo "--- $chart @ $version ($values)"
-  helm template test "$chart" --version "$version" -f "$values" >/dev/null || fail=1
+  helm template test "$chart" --version "$version" -f "$values" --kube-version "v${KUBE_VERSION}.0" >/dev/null || fail=1
 }
 
 check cilium/cilium                              cluster/cilium/values.yaml
