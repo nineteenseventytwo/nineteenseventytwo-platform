@@ -103,6 +103,19 @@ apiServer:
       mountPath: /var/log/kubernetes
       readOnly: false
       pathType: DirectoryOrCreate
+  # A soft cap for the Go garbage collector. Without one the apiserver runs
+  # GOGC=100 and no limit: it lets the heap grow to twice what is live before
+  # collecting, and holds the slack. Measured 2026-10-26: ~970MB live (heap
+  # profile), next GC due at 1.64GB, 2.1GB RSS - 7-day peak 3GB - on a 4GB
+  # node with 11% left. Two-thirds of the live heap is CRD schemas and their
+  # OpenAPI documents (108 CRDs), so it is structural, not a leak; the slack
+  # on top is what this takes back. The apiserver averages 0.1 cores, so the
+  # extra GC work is affordable. Soft: if live data ever exceeds it, Go
+  # collects harder (GC CPU is capped at ~50%) rather than failing.
+  # On an existing control plane: `make apiserver-memlimit` (30-cluster.yml).
+  extraEnvs:
+    - name: GOMEMLIMIT
+      value: "{{ kube_control_plane_apiserver_gomemlimit }}"
 controllerManager:
   extraArgs:
     - name: bind-address

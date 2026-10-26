@@ -27,3 +27,7 @@ kube_control_plane_pss_exempt_namespaces:
   - cilium-secure
   - longhorn-system
   - metallb-system
+
+# GOMEMLIMIT for kube-apiserver (kubeadm-config.yaml.j2 explains). ~970MB is
+# live; 1400MiB leaves ~40% for growth before the GC has to work hard.
+kube_control_plane_apiserver_gomemlimit: 1400MiB
