@@ -163,11 +163,10 @@ spec:
     requests.memory: 128Mi
     limits.memory: 256Mi
 ---
-# Sized around Prowler's own CronJob spec (policy/30-prowler.yaml: 250m/512Mi
-# requests, 1 CPU/2Gi limits per scan) with headroom above the single
-# concurrent scan pod that actually runs - completed Job pods retained by
-# successfulJobsHistoryLimit don't count against quota `used`, only
-# Running/Pending ones do.
+# Nothing runs here since Prowler moved to GitHub Actions (2026-10-26,
+# nineteenseventytwo-cloud's prowler workflow): the namespace holds only
+# ci-image-inventory's ServiceAccount and token. Kept small so anything that
+# does start running here has to be sized on purpose.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -175,9 +174,9 @@ metadata:
   namespace: security
 spec:
   hard:
-    requests.cpu: "1"
-    requests.memory: 1Gi
-    limits.memory: 3Gi
+    requests.cpu: 250m
+    requests.memory: 256Mi
+    limits.memory: 512Mi
 ---
 apiVersion: v1
 kind: ResourceQuota

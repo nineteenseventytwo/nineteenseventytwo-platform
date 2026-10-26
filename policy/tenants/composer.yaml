@@ -64,7 +64,7 @@ spec:
       default: {cpu: 500m, memory: 384Mi}
       # 192Mi -> 96Mi (2026-10-26): the API's 7-day peak was 70Mi, and its
       # unused request was part of why Prowler could no longer be scheduled
-      # anywhere (policy/30-prowler.yaml). The limit stays 384Mi for the
+      # anywhere (since moved off the cluster - policy/README.md#findings). The limit stays 384Mi for the
       # occasional large score.
       defaultRequest: {cpu: 100m, memory: 96Mi}
       max: {memory: 768Mi}

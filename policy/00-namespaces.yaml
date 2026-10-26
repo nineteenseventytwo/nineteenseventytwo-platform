@@ -128,10 +128,11 @@ metadata:
     pod-security.kubernetes.io/enforce: privileged
     platform.nineteenseventytwo/tier: infra
 ---
-# Prowler's scan pod runs unprivileged (see policy/30-prowler.yaml) - no host
-# access, no special capabilities, just outbound HTTPS to AWS's APIs and S3.
-# Already scoped into pod-identity-webhook's namespaceSelector alongside
-# argocd/vault/longhorn-system - see ADR-0014.
+# Held the Prowler CronJob until it moved to GitHub Actions (2026-10-26,
+# policy/README.md#findings); now only ci-image-inventory's ServiceAccount and
+# token (41-ci-image-inventory.yaml). Still scoped into pod-identity-webhook's
+# namespaceSelector (ADR-0014) - harmless with no pods, and it keeps the
+# namespace ready for another AWS-facing job.
 apiVersion: v1
 kind: Namespace
 metadata:
