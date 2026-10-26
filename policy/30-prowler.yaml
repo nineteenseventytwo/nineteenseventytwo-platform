@@ -25,6 +25,13 @@ spec:
   # scan has a detection window as wide as its interval. Off-peak UTC hour,
   # arbitrary otherwise.
   schedule: "0 5 * * *"
+  # SUSPENDED 2026-10-26. A scan peaks at 650-840Mi of real memory, and no
+  # node has that to spare: the workers' real usage runs well above their
+  # requests (Longhorn's instance managers request 0 and use ~380Mi a node),
+  # so a scan that fit worker-1 by requests took the node NotReady for ~3
+  # minutes four minutes in. Back on once it has somewhere real to run - see
+  # the PR that suspended it for the options.
+  suspend: true
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
