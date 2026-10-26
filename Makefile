@@ -384,6 +384,10 @@ remove-kube-proxy: ## One-time kube-proxy-replacement migration - see 30-cluster
 etcd-metrics: ## One-time: expose etcd metrics on the node IP of an existing control plane - restarts etcd, see 30-cluster.yml
 	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags etcd-metrics
 
+.PHONY: apiserver-memlimit
+apiserver-memlimit: ## One-time: set GOMEMLIMIT on an existing apiserver - restarts it (~30-60s API outage), see 30-cluster.yml
+	$(PLAYBOOK) ansible/playbooks/30-cluster.yml --tags apiserver-memlimit
+
 .PHONY: bootstrap-argocd
 bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
 	# Same adopt-don't-wait pattern as Cilium (cluster/README.md): Argo CD's own

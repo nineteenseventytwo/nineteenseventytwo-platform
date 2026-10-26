@@ -360,3 +360,112 @@
           ansible.builtin.command:
             cmd: kubeadm init phase upload-config kubeadm --config /etc/kubernetes/kubeadm-config.yaml
           changed_when: true
+
+# Applies kubeadm-config.yaml.j2's apiServer.extraEnvs (GOMEMLIMIT) to an
+# EXISTING control plane - same shape, and same reason, as etcd-metrics above.
+# `never`-tagged: run it explicitly with `make apiserver-memlimit`.
+#
+# Regenerating the apiserver manifest re-renders every flag, not just the new
+# env var, so a template that has drifted from the running apiserver would go
+# live with it. Rendered with --dry-run first; refuses unless the image,
+# command and volumes are unchanged - the env is the only thing allowed to
+# differ. The kubelet then restarts the apiserver: the API is down for
+# ~30-60s (workloads keep running). Pick a quiet moment, not mid-deploy.
+- name: Cap the apiserver's Go heap (GOMEMLIMIT)
+  hosts: control_plane
+  gather_facts: true
+  tags: [apiserver-memlimit, never]
+  vars_files:
+    - ../roles/kube_control_plane/defaults/main.yml
+    - ../roles/kube_prereqs/defaults/main.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Read the running apiserver manifest
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/manifests/kube-apiserver.yaml
+      register: apiserver_manifest
+      become: true
+
+    - name: Decide whether there is anything to do
+      ansible.builtin.set_fact:
+        apiserver_live: "{{ (apiserver_manifest.content | b64decode | from_yaml).spec.containers | first }}"
+
+    - name: Check what is already set
+      ansible.builtin.set_fact:
+        apiserver_memlimit_live: >-
+          {{ (apiserver_live.env | default([]) | selectattr('name', 'equalto', 'GOMEMLIMIT')
+              | map(attribute='value') | list) == [kube_control_plane_apiserver_gomemlimit] }}
+
+    - name: Apply the limit
+      when: not apiserver_memlimit_live
+      become: true
+      block:
+        - name: Render the current kubeadm config
+          ansible.builtin.template:
+            src: ../roles/kube_control_plane/templates/kubeadm-config.yaml.j2
+            dest: /etc/kubernetes/kubeadm-config.yaml
+            owner: root
+            group: root
+            mode: "0600"
+            backup: true
+
+        - name: Render the new apiserver manifest without applying it
+          ansible.builtin.command:
+            cmd: >-
+              kubeadm init phase control-plane apiserver
+              --config /etc/kubernetes/kubeadm-config.yaml
+              --dry-run
+          register: apiserver_dry_run
+          changed_when: false
+
+        # --dry-run writes the manifests to a temporary directory and names it.
+        - name: Read the dry-run manifest
+          ansible.builtin.slurp:
+            src: >-
+              {{ apiserver_dry_run.stdout
+                 | regex_search('/etc/kubernetes/tmp/kubeadm-init-dryrun[0-9]+') }}/kube-apiserver.yaml
+          register: apiserver_rendered
+
+        - name: Refuse unless the env is the only change
+          vars:
+            rendered: "{{ (apiserver_rendered.content | b64decode | from_yaml).spec.containers | first }}"
+          ansible.builtin.assert:
+            that:
+              - rendered.image == apiserver_live.image
+              - rendered.command == apiserver_live.command
+              - rendered.volumeMounts == apiserver_live.volumeMounts
+            fail_msg: >-
+              The template renders a different apiserver than the one running
+              (image, flags or mounts), so regenerating it would change more
+              than GOMEMLIMIT. Reconcile kubeadm-config.yaml.j2 with the
+              running /etc/kubernetes/manifests/kube-apiserver.yaml first.
+            quiet: true
+
+        # Outside manifests/ deliberately: the kubelet runs every file in
+        # that directory as a static pod, a backup included.
+        - name: Keep the current apiserver manifest for a manual rollback
+          ansible.builtin.copy:
+            src: /etc/kubernetes/manifests/kube-apiserver.yaml
+            dest: /etc/kubernetes/kube-apiserver.yaml.pre-memlimit
+            remote_src: true
+            mode: "0600"
+
+        - name: Regenerate the apiserver static-pod manifest
+          ansible.builtin.command:
+            cmd: kubeadm init phase control-plane apiserver --config /etc/kubernetes/kubeadm-config.yaml
+          changed_when: true
+
+        - name: Wait for the apiserver to come back
+          ansible.builtin.command:
+            cmd: kubectl get --raw /readyz
+          register: apiserver_ready
+          until: apiserver_ready.rc == 0
+          retries: 36
+          delay: 5
+          changed_when: false
+
+        - name: Upload the ClusterConfiguration so kubeadm upgrade keeps the env
+          ansible.builtin.command:
+            cmd: kubeadm init phase upload-config kubeadm --config /etc/kubernetes/kubeadm-config.yaml
+          changed_when: true
