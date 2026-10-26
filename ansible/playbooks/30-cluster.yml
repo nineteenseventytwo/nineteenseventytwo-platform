@@ -410,21 +410,22 @@
             mode: "0600"
             backup: true
 
+        # --dry-run writes the manifest to a random temp directory and names
+        # it only in a stderr warning; KUBEADM_INIT_DRYRUN_DIR pins it instead
+        # of parsing that (the first version parsed stdout and found nothing).
         - name: Render the new apiserver manifest without applying it
           ansible.builtin.command:
             cmd: >-
               kubeadm init phase control-plane apiserver
               --config /etc/kubernetes/kubeadm-config.yaml
               --dry-run
-          register: apiserver_dry_run
+          environment:
+            KUBEADM_INIT_DRYRUN_DIR: /etc/kubernetes/tmp/apiserver-memlimit-dryrun
           changed_when: false
 
-        # --dry-run writes the manifests to a temporary directory and names it.
         - name: Read the dry-run manifest
           ansible.builtin.slurp:
-            src: >-
-              {{ apiserver_dry_run.stdout
-                 | regex_search('/etc/kubernetes/tmp/kubeadm-init-dryrun[0-9]+') }}/kube-apiserver.yaml
+            src: /etc/kubernetes/tmp/apiserver-memlimit-dryrun/kube-apiserver.yaml
           register: apiserver_rendered
 
         - name: Refuse unless the env is the only change
