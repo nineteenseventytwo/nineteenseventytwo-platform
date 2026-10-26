@@ -433,6 +433,13 @@ rather than an empty or erroring page.
 
 ### W.5 — The private half _(~10h)_ — this is 07's Phase 8.1 and 8.2
 
+**Built 2026-10-26, awaiting the Cloudflare side** — `cluster/cloudflared`,
+`cluster/dash`, `images/dash`, `policy/42-dash.yaml`. The tunnel goes straight
+to the dash Service, not through the Gateway:
+[ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md), which also
+answers the Unbound question below (no override; tunnel only). The items
+stay unticked until the gate passes live.
+
 - [ ] `cloudflared` per [8.1](07-completion-plan.md#81--cloudflare-tunnel): own
       namespace, credentials by ExternalSecret from Vault, default-deny plus a
       scoped allow to the Gateway only

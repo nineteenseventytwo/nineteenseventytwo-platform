@@ -40,7 +40,7 @@ spec:
       containers:
         - name: dash
           # dash 0.1.1, arm64. Pinned by digest, like every image here.
-          image: ghcr.io/nineteenseventytwo/dash@sha256:DIGEST_PENDING_BUILD
+          image: ghcr.io/nineteenseventytwo/dash@sha256:bb99dd629362b6aa3c6df15729833b53a828ca699d37f16300bbf95c2c66f399
           imagePullPolicy: IfNotPresent
           env:
             - name: DASH_NAMESPACES
