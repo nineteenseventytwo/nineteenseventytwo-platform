@@ -39,7 +39,8 @@ Prowler report older than ~2 days, and the exporter not being scraped.
   repo only (`cluster/vault/README.md#findings-exporter`). Not ARC's App,
   which can administer the org's runners. A JWT signed with the App key buys a
   one-hour installation token, narrowed to `security_events: read` in the
-  request (`githubapp.go`). Locally, `FINDINGS_GITHUB_TOKEN_FILE` takes any
+  request (`githubapp.go`). In the cluster the Secret is mounted at
+  `FINDINGS_GITHUB_APP_DIR` (`app-id`, `installation-id`, `private-key`). Locally, `FINDINGS_GITHUB_TOKEN_FILE` takes any
   token instead.
 - **AWS:** none stored. The pod-identity webhook (ADR-0014) mounts a projected
   token, exchanged with STS for `cluster-findings-exporter` (cloud repo), which

@@ -27,6 +27,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -48,13 +49,21 @@ func main() {
 	if repos := splitList(os.Getenv("FINDINGS_GITHUB_REPOS")); len(repos) > 0 {
 		api := env("FINDINGS_GITHUB_API", "https://api.github.com")
 		var auth tokenSource = fileToken{path: env("FINDINGS_GITHUB_TOKEN_FILE", "/secrets/github/token")}
-		if appID := os.Getenv("FINDINGS_GITHUB_APP_ID"); appID != "" {
+		// The App's credentials are three files from one Secret: the two IDs
+		// are not secret, but files keep them out of the pod spec's env.
+		if dir := os.Getenv("FINDINGS_GITHUB_APP_DIR"); dir != "" {
+			appID, err1 := readTrimmed(filepath.Join(dir, "app-id"))
+			instID, err2 := readTrimmed(filepath.Join(dir, "installation-id"))
+			if err := errors.Join(err1, err2); err != nil {
+				logger.Error("github app credentials", "err", err)
+				os.Exit(1)
+			}
 			auth = &githubApp{
 				client:         client,
 				api:            api,
 				appID:          appID,
-				installationID: os.Getenv("FINDINGS_GITHUB_APP_INSTALLATION_ID"),
-				keyFile:        env("FINDINGS_GITHUB_APP_KEY_FILE", "/secrets/github/private-key"),
+				installationID: instID,
+				keyFile:        filepath.Join(dir, "private-key"),
 			}
 		}
 		src := &githubSource{
@@ -175,6 +184,14 @@ func every(key string, fallback time.Duration) time.Duration {
 		return d
 	}
 	return fallback
+}
+
+func readTrimmed(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(b)), nil
 }
 
 func splitList(s string) []string {
