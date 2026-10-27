@@ -725,6 +725,60 @@ spec:
 # PR #100) is its Gateway-API equivalent - already covers this traffic and
 # was left untouched.
 ---
+# Grafana's two datasources, Prometheus and Alertmanager. Grafana queries
+# them server-side, so this is Grafana's egress and their ingress. Neither
+# was ever allowed: default-deny-all above has covered this namespace's egress
+# since 2026-08-23, and every Prometheus-backed panel has timed out since then
+# ("dial tcp 10.99.53.71:9090: i/o timeout"). Nobody noticed until the
+# Findings dashboard (07 Phase 10.4) was the first thing anyone opened. The
+# dashboard sidecar kept working throughout - it talks to the API server,
+# which allow-monitoring-apiserver covers - and is why dashboards appeared
+# while every panel on them was empty.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-datasources-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - {protocol: TCP, port: 9090}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - {protocol: TCP, port: 9093}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-datasources-from-grafana
+  namespace: monitoring
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [prometheus, alertmanager]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - {protocol: TCP, port: 9090}
+        - {protocol: TCP, port: 9093}
+---
 # Second attempt at the Gateway cutover source, and the actually-correct one.
 # The first attempt (2026-09-01, since reverted) added a podSelector for
 # cilium-envoy's own pod labels to the plain NetworkPolicy above, on the
