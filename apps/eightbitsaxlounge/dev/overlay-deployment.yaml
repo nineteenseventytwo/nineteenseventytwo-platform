@@ -54,6 +54,10 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 1000
       containers:
         - name: overlay
           image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-overlay@sha256:5b843664552af8edbad6b699f69c454278bf8af88e18e8a047567985940e41ba
