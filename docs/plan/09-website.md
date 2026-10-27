@@ -433,29 +433,36 @@ rather than an empty or erroring page.
 
 ### W.5 — The private half _(~10h)_ — this is 07's Phase 8.1 and 8.2
 
-**Built 2026-10-26, awaiting the Cloudflare side** — `cluster/cloudflared`,
+**Done 2026-10-27; the gate passed live** — `cluster/cloudflared`,
 `cluster/dash`, `images/dash`, `policy/42-dash.yaml`. The tunnel goes straight
 to the dash Service, not through the Gateway:
 [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md), which also
-answers the Unbound question below (no override; tunnel only). The items
-stay unticked until the gate passes live.
+answers the Unbound question below (no override; tunnel only).
 
-- [ ] `cloudflared` per [8.1](07-completion-plan.md#81--cloudflare-tunnel): own
+- [x] `cloudflared` per [8.1](07-completion-plan.md#81--cloudflare-tunnel): own
       namespace, credentials by ExternalSecret from Vault, default-deny plus a
-      scoped allow to the Gateway only
-- [ ] Route one low-value hostname first and confirm the path before `dash.`
-- [ ] Cloudflare Access per 8.2, and **confirm the JWT is validated, not merely
+      scoped allow ~~to the Gateway only~~ to the dash pods only (ADR-0021)
+- [x] Route one low-value hostname first and confirm the path before `dash.`
+- [x] Cloudflare Access per 8.2, and **confirm the JWT is validated, not merely
       present** — 8.2 is explicit that an origin reachable around the proxy
-      makes Access decoration
-- [ ] The dashboard app: namespace-scoped ServiceAccount, two namespaces, read
+      makes Access decoration. cloudflared's `access.required` rejects a
+      forged `Cf-Access-Jwt-Assertion` with the same redirect as no token
+- [x] The dashboard app: namespace-scoped ServiceAccount, two namespaces, read
       only (W5)
-- [ ] Record whether internal Unbound overrides keep bypassing Access from
+- [x] Record whether internal Unbound overrides keep bypassing Access from
       VLAN 20 — 8.2 asks for this decision to be written down, not just taken
 
 **Gate (8.2's, unchanged):** the public site is reachable from a phone on
 mobile data; `dash.` is reachable only after an Access challenge; nothing is
 reachable by hitting the home IP directly; the router still has zero inbound
 port-forwards.
+
+**Gate result, 2026-10-27:** the public site and `dash.` (behind the Access
+challenge) both work from a phone on mobile data and from the home network. An
+external `nmap -Pn -p-` of the home IPv4 address found 65,534 ports filtered
+and 179/tcp `closed` (a reset, most likely the ISP's edge refusing BGP; nothing
+listening). OPNsense has no port-forwards, one-to-one NAT or WAN pass rules, and
+UPnP is off.
 
 ---
 
