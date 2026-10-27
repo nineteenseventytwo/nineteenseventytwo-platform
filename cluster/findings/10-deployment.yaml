@@ -40,7 +40,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: findings-exporter
-          image: ghcr.io/nineteenseventytwo/findings-exporter@sha256:9f480b0acf5a32b2b1708d803071a301c5a9f1bca4b5636b6df883ab9781ab51
+          image: ghcr.io/nineteenseventytwo/findings-exporter@sha256:074bae87dd59eb76808bdfb10ccc09d53895d8b5c04b2d99c534f52a75b7dd13
           imagePullPolicy: IfNotPresent
           env:
             - name: FINDINGS_ALERTMANAGER
