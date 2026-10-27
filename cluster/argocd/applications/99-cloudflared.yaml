@@ -8,8 +8,8 @@
 # put it ahead of the Vault ClusterSecretStore its ExternalSecret reads
 # (platform-manifests, wave 90). The parent app waits for each wave to be
 # healthy, so on a rebuild it would have waited on this app forever (see
-# 96-falco.yaml).
-# The live cluster never hit it: platform-policy also syncs on its own.
+# 96-falco.yaml). The live cluster never hit it: platform-policy also syncs
+# on its own.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
