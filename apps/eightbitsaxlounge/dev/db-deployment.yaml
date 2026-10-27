@@ -99,7 +99,22 @@ spec:
           # emptyDir's root-owned mount point, and a non-root uid may not -
           # "preserving times for '/seed/.': Operation not permitted", the
           # first rollout. Contents only; their owner is this uid anyway.
-          command: ["sh", "-c", "cp -R /opt/couchdb/etc/. /seed/"]
+          #
+          # Then a cookie. With no -setcookie, Erlang creates
+          # $HOME/.erlang.cookie (/opt/couchdb, the read-only root) and the
+          # VM dies: "Failed to create cookie file ... erofs", the second
+          # rollout. A random cookie in vm.args, which is in the writable
+          # seeded etc, means it never tries. Single node: nothing else
+          # needs to know it, and a new one each start costs nothing.
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              cp -R /opt/couchdb/etc/. /seed/
+              if ! grep -q '^-setcookie' /seed/vm.args; then
+                echo "-setcookie $(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)" >> /seed/vm.args
+              fi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
