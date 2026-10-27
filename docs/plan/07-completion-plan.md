@@ -27,7 +27,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 | 6.4 Egress log-only | ❌ Not started |
 | 7 Egress control | ❌ Not started |
 | 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
-| 8.1, 8.2 Tunnel and Access | ⚠️ Live 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): four tunnel connections; Access redirects unauthenticated and forged-header requests. The phone and LAN checks of [09](09-website.md)'s W.5 gate are still to do |
+| 8.1, 8.2 Tunnel and Access | ✅ 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): `dash.` behind Access via the tunnel; [09](09-website.md)'s W.5 gate passed (phone, LAN, external port scan). Grafana and Argo CD behind Access is still open |
 | 9 Hybrid | ❌ Not started |
 | 10 CNAPP | ⚠️ Prowler moved from the cluster to GitHub Actions in cloud (2026-10-26). Falco, scheduled Kubescape, asset graph and the drill are not started |
 | 11, 12 | ❌ Not started |
@@ -308,20 +308,22 @@ in front of it. Still no inbound ports.**
 
 ### 8.1 — Cloudflare Tunnel
 
-- [ ] `cloudflared` as a Deployment in the cluster, credentials via
+- [x] `cloudflared` as a Deployment in the cluster, credentials via
       ExternalSecret from Vault
-- [ ] Its own namespace, default-deny plus a scoped allow to the Gateway only —
-      a tunnel that can reach everything is a hole, not a control
-- [ ] Route one low-value hostname through it first and confirm the path end to
+- [x] Its own namespace, default-deny plus a scoped allow ~~to the Gateway
+      only~~ to its origin pods only (ADR-0021) — a tunnel that can reach
+      everything is a hole, not a control
+- [x] Route one low-value hostname through it first and confirm the path end to
       end before adding anything that matters
 
 ### 8.2 — Cloudflare Access
 
-- [ ] Access policy (email OTP to start) in front of Grafana and Argo CD
-- [ ] Confirm the Access JWT is actually validated, not merely present — an
+- [ ] Access policy (email OTP to start) in front of Grafana and Argo CD —
+      in front of `dash.` since 2026-10-27; these two still to move (ADR-0021)
+- [x] Confirm the Access JWT is actually validated, not merely present — an
       identity-aware proxy you can bypass by hitting the origin directly is
       decoration. The origin must be unreachable except through the tunnel
-- [ ] Decide and record whether internal Unbound overrides keep bypassing Access
+- [x] Decide and record whether internal Unbound overrides keep bypassing Access
       from VLAN 20, or whether the tunnel becomes the only path
 
 ### 8.3 — The public site _(needs D2)_
