@@ -201,7 +201,9 @@ endif
 # from their check_mode input so CI and a laptop spell it the same way.
 CHECK_ARGS = $(if $(CHECK),--check --diff,)
 
-PLAYBOOK = $(ANSIBLE) -i $(INVENTORY)
+# ARGS passes anything else through, e.g. a one-node, one-role converge:
+#   make deploy-cluster ARGS="--tags prereqs --limit 1972-worker-1"
+PLAYBOOK = $(ANSIBLE) -i $(INVENTORY) $(ARGS)
 
 .PHONY: help
 help: ## Show this help

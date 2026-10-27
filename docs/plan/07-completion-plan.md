@@ -285,7 +285,10 @@ are. Each path gets its own observation:
 - [ ] **Nodes:** `os-squid` on OPNsense, listening on the VLAN 20 interface
       at `:3128`, allowing VLAN 20 to any destination, access log on. Then
       flip `egress_proxy_enabled: true` and converge one node at a time
-      (containerd restarts)
+      (containerd restarts). Squid is up as of 2026-10-27, and a host-network
+      curl from 1972-worker-1 got through it. Cluster nodes' apt does not use
+      the proxy (only containerd does), so OPNsense's firewall log is the
+      record for that
 - [ ] After a full week: save both lists to `docs/egress-observed.md`. That
       file is Phase 7's allowlist input
 
