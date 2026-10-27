@@ -32,11 +32,14 @@ webhooks:
     # Scoped to the namespaces that actually federate to AWS. Every other pod
     # in the cluster skips this admission hop entirely, which on 2 GB nodes is
     # worth having, and it bounds what a compromised webhook could rewrite.
+    # A new AWS-federated workload needs its namespace added here as well as
+    # its role in the cloud repo: findings (07 Phase 10.4) was deployed
+    # without it and got no credentials.
     namespaceSelector:
       matchExpressions:
         - key: kubernetes.io/metadata.name
           operator: In
-          values: ["argocd", "vault", "longhorn-system", "security"]
+          values: ["argocd", "vault", "longhorn-system", "security", "findings"]
     objectSelector:
       matchExpressions:
         - key: eks.amazonaws.com/skip-pod-identity-webhook
