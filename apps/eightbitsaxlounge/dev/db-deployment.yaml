@@ -95,7 +95,11 @@ spec:
         - name: seed-etc
           image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:7be893b0f92023b859f014849763febcc26ab0bcd26ab6d5b96ccc9467ac018b
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "cp -a /opt/couchdb/etc/. /seed/"]
+          # cp -R, not -a: -a also sets the times on /seed itself, the
+          # emptyDir's root-owned mount point, and a non-root uid may not -
+          # "preserving times for '/seed/.': Operation not permitted", the
+          # first rollout. Contents only; their owner is this uid anyway.
+          command: ["sh", "-c", "cp -R /opt/couchdb/etc/. /seed/"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
