@@ -21,7 +21,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 
 | Phase | State |
 |---|---|
-| Immediate | SCPs to root and the build 0004 certificate note are still open |
+| Immediate | SCPs at the root 2026-10-27 (cloud #42). The build 0004 certificate note is still open |
 | 6.1, 6.2 eightbitsaxlounge | ✅ Gate met 2026-09-12. See [08](08-eightbitsaxlounge-migration.md) |
 | 6.3 Composer | ✅ Live in `composer-dev` with the `plan` arranger since 2026-09-24. D1 recorded as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md) |
 | 6.4 Egress log-only | ⚠️ Pod DNS observation built (`policy/12-egress-observe.yaml`, `tests/egress-observed.sh`). Squid on OPNsense and the node proxy flip are still to do |
@@ -162,7 +162,7 @@ twice.
 Revised 2026-09-07 after checking each item against the repos rather than
 against build 0003's carried list, which had gone stale in two places.
 
-- [ ] **Decide the two staged SCPs on evidence, not on the calendar.** The
+- [x] **Decide the two staged SCPs on evidence, not on the calendar.** The
       "clean CloudTrail week" rule is the wrong instrument for this step and
       the observation window has already told you everything it can — see
       [06 §The SCP window](06-programme-status.md#why-the-quiet-week-proves-nothing-here).
@@ -172,6 +172,11 @@ against build 0003's carried list, which had gone stale in two places.
       **Prowler's own all-regions scan will start generating expected
       `AccessDenied` entries** the moment `DenyRegionsOutsideAllowlist` reaches
       the root, and that those are correct behaviour, not a regression.
+      **Done 2026-10-27** (cloud #42): 90 days of CloudTrail in all three
+      accounts and both policies' resource types in code checked; nothing
+      legitimate affected. Both are attached to the root. Prowler's expected
+      denials are `DescribeAddresses`, `ListAccelerators` and
+      `ListMultiRegionAccessPoints`
 - [x] ~~**Land `bootstrap/cloud-init/render.sh`'s fix.**~~ **Already done** —
       commit `464b91f`, 2026-09-04, "fix: render.sh age-key mount path and
       output_dir chdir resolution". Build 0003's log lists it as carried
