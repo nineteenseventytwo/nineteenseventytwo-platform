@@ -121,3 +121,9 @@ any one of them produces a different confusing symptom:
 
 All three are handled by `ansible/roles/docker` and `ansible/roles/kube_prereqs`;
 set `egress_proxy_enabled: true` in group_vars to turn them on.
+
+None of the three reaches **pods**. Pod traffic is masqueraded to the node IP
+and goes straight out through OPNsense, never through Squid. Pod egress is
+observed through Cilium's DNS proxy (`policy/12-egress-observe.yaml`,
+`tests/egress-observed.sh`) and will be enforced there too
+([07](plan/07-completion-plan.md) Phase 6.4).

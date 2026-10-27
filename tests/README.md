@@ -77,3 +77,17 @@ control this cluster fails is classified there as fixed, accepted or open, so
 a scan is clean when its failure set matches that table rather than when the
 score reaches some number. Eleven of the eighteen are the CNI and the CSI
 driver being what they are.
+
+## egress-observed.sh
+
+The external names pods have resolved, by namespace, from Hubble's DNS metric
+in Prometheus (07 Phase 6.4). Needs `policy/12-egress-observe.yaml` live and a
+filled window: Prometheus keeps 7 days.
+
+```bash
+tests/egress-observed.sh          # last 7d
+tests/egress-observed.sh 24h
+ALL=1 tests/egress-observed.sh    # include cluster.local
+```
+
+Exit 125 if Prometheus could not be reached, 1 if it has no data yet.
