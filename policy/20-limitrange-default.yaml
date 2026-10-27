@@ -289,3 +289,16 @@ spec:
       default: {cpu: 1000m, memory: 64Mi}
       defaultRequest: {cpu: 10m, memory: 16Mi}
       max: {memory: 1Gi}
+---
+# findings: one small exporter that sets its own request and memory limit.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: findings
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 64Mi}
+      defaultRequest: {cpu: 10m, memory: 24Mi}
+      max: {memory: 128Mi}

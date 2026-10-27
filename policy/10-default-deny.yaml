@@ -1453,3 +1453,88 @@ spec:
               app.kubernetes.io/name: kubescape
       ports:
         - {protocol: TCP, port: 9093}
+---
+# findings (07 Phase 10.4): Prometheus scrapes the exporter; the exporter
+# reads Alertmanager in the cluster and three APIs on the internet
+# (api.github.com, STS and S3 in eu-west-2).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: findings
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-findings-exporter
+  namespace: findings
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: findings-exporter
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - {protocol: TCP, port: 9093}
+    # GitHub's API, STS and S3. Private ranges excepted, as everywhere else in
+    # this file.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-from-findings
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: findings
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: findings-exporter
+      ports:
+        - {protocol: TCP, port: 9093}

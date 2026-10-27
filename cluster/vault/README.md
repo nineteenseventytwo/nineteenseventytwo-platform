@@ -141,6 +141,22 @@ vault kv put kv/platform/cloudflared \
 unset VAULT_TOKEN
 ```
 
+<a id="findings-exporter"></a>
+The findings exporter (`cluster/findings/00-externalsecret.yaml`, 07 Phase
+10.4) reads a GitHub token from here to count the open code-scanning alerts on
+the platform repo. Create a **fine-grained** personal access token: resource
+owner `nineteenseventytwo`, repository access *only*
+`nineteenseventytwo-platform`, and one permission, **Code scanning alerts:
+Read-only**. Give it an expiry, and put the date in your calendar: when it
+lapses the dashboard's trivy and checkov rows go stale, and
+`FindingsSourceDown` fires two hours later. Same root-token pattern as above:
+
+```bash
+read -rs VAULT_TOKEN && export VAULT_TOKEN    # paste the root token
+read -rs GH && vault kv put kv/platform/findings-exporter github_token="$GH"; unset GH
+unset VAULT_TOKEN
+```
+
 Back in the same vault pod shell from step 4:
 
 ```bash

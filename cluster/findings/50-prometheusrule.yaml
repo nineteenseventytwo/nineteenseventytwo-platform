@@ -1,0 +1,45 @@
+---
+# A view that silently stops updating looks exactly like a clean one. These
+# make the gaps visible in the same Slack channel as the findings.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: findings-exporter
+  namespace: findings
+spec:
+  groups:
+    - name: findings
+      rules:
+        - alert: FindingsSourceDown
+          # Longer than the slowest refresh (Prowler, hourly) so one failed
+          # call does not page.
+          expr: findings_source_up == 0
+          for: 2h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Findings source {{ $labels.source }} is not refreshing"
+            description: >-
+              findings-exporter's last refresh of {{ $labels.source }} failed
+              and has not recovered for 2h, so its counts on the Findings
+              dashboard are stale. kubectl -n findings logs deploy/findings-exporter
+        - alert: ProwlerReportStale
+          # prowler.yml runs daily at 05:00 UTC. Two missed days, not one.
+          expr: time() - findings_source_data_timestamp_seconds{source="prowler"} > 50 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "No new Prowler report for over two days"
+            description: >-
+              The newest Prowler report in the findings bucket is
+              {{ $value | humanizeDuration }} old. Check
+              nineteenseventytwo-cloud's prowler workflow.
+        - alert: FindingsExporterAbsent
+          expr: absent(up{job="findings-exporter"} == 1)
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "findings-exporter is not being scraped"
+            description: "Prometheus has no healthy scrape of findings-exporter, so the Findings dashboard is empty or frozen."

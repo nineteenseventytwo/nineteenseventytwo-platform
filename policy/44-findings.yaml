@@ -1,0 +1,16 @@
+---
+# findings-exporter's identity (07 Phase 10.4). No Kubernetes RBAC at all: it
+# reads Alertmanager over HTTP, not the API server.
+#
+# The role-arn annotation is for the pod-identity webhook (ADR-0014), which
+# mounts a projected token this pod exchanges for cluster-findings-exporter
+# (nineteenseventytwo-cloud live/aws/platform-prod/cluster-federation.tf):
+# list and read findings/ in the Prowler bucket, nothing else. The role trusts
+# exactly this ServiceAccount.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: findings-exporter
+  namespace: findings
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::972034964468:role/cluster/cluster-findings-exporter"

@@ -1,0 +1,32 @@
+---
+# One view of every finding source (07 Phase 10.4). Wave 97, after
+# platform-manifests (90, the Vault ClusterSecretStore its ExternalSecret
+# needs) and platform-policy (95, its ServiceAccount, namespace and network
+# policy). The parent app waits for each wave to be healthy, so an app that
+# depends on a later wave would hold a rebuild forever (see 96-falco.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: findings
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "97"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: findings
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/findings
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
