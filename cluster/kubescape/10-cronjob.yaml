@@ -23,6 +23,11 @@ kind: CronJob
 metadata:
   name: kubescape
   namespace: kubescape
+  annotations:
+    # The same two decisions are accepted on the Kubescape side in
+    # 00-accepted.yaml (C-0270, C-0034).
+    checkov.io/skip1: "CKV_K8S_11=CPU limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_38=reading the API server is this workload's whole job"
 spec:
   # 03:30 UTC: an hour after the 02:30 Longhorn backup, before anyone is up.
   schedule: "30 3 * * *"
