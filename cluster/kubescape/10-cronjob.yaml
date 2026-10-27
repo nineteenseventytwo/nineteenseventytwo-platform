@@ -72,7 +72,7 @@ spec:
                 - {name: cache, mountPath: /cache}
           containers:
             - name: gate
-              image: ghcr.io/nineteenseventytwo/kubescape-gate@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              image: ghcr.io/nineteenseventytwo/kubescape-gate@sha256:71be0470f38f9052934b11bb45338d94d476146639a78fa7c1ac0c3c5b4f28c1
               env:
                 - name: GATE_ALERTMANAGER
                   value: http://monitoring-kube-prometheus-alertmanager.monitoring.svc:9093
