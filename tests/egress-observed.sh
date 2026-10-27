@@ -55,7 +55,13 @@ out = []
 for r in rows:
     m = r["metric"]
     q = m.get("query", "")
-    if os.environ["ALL"] != "1" and (q.endswith(".cluster.local.") or q.count(".") < 2):
+    # Not destinations, only lookups: cluster names; names with the node
+    # DHCP search domain (".internal") appended, which the resolver tries
+    # and discards before the real name; and gRPC SRV probes (_grpclb).
+    # No apostrophes in here: this is inside a single-quoted python3 -c.
+    if os.environ["ALL"] != "1" and (
+        q.endswith((".cluster.local.", ".internal.")) or q.startswith("_") or q.count(".") < 2
+    ):
         continue
     out.append((m.get("source", "?"), q.rstrip("."), round(float(r["value"][1]))))
 if not out:
