@@ -27,7 +27,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 | 6.4 Egress log-only | ❌ Not started |
 | 7 Egress control | ❌ Not started |
 | 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
-| 8.1, 8.2 Tunnel and Access | ❌ Not started. This is [09](09-website.md)'s W.5 |
+| 8.1, 8.2 Tunnel and Access | ⚠️ Live 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): four tunnel connections; Access redirects unauthenticated and forged-header requests. The phone and LAN checks of [09](09-website.md)'s W.5 gate are still to do |
 | 9 Hybrid | ❌ Not started |
 | 10 CNAPP | ⚠️ Prowler moved from the cluster to GitHub Actions in cloud (2026-10-26). Falco, scheduled Kubescape, asset graph and the drill are not started |
 | 11, 12 | ❌ Not started |
