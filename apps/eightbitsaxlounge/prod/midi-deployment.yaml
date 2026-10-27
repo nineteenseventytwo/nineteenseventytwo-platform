@@ -60,6 +60,10 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1654
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 1654
       containers:
         - name: midi-api
           image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-midi@sha256:6b48d27f5547a81eac113dd9ffc8c910500d1c584a95f751df828b7d7c7a646c

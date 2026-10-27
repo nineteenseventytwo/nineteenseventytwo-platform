@@ -31,10 +31,6 @@ metadata:
     # uid/gid 1000 — not a choice this manifest makes or could raise
     # unilaterally without rebuilding the image.
     checkov.io/skip5: "CKV_K8S_40=image creates a dedicated nats-run user at uid 1000 at build time; not adjustable here"
-    # entrypoint.sh substitutes five passwords into nats.conf.template and
-    # writes the result to /etc/nats/nats.conf inside the image layer at
-    # every start — same shape, same reason, as db's docker.ini finding.
-    checkov.io/skip6: "CKV_K8S_22=entrypoint writes nats.conf into the image layer at every start; confirmed to fail under a read-only root fs"
     # Tags are immutable once published in this repo's release model —
     # pinned by digest below regardless, so this is moot either way.
     checkov.io/skip7: "CKV_K8S_15=tags are immutable once published in this repo's release model; pinned by digest below regardless"
@@ -75,6 +71,29 @@ spec:
         # without running the image — it refuses to start the container
         # rather than assume. Learned live on db; applied here up front.
         runAsUser: 1000
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 1000
+      # entrypoint.sh renders /etc/nats/nats.conf from the template beside
+      # it at every start, which failed under a read-only root. seed-config
+      # copies /etc/nats (the template) into an emptyDir mounted over it, so
+      # the render lands there - db's seed-etc, same shape.
+      initContainers:
+        - name: seed-config
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:e59fc13e002f60076f2e4f1036c71895a42066b994e03a44a3f3a32f871cb612
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "cp -a /etc/nats/. /seed/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: nats-config
+              mountPath: /seed
       containers:
         - name: nats
           # 0.0.23, pinned by digest — the first two releases (0.0.21,
@@ -88,6 +107,7 @@ spec:
           args: ["-c", "/etc/nats/nats.conf"]
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
             seccompProfile:
@@ -109,6 +129,10 @@ spec:
           env:
             - name: NATS_URL
               value: "nats://127.0.0.1:4222"
+            # jetstream-bootstrap.sh's nats CLI keeps its context files under
+            # the XDG config dir; on the /tmp emptyDir, not the read-only root.
+            - name: XDG_CONFIG_HOME
+              value: /tmp
             - name: SYSTEM_PASS
               valueFrom:
                 secretKeyRef:
@@ -137,6 +161,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: nats-config
+              mountPath: /etc/nats
+            - name: tmp
+              mountPath: /tmp
           # Memory request at 48Mi, not 128Mi (2026-10-26): NATS's 7-day peak
           # was ~20Mi. Requests are what the scheduler plans with, and the
           # unused 80Mi on each was part of why Prowler could not be placed.
@@ -161,6 +189,11 @@ spec:
             failureThreshold: 2
             timeoutSeconds: 3
       terminationGracePeriodSeconds: 120
+      volumes:
+        - name: nats-config
+          emptyDir: {sizeLimit: 1Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
   volumeClaimTemplates:
     - metadata:
         name: data

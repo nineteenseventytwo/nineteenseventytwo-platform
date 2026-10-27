@@ -368,28 +368,3 @@ data:
     C-0271 monitoring/Deployment/monitoring-grafana
     C-0271 monitoring/StatefulSet/alertmanager-monitoring-kube-prometheus-alertmanager
     C-0271 monitoring/StatefulSet/prometheus-monitoring-kube-prometheus-prometheus
-
-    # ===== OPEN: app workloads not yet hardened. Real findings, being fixed:
-    # C-0013 is a missing runAsGroup (they already run as non-root users);
-    # C-0017 is a writable root on chat, db and state. eightbitsaxlounge-dev and
-    # composer-dev in platform #244, prod after it. Delete each line once its
-    # fix is live: from then on the gate logs it as stale.
-    C-0013 composer-dev/Deployment/composer
-    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
-    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-data
-    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
-    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-midi
-    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-overlay
-    C-0013 eightbitsaxlounge-dev/StatefulSet/eightbitsaxlounge-state
-    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
-    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-data
-    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
-    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-midi
-    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-overlay
-    C-0013 eightbitsaxlounge-prod/StatefulSet/eightbitsaxlounge-state
-    C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
-    C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
-    C-0017 eightbitsaxlounge-dev/StatefulSet/eightbitsaxlounge-state
-    C-0017 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
-    C-0017 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
-    C-0017 eightbitsaxlounge-prod/StatefulSet/eightbitsaxlounge-state
