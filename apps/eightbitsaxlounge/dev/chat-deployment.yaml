@@ -60,6 +60,10 @@ spec:
         fsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 1000
       containers:
         - name: twitch-bot
           image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-chat@sha256:94d4637ebbc21a1dc3cdb70efeba74dae34c4f527c396eb5955c584e4ad04422
@@ -70,9 +74,11 @@ spec:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
-          # Not read-only: the Twitch OAuth token database
-          # (/app/tokens/tokens.db, on the PVC below) is written to at
-          # runtime by design — that's the whole point of the PVC.
+            # The token database (/app/tokens/tokens.db) is on the PVC below,
+            # and a mounted volume stays writable under a read-only root -
+            # the note that used to stand here had that backwards. /tmp is
+            # an emptyDir for SQLite's and Python's temp files.
+            readOnlyRootFilesystem: true
           env:
             - name: TWITCH_CLIENT_ID
               valueFrom:
@@ -153,6 +159,8 @@ spec:
           volumeMounts:
             - name: tokens-volume
               mountPath: /app/tokens
+            - name: tmp
+              mountPath: /tmp
           startupProbe:
             httpGet:
               path: /health
@@ -178,3 +186,5 @@ spec:
         - name: tokens-volume
           persistentVolumeClaim:
             claimName: eightbitsaxlounge-chat-tokens
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
