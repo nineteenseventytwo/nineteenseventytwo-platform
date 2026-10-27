@@ -459,7 +459,9 @@ the drill.**
 ### 10.1 — Runtime detection
 
 - [ ] Falco as a DaemonSet. On arm64 kubeadm, check the driver situation before
-      committing an evening to it — the modern eBPF probe is the path
+      committing an evening to it — the modern eBPF probe is the path.
+      Checked 2026-10-27: the raspi 6.8 kernel has BTF, so modern eBPF needs
+      no driver build. `cluster/falco`, chart 9.2.0 (Falco 0.45.0)
 - [ ] Alerts into the existing Alertmanager → Slack route. Not a new
       notification channel: the point is one place findings land
 

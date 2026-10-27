@@ -257,3 +257,19 @@ spec:
       default: {cpu: 100m, memory: 64Mi}
       defaultRequest: {cpu: 10m, memory: 24Mi}
       max: {memory: 128Mi}
+---
+# falco: the DaemonSet and Falcosidekick both set their own requests and
+# memory limits (cluster/falco/values.yaml). The CPU default is the limit
+# they get, per ADR-0016. A full core, because a burst of syscalls is exactly
+# when Falco must not be throttled into dropping events.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: falco
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 1000m, memory: 128Mi}
+      defaultRequest: {cpu: 10m, memory: 32Mi}
+      max: {memory: 512Mi}

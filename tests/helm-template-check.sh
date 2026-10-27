@@ -27,6 +27,7 @@ add external-secrets     https://charts.external-secrets.io
 add hashicorp            https://helm.releases.hashicorp.com
 add prometheus-community https://prometheus-community.github.io/helm-charts
 add argo                 https://argoproj.github.io/argo-helm
+add falcosecurity        https://falcosecurity.github.io/charts
 helm repo update >/dev/null
 
 # Render for the Kubernetes the cluster actually runs. Without --kube-version
@@ -61,5 +62,6 @@ check external-secrets/external-secrets          cluster/external-secrets/values
 check hashicorp/vault                            cluster/vault/values.yaml
 check prometheus-community/kube-prometheus-stack cluster/monitoring/values.yaml
 check argo/argo-cd                               cluster/argocd/values.yaml
+check falcosecurity/falco                        cluster/falco/values.yaml
 
 exit $fail

@@ -1,0 +1,40 @@
+---
+# Runtime detection (07 Phase 10.1). After monitoring (70): Falcosidekick
+# sends to Alertmanager. The falco namespace, its default-deny and its quota
+# come from policy/ (platform-policy, wave 95), and there is deliberately no
+# CreateNamespace here, unlike every other Application. A namespace Argo
+# created would get the cluster's baseline Pod Security default, and the
+# privileged Falco pods would be refused. Instead this app's first sync fails
+# on the missing namespace and retries until policy/ creates it with its label.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: falco
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "75"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: falco
+  sources:
+    - repoURL: https://falcosecurity.github.io/charts
+      chart: falco
+      targetRevision: 9.2.0
+      helm:
+        releaseName: falco
+        valueFiles:
+          - $values/cluster/falco/values.yaml
+    - repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}
