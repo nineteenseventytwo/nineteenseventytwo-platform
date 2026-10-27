@@ -47,8 +47,14 @@ spec:
               value: http://monitoring-kube-prometheus-alertmanager.monitoring.svc:9093
             - name: FINDINGS_GITHUB_REPOS
               value: nineteenseventytwo/nineteenseventytwo-platform
-            - name: FINDINGS_GITHUB_TOKEN_FILE
-              value: /secrets/github/token
+            - name: FINDINGS_GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef: {name: findings-exporter-github, key: app-id}
+            - name: FINDINGS_GITHUB_APP_INSTALLATION_ID
+              valueFrom:
+                secretKeyRef: {name: findings-exporter-github, key: installation-id}
+            - name: FINDINGS_GITHUB_APP_KEY_FILE
+              value: /secrets/github/private-key
             - name: FINDINGS_PROWLER_BUCKET
               value: nineteenseventytwo-prowler-517148962038
           ports:
@@ -75,4 +81,7 @@ spec:
         - name: github
           secret:
             secretName: findings-exporter-github
+            # Only the key is a file; the two IDs arrive as env vars above.
+            items:
+              - {key: private-key, path: private-key}
             defaultMode: 288   # 0440: owner and fsGroup

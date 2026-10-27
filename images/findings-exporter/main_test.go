@@ -164,7 +164,7 @@ func TestGitHubSourcePaginatesAndFilters(t *testing.T) {
 	defer srv.Close()
 	tok := filepath.Join(t.TempDir(), "token")
 	os.WriteFile(tok, []byte("secret\n"), 0o600)
-	src := &githubSource{client: srv.Client(), api: srv.URL, repos: []string{"o/r"}, tools: []string{"trivy", "checkov"}, tokenFile: tok}
+	src := &githubSource{client: srv.Client(), api: srv.URL, repos: []string{"o/r"}, tools: []string{"trivy", "checkov"}, auth: fileToken{path: tok}}
 	got, err := src.collect(context.Background())
 	if err != nil {
 		t.Fatal(err)

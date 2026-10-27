@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -61,14 +60,13 @@ func (a *alertmanagerSource) collect(ctx context.Context) (map[string][]finding,
 
 // githubSource reads open code-scanning alerts: Trivy's weekly image scan
 // and the lint workflow's Checkov and Trivy filesystem scans all upload
-// there. The token is read on every refresh, so rotating it is a Secret
-// update, not a restart.
+// there. auth is a GitHub App in the cluster, or a token file locally.
 type githubSource struct {
-	client    *http.Client
-	api       string
-	repos     []string // owner/name
-	tools     []string // lowercased tool names to report, e.g. trivy, checkov
-	tokenFile string
+	client *http.Client
+	api    string
+	repos  []string // owner/name
+	tools  []string // lowercased tool names to report, e.g. trivy, checkov
+	auth   tokenSource
 }
 
 func (g *githubSource) names() []string { return g.tools }
@@ -89,12 +87,12 @@ type ghAlert struct {
 }
 
 func (g *githubSource) collect(ctx context.Context) (map[string][]finding, error) {
-	token, err := os.ReadFile(g.tokenFile)
+	token, err := g.auth.token(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("github token: %w", err)
+		return nil, err
 	}
 	headers := map[string]string{
-		"Authorization":        "Bearer " + strings.TrimSpace(string(token)),
+		"Authorization":        "Bearer " + token,
 		"Accept":               "application/vnd.github+json",
 		"X-GitHub-Api-Version": "2022-11-28",
 	}

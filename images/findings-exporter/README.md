@@ -35,8 +35,12 @@ Prowler report older than ~2 days, and the exporter not being scraped.
 
 ## Credentials
 
-- **GitHub:** a fine-grained token, code scanning read on the platform repo
-  only. `cluster/vault/README.md#findings-exporter`.
+- **GitHub:** its own GitHub App, *Code scanning alerts: read* on the platform
+  repo only (`cluster/vault/README.md#findings-exporter`). Not ARC's App,
+  which can administer the org's runners. A JWT signed with the App key buys a
+  one-hour installation token, narrowed to `security_events: read` in the
+  request (`githubapp.go`). Locally, `FINDINGS_GITHUB_TOKEN_FILE` takes any
+  token instead.
 - **AWS:** none stored. The pod-identity webhook (ADR-0014) mounts a projected
   token, exchanged with STS for `cluster-findings-exporter` (cloud repo), which
   can list and read `findings/` in the Prowler bucket. The STS and S3 calls are

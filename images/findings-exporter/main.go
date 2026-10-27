@@ -46,12 +46,23 @@ func main() {
 		go poll(ctx, logger, store, src, every("FINDINGS_ALERTMANAGER_EVERY", time.Minute))
 	}
 	if repos := splitList(os.Getenv("FINDINGS_GITHUB_REPOS")); len(repos) > 0 {
+		api := env("FINDINGS_GITHUB_API", "https://api.github.com")
+		var auth tokenSource = fileToken{path: env("FINDINGS_GITHUB_TOKEN_FILE", "/secrets/github/token")}
+		if appID := os.Getenv("FINDINGS_GITHUB_APP_ID"); appID != "" {
+			auth = &githubApp{
+				client:         client,
+				api:            api,
+				appID:          appID,
+				installationID: os.Getenv("FINDINGS_GITHUB_APP_INSTALLATION_ID"),
+				keyFile:        env("FINDINGS_GITHUB_APP_KEY_FILE", "/secrets/github/private-key"),
+			}
+		}
 		src := &githubSource{
-			client:    client,
-			api:       env("FINDINGS_GITHUB_API", "https://api.github.com"),
-			repos:     repos,
-			tools:     splitList(env("FINDINGS_GITHUB_TOOLS", "trivy,checkov")),
-			tokenFile: env("FINDINGS_GITHUB_TOKEN_FILE", "/secrets/github/token"),
+			client: client,
+			api:    api,
+			repos:  repos,
+			tools:  splitList(env("FINDINGS_GITHUB_TOOLS", "trivy,checkov")),
+			auth:   auth,
 		}
 		go poll(ctx, logger, store, src, every("FINDINGS_GITHUB_EVERY", 15*time.Minute))
 	}
