@@ -1,0 +1,86 @@
+---
+# chart: 9.2.0
+# repo:  https://falcosecurity.github.io/charts
+#
+# Runtime detection (07 Phase 10.1). One Falco per node, and alerts into the
+# existing Alertmanager -> Slack route, not a new channel.
+#
+# 9.2.0, not 9.2.1: 9.2.1 was a week old when this was written. Same two-week
+# rule as every other pin here.
+
+# The modern eBPF probe is compiled into Falco and needs only BTF, which the
+# raspi kernel has (6.8.0-*-raspi: CONFIG_DEBUG_INFO_BTF=y,
+# /sys/kernel/btf/vmlinux present - checked 2026-10-27). No kernel module, no
+# driver build, so the loader init container is off.
+driver:
+  kind: modern_ebpf
+  modernEbpf:
+    # Two per-CPU buffers of 8MB (preset 4) on a 4-core Pi, not four.
+    cpusForEachBuffer: 2
+  loader:
+    enabled: false
+
+# 512Mi is the chart's request, sized for nodes that are not 4GB Pis running
+# a cluster, and worker-2's memory requests are already at 86%. 128Mi is a
+# starting point: measure after rollout and set it from that. No CPU limit: the namespace LimitRange sets it (ADR-0016). The chart
+# ships a 1000m one, which a map merge would keep, hence the explicit null.
+resources:
+  requests: {cpu: 50m, memory: 128Mi}
+  limits: {cpu: null, memory: 384Mi}
+
+# Container metadata from containerd's CRI socket only. The chart's default
+# also mounts the docker, podman, crio and k3s sockets, none of which exist on
+# these nodes.
+collectors:
+  containerEngine:
+    engines:
+      docker: {enabled: false}
+      podman: {enabled: false}
+      containerd: {enabled: false}
+      cri:
+        enabled: true
+        sockets: ["/run/containerd/containerd.sock"]
+      lxc: {enabled: false}
+      libvirt_lxc: {enabled: false}
+      bpm: {enabled: false}
+
+# falcoctl installs the ruleset and the container plugin once, at pod start.
+# The `follow` sidecar would then replace the rules weekly from the internet,
+# which is a change to detection that no PR reviewed. Off. A new ruleset
+# arrives with a chart bump, like everything else.
+falcoctl:
+  artifact:
+    install:
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {memory: 64Mi}
+    follow:
+      enabled: false
+
+falco:
+  json_output: true
+  # Notice is where "Terminal shell in container" sits. Below that is noise.
+  priority: notice
+
+falcosidekick:
+  enabled: true
+  # One is enough to forward alerts. It is not on the detection path: Falco
+  # keeps detecting and logging if Sidekick is down.
+  replicaCount: 1
+  resources:
+    requests: {cpu: 10m, memory: 24Mi}
+    limits: {memory: 64Mi}
+  webui:
+    enabled: false
+  config:
+    alertmanager:
+      hostport: http://monitoring-kube-prometheus-alertmanager.monitoring.svc:9093
+      # Sidekick's default is /api/v1/alerts. Alertmanager removed the v1 API.
+      endpoint: /api/v2/alerts
+      # Warning and above page Slack. Notice still goes to Falco's own log,
+      # which is where the drill (10.5) looks first.
+      minimumpriority: warning
+      # Falco events are one-shot. Without this an alert sits "firing" in
+      # Alertmanager until its default resolve timeout.
+      expireafter: "900"
+      extralabels: "source:falco"

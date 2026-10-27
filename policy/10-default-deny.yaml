@@ -1249,3 +1249,118 @@ spec:
       app.kubernetes.io/name: dash
   egress:
     - toEntities: [kube-apiserver]
+---
+# falco (07 Phase 10.1). Falco watches syscalls through eBPF, which needs no
+# network at all. What it does need is narrow: its rules and container plugin
+# fetched once at start (falcoctl, init container), and a path for alerts to
+# Falcosidekick and on to Alertmanager. Nothing in the cluster calls Falco.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: falco
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-falco-egress
+  namespace: falco
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: falco
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # falcoctl's install: the index on falcosecurity.github.io, the rules and
+    # the container plugin on ghcr.io. Only at pod start; the follow sidecar
+    # is off. Private ranges excepted, as everywhere else in this file.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: falcosidekick
+      ports:
+        - {protocol: TCP, port: 2801}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-falcosidekick
+  namespace: falco
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: falcosidekick
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: falco
+      ports:
+        - {protocol: TCP, port: 2801}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - {protocol: TCP, port: 9093}
+---
+# The other end of the rule above: Alertmanager has admitted only Prometheus
+# until now. Falco's alerts arrive through the same Alertmanager -> Slack
+# route as everything else (10.1: one place findings land).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-from-falcosidekick
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: falco
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: falcosidekick
+      ports:
+        - {protocol: TCP, port: 9093}

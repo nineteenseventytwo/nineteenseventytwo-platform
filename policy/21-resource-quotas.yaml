@@ -228,3 +228,18 @@ spec:
     requests.cpu: 25m
     requests.memory: 48Mi
     limits.memory: 128Mi
+---
+# falco: three DaemonSet pods (50m/128Mi each, 384Mi limit; the DaemonSet
+# replaces one node at a time, so no surge) plus one Falcosidekick and its
+# rolling-update surge (10m/24Mi each, 64Mi limit). A fourth node is a quota
+# change in the same PR that adds it.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: falco
+spec:
+  hard:
+    requests.cpu: 200m
+    requests.memory: 512Mi
+    limits.memory: 1536Mi
