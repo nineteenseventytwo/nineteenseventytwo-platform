@@ -1,0 +1,64 @@
+---
+# kubescape's credential (07 Phase 10.2): read the cluster's configuration,
+# change nothing, and read no Secrets.
+#
+# The built-in `view` ClusterRole covers the namespaced workloads, ConfigMaps,
+# Services, ServiceAccounts and NetworkPolicies, and deliberately excludes
+# Secrets and RBAC objects. The second ClusterRole adds what the NSA controls
+# also read: RBAC (C-0035, C-0002), nodes and namespaces, webhooks.
+#
+# Anything Kubescape cannot read it skips rather than fails. The gate shows
+# that as "stale": accepted pairs that stopped appearing. A stale pair that
+# still exists in the cluster means a missing grant here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubescape
+  namespace: kubescape
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubescape-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: kubescape
+    namespace: kubescape
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubescape-read
+rules:
+  - apiGroups: [""]
+    resources: [nodes, namespaces, persistentvolumes]
+    verbs: [get, list, watch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, list, watch]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
+    verbs: [get, list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubescape-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubescape-read
+subjects:
+  - kind: ServiceAccount
+    name: kubescape
+    namespace: kubescape

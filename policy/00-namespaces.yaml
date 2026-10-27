@@ -207,3 +207,15 @@ metadata:
     # Falcosidekick shares the namespace but runs unprivileged anyway.
     pod-security.kubernetes.io/enforce: privileged
     platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubescape
+  labels:
+    # The nightly scan and gate (07 Phase 10.2). Both containers run as
+    # non-root with a read-only root and no capabilities.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra

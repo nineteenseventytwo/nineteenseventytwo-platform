@@ -273,3 +273,19 @@ spec:
       default: {cpu: 1000m, memory: 128Mi}
       defaultRequest: {cpu: 10m, memory: 32Mi}
       max: {memory: 512Mi}
+---
+# kubescape: both containers set their own requests and memory limits
+# (cluster/kubescape/10-cronjob.yaml). The CPU default is their limit
+# (ADR-0016): a full core, because the scan is a short burst at 03:30, and
+# throttling it only stretches it out.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: kubescape
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 1000m, memory: 64Mi}
+      defaultRequest: {cpu: 10m, memory: 16Mi}
+      max: {memory: 1Gi}

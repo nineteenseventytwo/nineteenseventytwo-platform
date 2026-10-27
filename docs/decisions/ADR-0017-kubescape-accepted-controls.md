@@ -96,7 +96,42 @@ away without removing the component.
 | Item | Why it is not closed |
 |---|---|
 | `deployments/scale` for `tenant-ci` | `chat-set-environment.yaml` needs it; granting it would let a tenant credential fight Argo CD's reconciliation loop. The script should delete the Pod instead. Belongs to WP-5. [`policy/tenants/README.md`](../../policy/tenants/README.md#deploymentsscale-is-needed-and-is-still-deliberately-not-granted) |
+| 115 untriaged pairs in `cluster/kubescape/00-accepted.yaml` | Accepted as a snapshot on 2026-10-27 so the nightly gate alerts only on change. Each needs moving under a reason or fixing. Note `/ClusterRoleBinding/cluster-admin` on C-0002 among them |
 | No check asserts LimitRange coverage | Coverage is complete today — verified live, the only namespaces without one run no workloads — but a new namespace added without one silently opts out of the mechanism [ADR-0016](ADR-0016-cpu-limits-from-limitrange.md) depends on. `tests/verify-default-deny.sh` does exactly this job for NetworkPolicy and exists because the same gap was open there. |
+
+## Update, 2026-10-27: the table is now enforced nightly
+
+07 Phase 10.2. `cluster/kubescape` runs this scan every night at 03:30, and
+`images/kubescape-gate` compares it with `cluster/kubescape/00-accepted.yaml`.
+That file is this ADR's table made exact: one line per (control, resource)
+pair, not per control. "C-0013 fails" stopped being informative once the same
+control failed on 56 resources. A new resource failing an accepted control
+is still new.
+
+Anything not in the file goes to Alertmanager, and from there to Slack, one
+alert per control. A scan or gate that cannot run fails its Job, which fires
+`KubeJobFailed`.
+
+The first snapshot (Kubescape v4.0.15, controls v2.0.38) found the same 18
+controls failing as build 0003, but on 330 pairs, not 215:
+
+- **211 pairs** carry over from build 0003, or are the Falco DaemonSet, which
+  is privileged by function (07 Phase 10.1). They are filed under the
+  reasons above, with two more for the scan's own CronJob (C-0034, C-0270),
+  which did not exist yet.
+- **4 pairs were fixed instead:** Falcosidekick on C-0013/16/17/55 (chart
+  defaults; it now runs non-root, read-only, with no capabilities).
+- **115 pairs are new and accepted untriaged.** They sit in their own
+  section of the file so the gate starts quiet. Most are app workloads
+  (eightbitsaxlounge, composer, dash, cloudflared) and Kubescape v4 now
+  scanning bare Pods (the static control plane, Longhorn instance-managers,
+  ARC listeners). Those classes are already accepted above, but that is the
+  claim this ADR says to check, not assume. See Open.
+
+Two of the 115 have been read: the eightbitsaxlounge-midi ConfigMap's C-0012
+hit is `token_expiry_minutes: 60` (a false positive), and
+`default/Pod/ansible-uid-check` is a debug pod left from 2026-09-18 that
+should be deleted.
 
 ## Consequences
 

@@ -1,0 +1,54 @@
+---
+name: image-kubescape-gate-build
+
+# Same trigger as the other images: publishing is tied to bumping
+# images/kubescape-gate/version.txt on a branch. The Go tests run inside the
+# Dockerfile's build stage, so an image that fails them is never pushed -
+# lint.yml's `go` job is what runs them on every PR.
+on:
+  push:
+    branches-ignore: [main]
+    paths: ["images/kubescape-gate/version.txt"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-kubescape-gate-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # cosign keyless signing in _build-image.yml
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      image: kubescape-gate
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Distroless has no shell, so the smoke test is the binary itself: with
+      # no scan mounted it must start, report that it cannot open one, and
+      # exit 1. That proves an arm64 binary that runs, and that a missing
+      # scan fails the Job instead of passing as clean.
+      - name: Verify the published image
+        run: |
+          set -uo pipefail
+          IMAGE="${{ needs.build.outputs.image_ref }}"
+          # `|| code=$?` because the step's shell runs with -e, and the
+          # expected exit 1 would otherwise end the step before the check.
+          code=0; out=$(docker run --rm "$IMAGE" 2>&1) || code=$?
+          echo "$out"
+          [ "$code" -eq 1 ] && grep -q "open scan" <<<"$out"

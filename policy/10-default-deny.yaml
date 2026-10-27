@@ -1364,3 +1364,92 @@ spec:
               app.kubernetes.io/name: falcosidekick
       ports:
         - {protocol: TCP, port: 9093}
+---
+# kubescape (07 Phase 10.2): the nightly scan reads the API server, downloads
+# its pinned control library from GitHub, and the gate posts to Alertmanager.
+# Nothing calls in.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kubescape
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kubescape-egress
+  namespace: kubescape
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubescape
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # The control library (--controls-version) is a GitHub release asset:
+    # github.com, then objects.githubusercontent.com. Private ranges excepted.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - {protocol: TCP, port: 9093}
+---
+# The scan's data source. Same reserved-identity shape as
+# allow-argocd-apiserver above, unscoped by port for the same reason.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kubescape-apiserver
+  namespace: kubescape
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubescape
+  egress:
+    - toEntities: [kube-apiserver]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-from-kubescape
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kubescape
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kubescape
+      ports:
+        - {protocol: TCP, port: 9093}

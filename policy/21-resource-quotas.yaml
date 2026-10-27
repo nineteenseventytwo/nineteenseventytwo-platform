@@ -243,3 +243,16 @@ spec:
     requests.cpu: 200m
     requests.memory: 512Mi
     limits.memory: 1536Mi
+---
+# kubescape: one Job pod at a time (concurrencyPolicy: Forbid). Its requests
+# are the scan init container's, 100m/256Mi, the larger of the two steps.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: kubescape
+spec:
+  hard:
+    requests.cpu: 150m
+    requests.memory: 320Mi
+    limits.memory: 1Gi

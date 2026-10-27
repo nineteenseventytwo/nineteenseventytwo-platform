@@ -471,7 +471,11 @@ the drill.**
       `docs/baseline-nsa.json` and alert on regression rather than on absolute
       score — [ADR-0017](../decisions/ADR-0017-kubescape-accepted-controls.md)
       already establishes which controls are accepted, so a regression is
-      meaningful and a raw score is not
+      meaningful and a raw score is not.
+      Built 2026-10-27: `cluster/kubescape` (nightly 03:30), compared by
+      `images/kubescape-gate` against `cluster/kubescape/00-accepted.yaml`
+      per (control, resource) pair, not per control. 115 pairs new since
+      build 0003 are accepted untriaged; triaging them is open in ADR-0017
 
 ### 10.3 — Asset graph
 
