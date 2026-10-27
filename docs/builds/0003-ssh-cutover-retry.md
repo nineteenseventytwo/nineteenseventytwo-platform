@@ -59,7 +59,9 @@ From [build 0002](0002-k8s1.67.md#carried-into-build-0003):
       (`0003-baseline-nsa.json` 78/100, `0003-postinstall-nsa.json` 73/100).
 - [ ] **`eightbitsaxlounge/server` deletion** and **`apps/` ApplicationSet
       being empty** — both still out of scope, carried forward unchanged
-      since build 0001.
+      since build 0001. Half done: `apps/` has been populated since the
+      eightbitsaxlounge migration (07 Phase 6.1). `server/` is still in the
+      eightbitsaxlounge repo as of 2026-10-27.
 
 ## Deviations from the runbook
 
@@ -162,17 +164,21 @@ more dangerous of the two directions).
 
 ## Carried into build 0004
 
-- [ ] **Land `bootstrap/cloud-init/render.sh`'s fix**, held uncommitted
+- [x] **Land `bootstrap/cloud-init/render.sh`'s fix**, held uncommitted
       across three builds now, still at the user's explicit request. Worth
       asking directly whether it should just land at the start of the next
-      build rather than being re-asked about again.
-- [ ] **Document Argo CD manual-sync semantics** in `cluster/README.md` —
+      build rather than being re-asked about again. **Landed** `464b91f`,
+      2026-09-04, after this log closed.
+- [x] **Document Argo CD manual-sync semantics** in `cluster/README.md` —
       now two undocumented gotchas deep (build 0002's prune/refresh
       semantics, this build's discovery-cache/controller-restart one).
-      Third build in a row this has cost time without landing.
+      Third build in a row this has cost time without landing. **Done**
+      2026-09-07: `cluster/README.md`, "Nudging a sync by hand".
 - [ ] **`eightbitsaxlounge/server` deletion** and **`apps/` ApplicationSet
       being empty** — both still out of scope, carried forward unchanged
-      since build 0001.
+      since build 0001. Half done: `apps/` has been populated since the
+      eightbitsaxlounge migration (07 Phase 6.1). `server/` is still in the
+      eightbitsaxlounge repo as of 2026-10-27.
 - [ ] **The Vault token `revoke-self` mystery** (Deviations table, step 7
       row) — root cause never found, only worked around. Worth a real
       investigation next time it's convenient, before it costs more time
@@ -204,10 +210,11 @@ more dangerous of the two directions).
         grants every identity gets) and `config-reloader` runs on
         `--watched-dir` inotify plus a localhost reload URL, not the API.
         Landed, so this is a fourth real finding rather than a carried item.
-  - [ ] **A LimitRange coverage check**, the direct analogue of
+  - [x] **A LimitRange coverage check**, the direct analogue of
         `tests/verify-default-deny.sh`. ADR-0016's whole mechanism depends on
         every namespace having one, and nothing asserts that — the same gap
         that existed for NetworkPolicy until step 4.5's own check was written.
+        **Done:** `tests/verify-limitrange.sh` (`make verify-limitrange`).
 - [ ] **`chat-set-environment.yaml` needs rewriting to restart by deleting
       the Pod**, not by scaling the Deployment to 0 and back. It is the one
       app-repo playbook that cannot run under the tenant CI credential, and
@@ -215,3 +222,29 @@ more dangerous of the two directions).
       Argo CD's reconciliation loop — see
       [`policy/tenants/README.md`](../../policy/tenants/README.md#deploymentsscale-is-needed-and-is-still-deliberately-not-granted).
       Belongs with WP-5.
+- [ ] **The un-revoked admin certificate.** For 2026-09-04 to 2026-09-07
+      the repo's `KUBECONFIG` Actions secret held kubeadm's admin client
+      certificate (`CN=kubernetes-admin`, `O=kubeadm:cluster-admins`) for
+      one consumer on the lab-network runner, before the swap to the scoped
+      `ci-argocd-sync` ServiceAccount (07, Immediate). Deleting the secret
+      removed the copy and did nothing to the certificate: Kubernetes has no
+      revocation for client certificates, and the group binding cannot be
+      dropped without cutting off every kubeadm admin credential with it.
+      **Accepted, not rotated** - a short window, one consumer, a runner on
+      the lab network - and that is a decision, so it is written down here
+      rather than left to be forgotten.
+  - **What exists today:** this build's cluster CA (`CN=kubernetes`) and its
+    admin certificate were both issued 2026-09-04 06:39 UTC. The admin
+    certificate is valid until **2027-09-04 06:44 UTC**, and the CA until
+    2036. The exposed copy was very likely this same certificate.
+  - **What closes it:** a from-scratch build. `kubeadm init` generates a new
+    CA, and nothing in the rebuild preserves `/etc/kubernetes/pki` (only the
+    OIDC issuer *URL* is a one-way door; its keys are republished by
+    `make publish-oidc`). Every certificate the old CA signed stops working.
+  - **For build 0004's log:** record the new CA's `notBefore`, which must be
+    after 2026-09-07, as the deliberate closure of this item, not a side
+    effect: `kubectl config view --raw -o
+    jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d |
+    openssl x509 -noout -subject -startdate`. **If no rebuild happens before
+    2027-09-04, the certificate expires on its own that day**, and that is
+    the closure to record instead.

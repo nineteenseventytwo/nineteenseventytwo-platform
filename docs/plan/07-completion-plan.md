@@ -21,7 +21,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 
 | Phase | State |
 |---|---|
-| Immediate | SCPs at the root 2026-10-27 (cloud #42). The build 0004 certificate note is still open |
+| Immediate | ✅ SCPs at the root (cloud #42) and the admin-certificate note carried into build 0004, both 2026-10-27 |
 | 6.1, 6.2 eightbitsaxlounge | ✅ Gate met 2026-09-12. See [08](08-eightbitsaxlounge-migration.md) |
 | 6.3 Composer | ✅ Live in `composer-dev` with the `plan` arranger since 2026-09-24. D1 recorded as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md) |
 | 6.4 Egress log-only | ⚠️ Pod DNS observation built (`policy/12-egress-observe.yaml`, `tests/egress-observed.sh`). Squid on OPNsense and the node proxy flip are still to do |
@@ -196,12 +196,16 @@ against build 0003's carried list, which had gone stale in two places.
       now carries the `ci-argocd-sync` credential. Audit log across two runs —
       `kubernetes-admin` 5 calls → 0, `ci-argocd-sync` 0 → 10, no non-`system:`
       identity left in the window. Nothing needed widening.
-- [ ] **Note the un-revoked admin certificate in build 0004's log.** The swap
+- [x] **Note the un-revoked admin certificate in build 0004's log.** The swap
       removed the credential from GitHub but cannot invalidate it — a kubeadm
       client cert has no CRL and a year of validity. Exposure was narrow
       (2026-09-04 to 2026-09-07, one consumer, lab-network runner), so it is
       accepted rather than rotated. A from-scratch build regenerates the cluster
       CA and closes it; record that as a deliberate closure, not a side effect.
+      **Done 2026-10-27:** carried into build 0004 in
+      [0003's log](../builds/0003-ssh-cutover-retry.md#carried-into-build-0004),
+      with the certificate's dates (issued 2026-09-04, expires 2027-09-04),
+      the check that confirms the new CA, and the natural-expiry fallback
 
 **Gate:** `make verify-default-deny` and `make verify-limitrange` both exit 0;
 the cloud repo's README has no stale SCP TODO; `cluster/README.md` documents
