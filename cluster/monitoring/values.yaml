@@ -141,6 +141,17 @@ alertmanager:
         - receiver: "null"
           matchers:
             - alertname =~ "Watchdog|InfoInhibitor"
+        # Falco (07 Phase 10.1), via Falcosidekick. Its alerts have no
+        # alertname or namespace label and carry per-event labels (evt_time,
+        # container_id), so under the default route they post as "FIRING: "
+        # with an empty title, and again as RESOLVED when they expire 15
+        # minutes later. Grouped by rule and namespace instead, with a
+        # template that reads Falco's own labels. Same Slack channel: one
+        # place findings land.
+        - receiver: slack-falco
+          matchers:
+            - source = "falco"
+          group_by: ["rule", "k8s_ns_name"]
     receivers:
       # The chart's default route.routes (untouched above, since we only set
       # route's top-level keys) still ships a Watchdog -> "null" sub-route.
@@ -157,6 +168,17 @@ alertmanager:
             text: >-
               {{ range .Alerts }}*{{ .Labels.severity | toUpper }}*
               ({{ .Labels.namespace }}) {{ .Annotations.summary }}
+              {{ .Annotations.description }}
+              {{ end }}
+      - name: slack-falco
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/slack-alerts/webhook-url
+            # An event happened; it does not "resolve".
+            send_resolved: false
+            title: 'Falco {{ .CommonLabels.priority }}: {{ .CommonLabels.rule }}'
+            text: >-
+              {{ range .Alerts }}*{{ .Labels.k8s_ns_name }}/{{ .Labels.k8s_pod_name }}*
+              on {{ .Labels.hostname }}: `{{ .Labels.proc_cmdline }}`
               {{ .Annotations.description }}
               {{ end }}
 
