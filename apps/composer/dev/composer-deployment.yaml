@@ -72,6 +72,9 @@ spec:
         # estate does not control; composer's image is built in-house, so it
         # gets the fix instead of the exemption.
         runAsUser: 10001
+        # The image's own group (useradd --uid 10001 creates group 10001),
+        # stated for Kubescape C-0013 like the eightbitsaxlounge workloads.
+        runAsGroup: 10001
       containers:
         - name: composer
           # composer 0.1.2, arm64, published 2026-10-19. Pinned by digest like
