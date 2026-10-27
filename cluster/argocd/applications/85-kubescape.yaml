@@ -1,0 +1,32 @@
+---
+# Nightly Kubescape scan and gate (07 Phase 10.2, ADR-0017). Namespace,
+# RBAC, quota, LimitRange and network policy come from policy/
+# (platform-policy, wave 95) - CreateNamespace below is the same
+# belt-and-braces every Application here carries. Everything here runs
+# under restricted Pod Security, so a namespace Argo creates first is fine.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubescape
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "85"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubescape
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/kubescape
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}

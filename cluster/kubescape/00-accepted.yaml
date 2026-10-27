@@ -1,0 +1,429 @@
+---
+# The list images/kubescape-gate compares each nightly scan against
+# (07 Phase 10.2, ADR-0017). Mounted into the CronJob at /accepted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubescape-accepted
+  namespace: kubescape
+data:
+  accepted.txt: |
+    # Failing Kubescape NSA (control, resource) pairs this cluster accepts.
+    # ADR-0017: a scan is clean when its failures match a reviewed list, not when
+    # its score clears a number. images/kubescape-gate compares each nightly scan
+    # with this file and alerts, per control, on any pair not listed here.
+    #
+    # Format: one "C-NNNN namespace/Kind/name" per line ("/Kind/name" for
+    # cluster-scoped objects). Hex runs of 8+ in a name are written as "*"
+    # (generated names: Longhorn instance-managers, ARC listeners).
+    #
+    # To accept a new finding, add it in a PR under the control with its reason.
+    # Argo syncs the change; the next nightly run reads it.
+    # The gate also logs accepted pairs that no longer fail ("stale"): delete
+    # those.
+    #
+    # Snapshot of the 2026-10-27 scan: Kubescape v4.0.15, controls v2.0.38
+    # (both pinned in 10-cronjob.yaml; a bump of either is a re-snapshot).
+
+    # ===== Triaged: in build 0003's post-install scan (ADR-0017), or the Falco
+    # DaemonSet, whose privileges are the job (07 Phase 10.1).
+
+    # C-0002 Prevent containers from allowing command execution: exec verbs. Ours fixed in ADR-0017; the rest are not ours
+    C-0002 /ClusterRoleBinding/argocd-application-controller
+    C-0002 /ClusterRoleBinding/kubeadm:cluster-admins
+    C-0002 /ClusterRoleBinding/longhorn-support-bundle
+    C-0002 arc-runners/RoleBinding/lab-deploy-gha-rs-kube-mode
+
+    # C-0012 Applications credentials in configuration files: verified false positives: KMS alias, Secret names, flags and paths, kube-public CA
+    C-0012 argocd/ConfigMap/argocd-cm
+    C-0012 kube-system/ConfigMap/cilium-config
+    C-0012 metallb-system/Deployment/metallb-controller
+    C-0012 vault/ConfigMap/vault-config
+
+    # C-0013 Non-root containers: upstream chart defaults (ADR-0017 structural)
+    C-0013 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0013 arc-systems/Pod/lab-deploy-*-listener
+    C-0013 arc-systems/Pod/lab-dind-*-listener
+    C-0013 argocd/Deployment/argocd-applicationset-controller
+    C-0013 argocd/Deployment/argocd-redis
+    C-0013 argocd/Deployment/argocd-repo-server
+    C-0013 argocd/Deployment/argocd-server
+    C-0013 argocd/StatefulSet/argocd-application-controller
+    C-0013 cert-manager/Deployment/cert-manager
+    C-0013 cert-manager/Deployment/cert-manager-cainjector
+    C-0013 cert-manager/Deployment/cert-manager-webhook
+    C-0013 external-secrets/Deployment/external-secrets
+    C-0013 external-secrets/Deployment/external-secrets-cert-controller
+    C-0013 external-secrets/Deployment/external-secrets-webhook
+    C-0013 falco/DaemonSet/falco
+    C-0013 kube-system/DaemonSet/cilium
+    C-0013 kube-system/DaemonSet/cilium-envoy
+    C-0013 kube-system/Deployment/cilium-operator
+    C-0013 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0013 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0013 longhorn-system/DaemonSet/longhorn-manager
+    C-0013 longhorn-system/Deployment/csi-attacher
+    C-0013 longhorn-system/Deployment/csi-provisioner
+    C-0013 longhorn-system/Deployment/csi-resizer
+    C-0013 longhorn-system/Deployment/csi-snapshotter
+    C-0013 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0013 longhorn-system/Deployment/longhorn-ui
+    C-0013 longhorn-system/Pod/instance-manager-*
+    C-0013 metallb-system/DaemonSet/metallb-speaker
+    C-0013 metallb-system/Deployment/metallb-controller
+    C-0013 monitoring/Deployment/monitoring-grafana
+
+    # C-0016 Allow privilege escalation: upstream chart defaults (ADR-0017 structural)
+    C-0016 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0016 arc-systems/Pod/lab-deploy-*-listener
+    C-0016 arc-systems/Pod/lab-dind-*-listener
+    C-0016 falco/DaemonSet/falco
+    C-0016 kube-system/DaemonSet/cilium
+    C-0016 kube-system/DaemonSet/cilium-envoy
+    C-0016 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0016 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0016 longhorn-system/DaemonSet/longhorn-manager
+    C-0016 longhorn-system/Deployment/csi-attacher
+    C-0016 longhorn-system/Deployment/csi-provisioner
+    C-0016 longhorn-system/Deployment/csi-resizer
+    C-0016 longhorn-system/Deployment/csi-snapshotter
+    C-0016 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0016 longhorn-system/Deployment/longhorn-ui
+    C-0016 longhorn-system/Pod/instance-manager-*
+    C-0016 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+
+    # C-0017 Immutable container filesystem: upstream chart defaults (ADR-0017 structural)
+    C-0017 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0017 arc-systems/Pod/lab-deploy-*-listener
+    C-0017 arc-systems/Pod/lab-dind-*-listener
+    C-0017 falco/DaemonSet/falco
+    C-0017 kube-system/DaemonSet/cilium
+    C-0017 kube-system/DaemonSet/cilium-envoy
+    C-0017 kube-system/Deployment/cilium-operator
+    C-0017 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0017 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0017 longhorn-system/DaemonSet/longhorn-manager
+    C-0017 longhorn-system/Deployment/csi-attacher
+    C-0017 longhorn-system/Deployment/csi-provisioner
+    C-0017 longhorn-system/Deployment/csi-resizer
+    C-0017 longhorn-system/Deployment/csi-snapshotter
+    C-0017 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0017 longhorn-system/Deployment/longhorn-ui
+    C-0017 longhorn-system/Pod/instance-manager-*
+    C-0017 monitoring/Deployment/monitoring-grafana
+    C-0017 vault/StatefulSet/vault
+
+    # C-0030 Ingress and Egress blocked: kube-system and node-exporter-system: documented default-deny exemptions
+    C-0030 kube-system/DaemonSet/cilium
+    C-0030 kube-system/DaemonSet/cilium-envoy
+    C-0030 kube-system/Deployment/cilium-operator
+    C-0030 kube-system/Deployment/hubble-relay
+    C-0030 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+
+    # C-0034 Automatic mapping of service account: controllers that call the API server with their own token
+    C-0034 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0034 arc-systems/Pod/lab-deploy-*-listener
+    C-0034 arc-systems/Pod/lab-dind-*-listener
+    C-0034 argocd/Deployment/argocd-applicationset-controller
+    C-0034 argocd/Deployment/argocd-repo-server
+    C-0034 argocd/Deployment/argocd-server
+    C-0034 argocd/StatefulSet/argocd-application-controller
+    C-0034 cert-manager/Deployment/cert-manager
+    C-0034 cert-manager/Deployment/cert-manager-cainjector
+    C-0034 cert-manager/Deployment/cert-manager-webhook
+    C-0034 external-secrets/Deployment/external-secrets
+    C-0034 external-secrets/Deployment/external-secrets-cert-controller
+    C-0034 external-secrets/Deployment/external-secrets-webhook
+    C-0034 falco/DaemonSet/falco
+    C-0034 kube-system/DaemonSet/cilium
+    C-0034 kube-system/DaemonSet/cilium-envoy
+    C-0034 kube-system/Deployment/cilium-operator
+    C-0034 kubelet-csr-approver/Deployment/kubelet-csr-approver
+    C-0034 kubescape/CronJob/kubescape
+    C-0034 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0034 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0034 longhorn-system/DaemonSet/longhorn-manager
+    C-0034 longhorn-system/Deployment/csi-attacher
+    C-0034 longhorn-system/Deployment/csi-provisioner
+    C-0034 longhorn-system/Deployment/csi-resizer
+    C-0034 longhorn-system/Deployment/csi-snapshotter
+    C-0034 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0034 longhorn-system/Deployment/longhorn-ui
+    C-0034 longhorn-system/Pod/instance-manager-*
+    C-0034 metallb-system/DaemonSet/metallb-speaker
+    C-0034 metallb-system/Deployment/metallb-controller
+    C-0034 monitoring/Deployment/monitoring-grafana
+    C-0034 monitoring/Deployment/monitoring-kube-prometheus-operator
+    C-0034 monitoring/Deployment/monitoring-kube-state-metrics
+    C-0034 monitoring/StatefulSet/prometheus-monitoring-kube-prometheus-prometheus
+    C-0034 pod-identity-webhook/Deployment/pod-identity-webhook
+    C-0034 vault/StatefulSet/vault
+
+    # C-0035 Administrative Roles: kubeadm cluster-admins, Argo CD's controller, Longhorn's support-bundle SA
+    C-0035 /ClusterRoleBinding/argocd-application-controller
+    C-0035 /ClusterRoleBinding/kubeadm:cluster-admins
+    C-0035 /ClusterRoleBinding/longhorn-support-bundle
+
+    # C-0038 Host PID/IPC privileges: node-exporter reads host process state; that is the job
+    C-0038 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+
+    # C-0041 HostNetwork access: CNI, L2 speaker, node-exporter, static control plane
+    C-0041 kube-system/DaemonSet/cilium
+    C-0041 kube-system/DaemonSet/cilium-envoy
+    C-0041 kube-system/Deployment/cilium-operator
+    C-0041 metallb-system/DaemonSet/metallb-speaker
+    C-0041 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+
+    # C-0044 Container hostPort: cilium and the static control plane
+    C-0044 kube-system/DaemonSet/cilium
+    C-0044 kube-system/DaemonSet/cilium-envoy
+    C-0044 kube-system/Deployment/cilium-operator
+    C-0044 kube-system/Pod/kube-apiserver-1972-master-1
+
+    # C-0046 Insecure capabilities: cilium eBPF, longhorn CSI, metallb speaker
+    C-0046 kube-system/DaemonSet/cilium
+    C-0046 kube-system/DaemonSet/cilium-envoy
+    C-0046 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0046 metallb-system/DaemonSet/metallb-speaker
+
+    # C-0054 Cluster internal networking: namespaces with no pods, or hostNetwork only: documented exemptions
+    C-0054 /Namespace/cilium-secrets
+    C-0054 /Namespace/gateway
+    C-0054 /Namespace/node-exporter-system
+
+    # C-0055 Linux hardening: upstream chart defaults: no seccomp/AppArmor profile (ADR-0017 structural)
+    C-0055 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0055 arc-systems/Pod/lab-deploy-*-listener
+    C-0055 arc-systems/Pod/lab-dind-*-listener
+    C-0055 falco/DaemonSet/falco
+    C-0055 kube-system/DaemonSet/cilium-envoy
+    C-0055 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0055 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0055 longhorn-system/DaemonSet/longhorn-manager
+    C-0055 longhorn-system/Deployment/csi-attacher
+    C-0055 longhorn-system/Deployment/csi-provisioner
+    C-0055 longhorn-system/Deployment/csi-resizer
+    C-0055 longhorn-system/Deployment/csi-snapshotter
+    C-0055 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0055 longhorn-system/Deployment/longhorn-ui
+    C-0055 longhorn-system/Pod/instance-manager-*
+    C-0055 metallb-system/DaemonSet/metallb-speaker
+    C-0055 metallb-system/Deployment/metallb-controller
+    C-0055 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+    C-0055 vault/StatefulSet/vault
+
+    # C-0057 Privileged container: CNI, CSI and Falco: privileged by function
+    C-0057 falco/DaemonSet/falco
+    C-0057 kube-system/DaemonSet/cilium
+    C-0057 kube-system/DaemonSet/cilium-envoy
+    C-0057 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0057 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0057 longhorn-system/DaemonSet/longhorn-manager
+    C-0057 longhorn-system/Pod/instance-manager-*
+
+    # C-0068 PSP enabled: PSP no longer exists; Pod Security Admission is used
+    C-0068 kube-system/Pod/kube-apiserver-1972-master-1
+
+    # C-0270 Ensure CPU limits are set: limits come from the namespace LimitRange at admission (ADR-0016)
+    C-0270 arc-systems/Deployment/arc-controller-gha-rs-controller
+    C-0270 argocd/Deployment/argocd-applicationset-controller
+    C-0270 argocd/Deployment/argocd-redis
+    C-0270 argocd/Deployment/argocd-repo-server
+    C-0270 argocd/Deployment/argocd-server
+    C-0270 argocd/StatefulSet/argocd-application-controller
+    C-0270 cert-manager/Deployment/cert-manager
+    C-0270 cert-manager/Deployment/cert-manager-cainjector
+    C-0270 cert-manager/Deployment/cert-manager-webhook
+    C-0270 external-secrets/Deployment/external-secrets
+    C-0270 external-secrets/Deployment/external-secrets-cert-controller
+    C-0270 external-secrets/Deployment/external-secrets-webhook
+    C-0270 falco/DaemonSet/falco
+    C-0270 kube-system/DaemonSet/cilium
+    C-0270 kube-system/DaemonSet/cilium-envoy
+    C-0270 kube-system/Deployment/cilium-operator
+    C-0270 kube-system/Deployment/hubble-relay
+    C-0270 kubescape/CronJob/kubescape
+    C-0270 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0270 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0270 longhorn-system/DaemonSet/longhorn-manager
+    C-0270 longhorn-system/Deployment/csi-attacher
+    C-0270 longhorn-system/Deployment/csi-provisioner
+    C-0270 longhorn-system/Deployment/csi-resizer
+    C-0270 longhorn-system/Deployment/csi-snapshotter
+    C-0270 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0270 longhorn-system/Deployment/longhorn-ui
+    C-0270 metallb-system/DaemonSet/metallb-speaker
+    C-0270 metallb-system/Deployment/metallb-controller
+    C-0270 monitoring/Deployment/monitoring-grafana
+    C-0270 monitoring/Deployment/monitoring-kube-prometheus-operator
+    C-0270 monitoring/Deployment/monitoring-kube-state-metrics
+    C-0270 monitoring/StatefulSet/alertmanager-monitoring-kube-prometheus-alertmanager
+    C-0270 monitoring/StatefulSet/prometheus-monitoring-kube-prometheus-prometheus
+    C-0270 node-exporter-system/DaemonSet/monitoring-prometheus-node-exporter
+    C-0270 vault/StatefulSet/vault
+
+    # C-0271 Ensure memory limits are set: limits come from the namespace LimitRange at admission (ADR-0016)
+    C-0271 kube-system/DaemonSet/cilium-envoy
+    C-0271 longhorn-system/DaemonSet/engine-image-ei-*
+    C-0271 longhorn-system/DaemonSet/longhorn-csi-plugin
+    C-0271 longhorn-system/DaemonSet/longhorn-manager
+    C-0271 longhorn-system/Deployment/csi-attacher
+    C-0271 longhorn-system/Deployment/csi-provisioner
+    C-0271 longhorn-system/Deployment/csi-resizer
+    C-0271 longhorn-system/Deployment/csi-snapshotter
+    C-0271 longhorn-system/Deployment/longhorn-driver-deployer
+    C-0271 longhorn-system/Deployment/longhorn-ui
+    C-0271 monitoring/Deployment/monitoring-grafana
+    C-0271 monitoring/StatefulSet/alertmanager-monitoring-kube-prometheus-alertmanager
+    C-0271 monitoring/StatefulSet/prometheus-monitoring-kube-prometheus-prometheus
+
+
+    # ===== UNTRIAGED: 115 pairs new since build 0003 (2026-09-04), accepted
+    # as-is so the gate starts quiet and alerts only on what changes from here.
+    # They are NOT reviewed. Most look like the classes above (app workloads on
+    # chart or image defaults, LimitRange-supplied limits), but that is the
+    # claim ADR-0017 says to check, not assume. Triage is an open item there:
+    # move each one up under a reason, or fix it and delete it.
+
+    # C-0002 Prevent containers from allowing command execution
+    C-0002 /ClusterRoleBinding/cluster-admin
+
+    # C-0012 Applications credentials in configuration files
+    C-0012 eightbitsaxlounge-dev/ConfigMap/eightbitsaxlounge-midi-config
+    C-0012 eightbitsaxlounge-prod/ConfigMap/eightbitsaxlounge-midi-config
+
+    # C-0013 Non-root containers
+    C-0013 composer-dev/Deployment/composer
+    C-0013 default/Pod/ansible-uid-check
+    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
+    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-data
+    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
+    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-midi
+    C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-overlay
+    C-0013 eightbitsaxlounge-dev/StatefulSet/eightbitsaxlounge-state
+    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
+    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-data
+    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
+    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-midi
+    C-0013 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-overlay
+    C-0013 eightbitsaxlounge-prod/StatefulSet/eightbitsaxlounge-state
+    C-0013 kube-system/Deployment/coredns
+    C-0013 kube-system/Pod/etcd-1972-master-1
+    C-0013 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0013 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0013 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0013 longhorn-system/CronJob/daily-backup
+    C-0013 longhorn-system/Deployment/longhorn-global-manager
+
+    # C-0016 Allow privilege escalation
+    C-0016 default/Pod/ansible-uid-check
+    C-0016 kube-system/Pod/etcd-1972-master-1
+    C-0016 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0016 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0016 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0016 longhorn-system/CronJob/daily-backup
+    C-0016 longhorn-system/Deployment/longhorn-global-manager
+
+    # C-0017 Immutable container filesystem
+    C-0017 default/Pod/ansible-uid-check
+    C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
+    C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
+    C-0017 eightbitsaxlounge-dev/StatefulSet/eightbitsaxlounge-state
+    C-0017 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
+    C-0017 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
+    C-0017 eightbitsaxlounge-prod/StatefulSet/eightbitsaxlounge-state
+    C-0017 kube-system/Pod/etcd-1972-master-1
+    C-0017 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0017 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0017 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0017 longhorn-system/CronJob/daily-backup
+    C-0017 longhorn-system/Deployment/longhorn-global-manager
+
+    # C-0030 Ingress and Egress blocked
+    C-0030 kube-system/Deployment/coredns
+    C-0030 kube-system/Pod/etcd-1972-master-1
+    C-0030 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0030 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0030 kube-system/Pod/kube-scheduler-1972-master-1
+
+    # C-0034 Automatic mapping of service account
+    C-0034 dash/Deployment/dash
+    C-0034 default/Pod/ansible-uid-check
+    C-0034 falco/Deployment/falco-falcosidekick
+    C-0034 kube-system/Deployment/coredns
+    C-0034 kube-system/Pod/etcd-1972-master-1
+    C-0034 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0034 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0034 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0034 longhorn-system/CronJob/daily-backup
+    C-0034 longhorn-system/Deployment/longhorn-global-manager
+
+    # C-0035 Administrative Roles
+    C-0035 /ClusterRoleBinding/cluster-admin
+
+    # C-0041 HostNetwork access
+    C-0041 kube-system/Pod/etcd-1972-master-1
+    C-0041 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0041 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0041 kube-system/Pod/kube-scheduler-1972-master-1
+
+    # C-0044 Container hostPort
+    C-0044 kube-system/Pod/etcd-1972-master-1
+    C-0044 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0044 kube-system/Pod/kube-scheduler-1972-master-1
+
+    # C-0054 Cluster internal networking
+    C-0054 /Namespace/kube-node-lease
+    C-0054 /Namespace/kube-public
+    C-0054 /Namespace/kube-system
+
+    # C-0055 Linux hardening
+    C-0055 default/Pod/ansible-uid-check
+    C-0055 kube-system/Deployment/coredns
+    C-0055 longhorn-system/CronJob/daily-backup
+    C-0055 longhorn-system/Deployment/longhorn-global-manager
+
+    # C-0270 Ensure CPU limits are set
+    C-0270 cloudflared/Deployment/cloudflared
+    C-0270 composer-dev/Deployment/composer
+    C-0270 dash/Deployment/dash
+    C-0270 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
+    C-0270 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-data
+    C-0270 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
+    C-0270 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-midi
+    C-0270 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-overlay
+    C-0270 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
+    C-0270 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-data
+    C-0270 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
+    C-0270 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-midi
+    C-0270 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-overlay
+    C-0270 falco/Deployment/falco-falcosidekick
+    C-0270 kube-system/Deployment/coredns
+    C-0270 kube-system/Pod/etcd-1972-master-1
+    C-0270 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0270 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0270 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0270 longhorn-system/CronJob/daily-backup
+    C-0270 longhorn-system/Deployment/longhorn-global-manager
+    C-0270 longhorn-system/Pod/instance-manager-*
+
+    # C-0271 Ensure memory limits are set
+    C-0271 cloudflared/Deployment/cloudflared
+    C-0271 composer-dev/Deployment/composer
+    C-0271 dash/Deployment/dash
+    C-0271 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
+    C-0271 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-data
+    C-0271 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
+    C-0271 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-midi
+    C-0271 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-overlay
+    C-0271 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-chat
+    C-0271 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-data
+    C-0271 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-db
+    C-0271 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-midi
+    C-0271 eightbitsaxlounge-prod/Deployment/eightbitsaxlounge-overlay
+    C-0271 kube-system/Pod/etcd-1972-master-1
+    C-0271 kube-system/Pod/kube-apiserver-1972-master-1
+    C-0271 kube-system/Pod/kube-controller-manager-1972-master-1
+    C-0271 kube-system/Pod/kube-scheduler-1972-master-1
+    C-0271 longhorn-system/CronJob/daily-backup
+    C-0271 longhorn-system/Pod/instance-manager-*

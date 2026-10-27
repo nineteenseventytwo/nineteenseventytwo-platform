@@ -1,0 +1,96 @@
+---
+# Nightly Kubescape NSA scan, compared with the accepted list (07 Phase 10.2,
+# ADR-0017). Two steps in one pod, sharing an emptyDir:
+#
+#   1. scan (init container): Kubescape writes its JSON to /scan
+#   2. gate: images/kubescape-gate diffs it with 00-accepted.yaml and sends
+#      one Alertmanager alert per control with newly failing resources
+#
+# A scan that fails, or a gate that cannot run, fails the Job, and the
+# kube-prometheus KubeJobFailed alert fires instead (backoffLimit 0: a retry
+# would hide the failure until the next night anyway).
+#
+# Both versions are pinned. Kubescape would otherwise download the newest
+# control library on every run, and a changed control would read as a
+# regression in the cluster. Bumping either means re-snapshotting the list.
+#
+# Read-only: the ServiceAccount is bound to `view` plus a few cluster-scoped
+# reads (policy/43-kubescape.yaml). No Secrets. Results stay in the cluster
+# (--keep-local), and host scanning is off: it would deploy a privileged
+# DaemonSet, which is Falco's job here, not a nightly scan's.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubescape
+  namespace: kubescape
+spec:
+  # 03:30 UTC: an hour after the 02:30 Longhorn backup, before anyone is up.
+  schedule: "30 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: kubescape
+        spec:
+          serviceAccountName: kubescape
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile: {type: RuntimeDefault}
+          initContainers:
+            - name: scan
+              image: quay.io/kubescape/kubescape-cli:v4.0.15@sha256:16f1383351936d4085f9eec4a01a08abe34e531629d2e849d3893aaed2c74052
+              args:
+                - scan
+                - framework
+                - nsa
+                - --controls-version=v2.0.38
+                - --host-scan=false
+                - --keep-local
+                - --format=json
+                - --output=/scan/results.json
+                - --logger=warning
+                - --cache-dir=/cache
+              resources:
+                requests: {cpu: 100m, memory: 256Mi}
+                limits: {memory: 768Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: [ALL]}
+              volumeMounts:
+                - {name: scan, mountPath: /scan}
+                - {name: cache, mountPath: /cache}
+          containers:
+            - name: gate
+              image: ghcr.io/nineteenseventytwo/kubescape-gate@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              env:
+                - name: GATE_ALERTMANAGER
+                  value: http://monitoring-kube-prometheus-alertmanager.monitoring.svc:9093
+              resources:
+                requests: {cpu: 10m, memory: 16Mi}
+                limits: {memory: 64Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: [ALL]}
+              volumeMounts:
+                - {name: scan, mountPath: /scan, readOnly: true}
+                - {name: accepted, mountPath: /accepted, readOnly: true}
+          volumes:
+            - name: scan
+              emptyDir: {sizeLimit: 64Mi}
+            - name: cache
+              emptyDir: {sizeLimit: 128Mi}
+            - name: accepted
+              configMap:
+                name: kubescape-accepted
