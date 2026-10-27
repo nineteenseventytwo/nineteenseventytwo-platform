@@ -3,13 +3,19 @@
 # Namespace, quota, LimitRange and network policy come from policy/
 # (platform-policy, wave 95) - CreateNamespace below is the same
 # belt-and-braces every Application here carries.
+#
+# Wave 98, after platform-policy (95). It was 83 until 2026-10-27, which
+# put it ahead of its ServiceAccount and Roles (policy/42-dash.yaml). The
+# parent app waits for each wave to be healthy, so on a rebuild it would have
+# waited on this app forever (see 96-falco.yaml). The live cluster never hit
+# it: platform-policy also syncs on its own.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dash
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "83"
+    argocd.argoproj.io/sync-wave: "98"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
