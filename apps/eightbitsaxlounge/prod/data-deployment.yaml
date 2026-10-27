@@ -47,6 +47,10 @@ spec:
         # db and state. uid 1000 is what the Dockerfile's own
         # `adduser -u 1000` creates.
         runAsUser: 1000
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 1000
       containers:
         - name: data
           # Memory request set here rather than from the tenant LimitRange's

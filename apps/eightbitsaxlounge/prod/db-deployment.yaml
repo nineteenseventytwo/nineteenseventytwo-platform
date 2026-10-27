@@ -35,13 +35,6 @@ metadata:
     # environment — there is no file-based alternative the upstream
     # entrypoint supports.
     checkov.io/skip6: "CKV_K8S_35=upstream couchdb image only reads COUCHDB_PASSWORD from the environment, no file-based alternative exists"
-    # Confirmed live 2026-09-08: the entrypoint writes runtime config to
-    # /opt/couchdb/etc/local.d/docker.ini, baked into the image rather
-    # than a volume. `docker run --read-only` fails outright —
-    # "Read-only file system" on that exact path. Would need an
-    # initContainer to seed an emptyDir at /opt/couchdb/etc before this
-    # is safe; out of scope for this migration step.
-    checkov.io/skip7: "CKV_K8S_22=entrypoint writes docker.ini into the image layer; confirmed to fail under a read-only root fs"
     # Tags in this repo are immutable once published — release-template.yaml's
     # own "check if image exists in registry, skip build" logic depends
     # on that invariant. Always re-pulling an immutable tag is pure
@@ -87,6 +80,51 @@ spec:
         # rather than assume. Same uid confirmed throughout this migration
         # (fsGroup above, the entrypoint's own setpriv target).
         runAsUser: 5984
+        # runAsGroup: the image's own group, stated rather than inherited.
+        # Kubescape C-0013 counts a container with no explicit non-root
+        # group as possibly running as group 0 (ADR-0017, 2026-10-27).
+        runAsGroup: 5984
+      # The entrypoint writes its runtime config into /opt/couchdb/etc at
+      # every start (local.d/docker.ini, and vm.args for NODENAME), which
+      # failed under a read-only root (confirmed 2026-09-08). seed-etc copies
+      # the image's etc into an emptyDir that is mounted over it, so those
+      # writes land in the emptyDir and the root can be read-only. Nothing
+      # there needs to persist: docker.ini is regenerated from the env and
+      # init-couchdb.sh re-applies single-node setup on every start.
+      initContainers:
+        - name: seed-etc
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:7be893b0f92023b859f014849763febcc26ab0bcd26ab6d5b96ccc9467ac018b
+          imagePullPolicy: IfNotPresent
+          # cp -R, not -a: -a also sets the times on /seed itself, the
+          # emptyDir's root-owned mount point, and a non-root uid may not -
+          # "preserving times for '/seed/.': Operation not permitted", the
+          # first rollout. Contents only; their owner is this uid anyway.
+          #
+          # Then a cookie. With no -setcookie, Erlang creates
+          # $HOME/.erlang.cookie (/opt/couchdb, the read-only root) and the
+          # VM dies: "Failed to create cookie file ... erofs", the second
+          # rollout. A random cookie in vm.args, which is in the writable
+          # seeded etc, means it never tries. Single node: nothing else
+          # needs to know it, and a new one each start costs nothing.
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              cp -R /opt/couchdb/etc/. /seed/
+              if ! grep -q '^-setcookie' /seed/vm.args; then
+                echo "-setcookie $(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)" >> /seed/vm.args
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: couchdb-etc
+              mountPath: /seed
       containers:
         - name: couchdb
           # 2.0.4, pinned by digest (CKV_K8S_43) rather than tag — belt and
@@ -101,6 +139,7 @@ spec:
           # below are what dev's own dry-run flagged as missing.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
             seccompProfile:
@@ -145,7 +184,15 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
+            - name: couchdb-etc
+              mountPath: /opt/couchdb/etc
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:
             claimName: couchdb-data
+        - name: couchdb-etc
+          emptyDir: {sizeLimit: 16Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
