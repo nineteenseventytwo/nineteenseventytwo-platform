@@ -278,7 +278,7 @@ data:
     C-0271 monitoring/StatefulSet/prometheus-monitoring-kube-prometheus-prometheus
 
 
-    # ===== UNTRIAGED: 115 pairs new since build 0003 (2026-09-04), accepted
+    # ===== UNTRIAGED: 110 pairs new since build 0003 (2026-09-04), accepted
     # as-is so the gate starts quiet and alerts only on what changes from here.
     # They are NOT reviewed. Most look like the classes above (app workloads on
     # chart or image defaults, LimitRange-supplied limits), but that is the
@@ -294,7 +294,6 @@ data:
 
     # C-0013 Non-root containers
     C-0013 composer-dev/Deployment/composer
-    C-0013 default/Pod/ansible-uid-check
     C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
     C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-data
     C-0013 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
@@ -316,7 +315,6 @@ data:
     C-0013 longhorn-system/Deployment/longhorn-global-manager
 
     # C-0016 Allow privilege escalation
-    C-0016 default/Pod/ansible-uid-check
     C-0016 kube-system/Pod/etcd-1972-master-1
     C-0016 kube-system/Pod/kube-apiserver-1972-master-1
     C-0016 kube-system/Pod/kube-controller-manager-1972-master-1
@@ -325,7 +323,6 @@ data:
     C-0016 longhorn-system/Deployment/longhorn-global-manager
 
     # C-0017 Immutable container filesystem
-    C-0017 default/Pod/ansible-uid-check
     C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-chat
     C-0017 eightbitsaxlounge-dev/Deployment/eightbitsaxlounge-db
     C-0017 eightbitsaxlounge-dev/StatefulSet/eightbitsaxlounge-state
@@ -348,7 +345,6 @@ data:
 
     # C-0034 Automatic mapping of service account
     C-0034 dash/Deployment/dash
-    C-0034 default/Pod/ansible-uid-check
     C-0034 falco/Deployment/falco-falcosidekick
     C-0034 kube-system/Deployment/coredns
     C-0034 kube-system/Pod/etcd-1972-master-1
@@ -378,7 +374,6 @@ data:
     C-0054 /Namespace/kube-system
 
     # C-0055 Linux hardening
-    C-0055 default/Pod/ansible-uid-check
     C-0055 kube-system/Deployment/coredns
     C-0055 longhorn-system/CronJob/daily-backup
     C-0055 longhorn-system/Deployment/longhorn-global-manager
