@@ -96,7 +96,7 @@ away without removing the component.
 | Item | Why it is not closed |
 |---|---|
 | `deployments/scale` for `tenant-ci` | `chat-set-environment.yaml` needs it; granting it would let a tenant credential fight Argo CD's reconciliation loop. The script should delete the Pod instead. Belongs to WP-5. [`policy/tenants/README.md`](../../policy/tenants/README.md#deploymentsscale-is-needed-and-is-still-deliberately-not-granted) |
-| 115 untriaged pairs in `cluster/kubescape/00-accepted.yaml` | Accepted as a snapshot on 2026-10-27 so the nightly gate alerts only on change. Each needs moving under a reason or fixing. Note `/ClusterRoleBinding/cluster-admin` on C-0002 among them |
+| 110 untriaged pairs in `cluster/kubescape/00-accepted.yaml` (115 at the snapshot; the 5 for the deleted `ansible-uid-check` pod are gone) | Accepted as a snapshot on 2026-10-27 so the nightly gate alerts only on change. Each needs moving under a reason or fixing. Note `/ClusterRoleBinding/cluster-admin` on C-0002 among them |
 | No check asserts LimitRange coverage | Coverage is complete today — verified live, the only namespaces without one run no workloads — but a new namespace added without one silently opts out of the mechanism [ADR-0016](ADR-0016-cpu-limits-from-limitrange.md) depends on. `tests/verify-default-deny.sh` does exactly this job for NetworkPolicy and exists because the same gap was open there. |
 
 ## Update, 2026-10-27: the table is now enforced nightly
@@ -130,8 +130,8 @@ controls failing as build 0003, but on 330 pairs, not 215:
 
 Two of the 115 have been read: the eightbitsaxlounge-midi ConfigMap's C-0012
 hit is `token_expiry_minutes: 60` (a false positive), and
-`default/Pod/ansible-uid-check` is a debug pod left from 2026-09-18 that
-should be deleted.
+`default/Pod/ansible-uid-check` was a debug pod left from 2026-09-18,
+deleted the same day.
 
 ## Consequences
 

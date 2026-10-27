@@ -75,9 +75,11 @@ falcosidekick:
   # Sidekick receives HTTP and makes HTTP calls; it needs none of Falco's
   # privileges, and the namespace's privileged label is for Falco only. The
   # Kubescape scan of 2026-10-27 flagged it on C-0013/16/17/55 with the
-  # chart's defaults (uid 1234, nothing else set).
+  # chart's defaults (uid 1234, nothing else set). C-0013 also wants an
+  # explicit non-root group: without runAsGroup the image's gid applies.
   podSecurityContext:
     runAsUser: 1234
+    runAsGroup: 1234
     runAsNonRoot: true
     fsGroup: 1234
     seccompProfile: {type: RuntimeDefault}
