@@ -1,18 +1,21 @@
 ---
-# Runtime detection (07 Phase 10.1). After monitoring (70): Falcosidekick
-# sends to Alertmanager. The falco namespace, its default-deny and its quota
-# come from policy/ (platform-policy, wave 95), and there is deliberately no
-# CreateNamespace here, unlike every other Application. A namespace Argo
-# created would get the cluster's baseline Pod Security default, and the
-# privileged Falco pods would be refused. Instead this app's first sync fails
-# on the missing namespace and retries until policy/ creates it with its label.
+# Runtime detection (07 Phase 10.1). Wave 96, after platform-policy (95),
+# not beside the other infra apps. The falco namespace comes from policy/,
+# with its privileged Pod Security label, and this app deliberately has no
+# CreateNamespace: a namespace Argo created would get the cluster's baseline
+# default and the Falco pods would be refused.
+#
+# The parent app waits for each wave's Applications to be healthy before the
+# next wave. At wave 75 (the first version of this file) a rebuild would wait
+# on Falco forever, for a namespace that only wave 95 creates. The live
+# cluster got away with it only because policy/ syncs on its own as well.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: falco
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "75"
+    argocd.argoproj.io/sync-wave: "96"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
