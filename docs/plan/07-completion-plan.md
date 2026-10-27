@@ -17,6 +17,21 @@ sequencing it badly is the main way it does not get done.
 Every phase has a **gate**, in the sense `REBUILD.md` uses the word: a check
 that either passes or the phase is not finished. Gates are not suggestions.
 
+### Progress, 2026-10-26
+
+| Phase | State |
+|---|---|
+| Immediate | SCPs to root and the build 0004 certificate note are still open |
+| 6.1, 6.2 eightbitsaxlounge | ✅ Gate met 2026-09-12. See [08](08-eightbitsaxlounge-migration.md) |
+| 6.3 Composer | ✅ Live in `composer-dev` with the `plan` arranger since 2026-09-24. D1 recorded as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md) |
+| 6.4 Egress log-only | ❌ Not started |
+| 7 Egress control | ❌ Not started |
+| 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
+| 8.1, 8.2 Tunnel and Access | ⚠️ Live 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): four tunnel connections; Access redirects unauthenticated and forged-header requests. The phone and LAN checks of [09](09-website.md)'s W.5 gate are still to do |
+| 9 Hybrid | ❌ Not started |
+| 10 CNAPP | ⚠️ Prowler moved from the cluster to GitHub Actions in cloud (2026-10-26). Falco, scheduled Kubescape, asset graph and the drill are not started |
+| 11, 12 | ❌ Not started |
+
 ---
 
 ## Ordering principle
@@ -63,7 +78,8 @@ ADR, not a config edit.
 | **(c)** Inference in AWS Bedrock; no GPU node at all | Costs per token. Needs an IRSA role for the composer pod — a pattern that already exists and works. **This is literally the 90-day plan's stated deliverable** ("build it locally on Ollama, then write up how I'd port it to Bedrock"). |
 | **(d)** Tailscale-join the GPU node | Not a different architecture — a reachability variant of (b). Only needed if the PC ends up somewhere VLAN 20 cannot reach it. |
 
-**DECIDED 2026-09-07 — (b).** Composer's API runs in the cluster on arm64 and
+**DECIDED 2026-09-07 — (b)**, recorded as
+[ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md). Composer's API runs in the cluster on arm64 and
 delivers work to the GPU host outside it. (c), a Bedrock backend behind the
 same interface, follows in Phase 11 and turns the pair into the comparison
 write-up. (a) is rejected.
@@ -237,19 +253,18 @@ Two known snags, both already diagnosed:
 
 ### 6.3 — Composer standup _(needs D1)_
 
-- [ ] Write the ADR recording D1 before any code
-- [ ] `policy/tenants/composer.yaml` — namespaces, quota, LimitRange,
-      default-deny, tenant RBAC. Copy the eightbitsaxlounge tenant as the
-      template. Merge and let it sync **before** any workload
-- [ ] `apps/composer/dev/` — the composer API and musicxml-tools
-- [ ] The inference path per D1: a NetworkPolicy allow-pair to the GPU host, or
-      an IRSA role for Bedrock. Not both yet — the second backend is Phase 12
-- [ ] **Fix `composer/infra/README.md`** (WP-7). It documents a cluster that no
-      longer exists: 192.168.68.0/24, Flannel, and a `server` layer that Phase
-      6.2 just deleted. Correct it or replace it with a banner
-- [ ] Delete or rewrite `composer/infra/k8s/` — the platform repo owns
-      manifests now (ADR-0012), and a second set in the app repo is exactly the
-      ambiguity that ADR exists to remove
+- [x] Write the ADR recording D1 before any code. Written after the code
+      instead, as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md),
+      on 2026-10-26
+- [x] `policy/tenants/composer.yaml`: namespace, quota, LimitRange,
+      default-deny, tenant RBAC. Sized from measurement rather than copied
+      (#176). dev only, by decision
+- [x] `apps/composer/dev/`: the composer API. musicxml-tools is a library
+      inside the same image, not a separate service
+- [x] The inference path per D1: a NetworkPolicy allow-pair to `1972-gpu-1`,
+      proven 2026-09-24 (#194). Bedrock is the Phase 11 second backend
+- [x] `composer/infra/` is gone from the composer repo, both the README and
+      `k8s/` (WP-7)
 
 ### 6.4 — Turn the egress proxy on in log-only mode
 
@@ -518,11 +533,12 @@ keys and private-networking sections.
 
 The original documents get to be closed when all of these hold:
 
-1. `apps/` carries every eightbitsaxlounge service and composer, reconciled by
+1. ✅ `apps/` carries every eightbitsaxlounge service and composer, reconciled by
    Argo CD, and `eightbitsaxlounge/server` no longer exists.
 2. All three proxy types are in service: reverse, forward, ZTNA.
-3. A public site is reachable from the internet and survives the cluster being
-   rebuilt; a private area behind identity is reachable and cannot be bypassed.
+3. ⚠️ A public site is reachable from the internet and survives the cluster being
+   rebuilt (✅ 2026-10-20); a private area behind identity is reachable and
+   cannot be bypassed (❌).
 4. On-prem and AWS reach each other privately, and at least one cloud node has
    run real work scheduled by the on-prem control plane.
 5. All six CNAPP pillars are live, on a schedule, reporting into one place.

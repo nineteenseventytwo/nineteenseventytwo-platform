@@ -74,7 +74,7 @@ spec:
         runAsUser: 10001
       containers:
         - name: composer
-          # composer 0.1.1, arm64, published 2026-09-17. Pinned by digest like
+          # composer 0.1.2, arm64, published 2026-10-19. Pinned by digest like
           # every other image here: a tag is a moving target, and the weekly
           # vulnerability scan cannot say anything useful about one.
           image: ghcr.io/nineteenseventytwo/composer@sha256:74f849ec2b7bdc3a9368cc502c3b1bda37a9f3dea72dda339337ca7c53f7d0d7
