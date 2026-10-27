@@ -29,7 +29,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 | 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
 | 8.1, 8.2 Tunnel and Access | ✅ 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): `dash.` behind Access via the tunnel; [09](09-website.md)'s W.5 gate passed (phone, LAN, external port scan). Grafana and Argo CD behind Access is still open |
 | 9 Hybrid | ❌ Not started |
-| 10 CNAPP | ⚠️ Prowler moved from the cluster to GitHub Actions in cloud (2026-10-26). Falco, scheduled Kubescape, asset graph and the drill are not started |
+| 10 CNAPP | ⚠️ 10.1 Falco (#235, #236), 10.2 nightly Kubescape gate (#237, #238) and 10.4 the `Findings` dashboard (#239, #241; cloud#39) done 2026-10-27. 10.3 asset graph and 10.5 the drill not started |
 | 11, 12 | ❌ Not started |
 
 ---
@@ -458,16 +458,18 @@ the drill.**
 
 ### 10.1 — Runtime detection
 
-- [ ] Falco as a DaemonSet. On arm64 kubeadm, check the driver situation before
+- [x] Falco as a DaemonSet. On arm64 kubeadm, check the driver situation before
       committing an evening to it — the modern eBPF probe is the path.
       Checked 2026-10-27: the raspi 6.8 kernel has BTF, so modern eBPF needs
-      no driver build. `cluster/falco`, chart 9.2.0 (Falco 0.45.0)
-- [ ] Alerts into the existing Alertmanager → Slack route. Not a new
+      no driver build. `cluster/falco`, chart 9.2.0 (Falco 0.45.0). Verified
+      live: a sensitive-file read in a test pod reached Slack via
+      Falcosidekick and Alertmanager within the same minute
+- [x] Alerts into the existing Alertmanager → Slack route. Not a new
       notification channel: the point is one place findings land
 
 ### 10.2 — Schedule what is currently manual
 
-- [ ] Kubescape as a CronJob, not a per-build hand-run. Compare against
+- [x] Kubescape as a CronJob, not a per-build hand-run. Compare against
       `docs/baseline-nsa.json` and alert on regression rather than on absolute
       score — [ADR-0017](../decisions/ADR-0017-kubescape-accepted-controls.md)
       already establishes which controls are accepted, so a regression is
@@ -486,7 +488,7 @@ the drill.**
 
 ### 10.4 — Findings in one place
 
-- [ ] Prowler's S3 findings, Trivy's weekly scan, Kubescape's regressions and
+- [x] Prowler's S3 findings, Trivy's weekly scan, Kubescape's regressions and
       Falco's alerts currently land in four unrelated places. Route them to one
       Grafana view. This is the part of a CNAPP that is actually hard, and the
       part interviews ask about: prioritisation, not collection.
@@ -494,7 +496,9 @@ the drill.**
       (Falco, Kubescape, Trivy, Checkov, Prowler) to open counts by source,
       severity and item, for the `Findings` dashboard
       (`cluster/findings`). Counts only; detail stays in Slack, the
-      Security tab and the bucket
+      Security tab and the bucket. Verified live 2026-10-27, all five
+      sources up: Trivy and Checkov through the exporter's own GitHub App,
+      Prowler through `cluster-findings-exporter` (cloud#39)
 
 ### 10.5 — The drill _(90-day plan 3B — the highest-signal missing item)_
 
