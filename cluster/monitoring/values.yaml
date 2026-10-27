@@ -1,5 +1,5 @@
 ---
-# chart: 88.6.2  (kube-prometheus-stack)
+# chart: 92.3.1  (kube-prometheus-stack)
 # repo:  https://prometheus-community.github.io/helm-charts
 #
 # The heaviest thing in the cluster by some distance. Everything below is
@@ -20,6 +20,20 @@ defaultRules:
     KubeCPUOvercommit: true
 
 prometheus:
+  # Chart 90 moved the control-plane ServiceMonitors (kubelet, apiserver,
+  # controller-manager, scheduler, etcd, coredns) from a token file on the
+  # scraper's filesystem to a token in a Secret, because a ServiceMonitor can
+  # only reference credentials that way. Kubernetes no longer creates such a
+  # Secret, so the chart does: a kubernetes.io/service-account-token for
+  # Prometheus's ServiceAccount, which does not expire.
+  #
+  # Kept, deliberately: supplying our own Secret would be the same long-lived
+  # credential under a different name. What it can do is what Prometheus's
+  # ClusterRole allows - read nodes, their metrics endpoints, services,
+  # endpoints and pods - and it is readable only by whoever can read Secrets
+  # in monitoring. Stated rather than left as the chart's default.
+  serviceAccount:
+    createTokenSecret: true
   prometheusSpec:
     replicas: 1
     retention: 7d
@@ -185,13 +199,10 @@ alertmanager:
 grafana:
   enabled: true
   replicas: 1
-  # Ahead of the chart: 88.6.2 ships 13.2.0, whose Go stdlib, grpc and
-  # x/net carry 273 fixable highs in the image scan; 13.2.4 carries 61.
-  # A patch release on the same minor, so no migration. Drop this override
-  # when the chart bump catches up (92.x ships 13.2.4) — leaving it would
-  # silently pin grafana behind every later chart.
-  image:
-    tag: "13.2.4"
+  # No image override: chart 92.3.1's Grafana subchart (13.5.1) ships
+  # 13.2.4, the version this file used to pin ahead of 88.6.2's 13.2.0. Its
+  # remaining fixable highs (78 in the 2026-10-27 scan) are fixed in 13.2.5,
+  # released 2026-10-27 - an image override again once that is two weeks old.
   # 256Mi OOMKilled under real interactive use (exitCode 137, confirmed live
   # on build 0003) - ran fine for ~10 hours at idle/scrape-only load, then
   # crashed once someone actually opened the UI and browsed dashboards.
