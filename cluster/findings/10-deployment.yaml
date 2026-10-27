@@ -1,0 +1,79 @@
+---
+# One view of every finding source (07 Phase 10.4). images/findings-exporter
+# reads Alertmanager (Falco, Kubescape), GitHub code scanning (Trivy,
+# Checkov) and the newest Prowler report in S3, and serves counts by source,
+# severity and item for Prometheus. The dashboard is 40-dashboard.yaml.
+#
+# AWS access is the pod-identity webhook's (ADR-0014): the ServiceAccount's
+# role-arn annotation (policy/44-findings.yaml) gets this pod a projected
+# token for cluster-findings-exporter in nineteenseventytwo-cloud, which can
+# read the findings bucket and nothing else.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: findings-exporter
+  namespace: findings
+  annotations:
+    # ADR-0016: CPU limits come from the namespace LimitRange.
+    checkov.io/skip1: "CKV_K8S_11=CPU limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_38=the projected token is the AWS credential (pod-identity webhook, ADR-0014)"
+spec:
+  # One replica: Prometheus scrapes it every 30s and a gap of a restart costs
+  # nothing - every source refreshes on minutes-to-hours intervals anyway.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: findings-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: findings-exporter
+    spec:
+      serviceAccountName: findings-exporter
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        # The projected AWS token is mode 0600 for the pod's fsGroup.
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: findings-exporter
+          image: ghcr.io/nineteenseventytwo/findings-exporter@sha256:074bae87dd59eb76808bdfb10ccc09d53895d8b5c04b2d99c534f52a75b7dd13
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FINDINGS_ALERTMANAGER
+              value: http://monitoring-kube-prometheus-alertmanager.monitoring.svc:9093
+            - name: FINDINGS_GITHUB_REPOS
+              value: nineteenseventytwo/nineteenseventytwo-platform
+            - name: FINDINGS_GITHUB_APP_DIR
+              value: /secrets/github
+            - name: FINDINGS_PROWLER_BUCKET
+              value: nineteenseventytwo-prowler-517148962038
+          ports:
+            - containerPort: 8080
+              name: metrics
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: github, mountPath: /secrets/github, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            periodSeconds: 20
+            failureThreshold: 3
+      volumes:
+        - name: github
+          secret:
+            secretName: findings-exporter-github
+            # app-id, installation-id and private-key, all as files.
+            defaultMode: 288   # 0440: owner and fsGroup

@@ -489,7 +489,12 @@ the drill.**
 - [ ] Prowler's S3 findings, Trivy's weekly scan, Kubescape's regressions and
       Falco's alerts currently land in four unrelated places. Route them to one
       Grafana view. This is the part of a CNAPP that is actually hard, and the
-      part interviews ask about: prioritisation, not collection
+      part interviews ask about: prioritisation, not collection.
+      Built 2026-10-27: `images/findings-exporter` reduces all five
+      (Falco, Kubescape, Trivy, Checkov, Prowler) to open counts by source,
+      severity and item, for the `Findings` dashboard
+      (`cluster/findings`). Counts only; detail stays in Slack, the
+      Security tab and the bucket
 
 ### 10.5 — The drill _(90-day plan 3B — the highest-signal missing item)_
 

@@ -256,3 +256,15 @@ spec:
     requests.cpu: 150m
     requests.memory: 320Mi
     limits.memory: 1Gi
+---
+# findings: one exporter pod plus its rolling-update surge.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: infra-quota
+  namespace: findings
+spec:
+  hard:
+    requests.cpu: 25m
+    requests.memory: 48Mi
+    limits.memory: 128Mi

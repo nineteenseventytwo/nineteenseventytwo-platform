@@ -1,0 +1,14 @@
+---
+# The findings app syncs at wave 97, after monitoring (70), so the CRD exists.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: findings-exporter
+  namespace: findings
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: findings-exporter
+  endpoints:
+    - port: metrics
+      interval: 60s

@@ -141,6 +141,34 @@ vault kv put kv/platform/cloudflared \
 unset VAULT_TOKEN
 ```
 
+<a id="findings-exporter"></a>
+The findings exporter (`cluster/findings/00-externalsecret.yaml`, 07 Phase
+10.4) authenticates to GitHub as its own App to count the platform repo's open
+code-scanning alerts. **Not ARC's App** (`platform/github-app`): that one can
+administer the org's self-hosted runners. Create a second one under the org's
+*Settings → Developer settings → GitHub Apps → New GitHub App*:
+
+- Name `nineteenseventytwo-findings`; any homepage URL; **Webhook: off**.
+- Repository permissions: **Code scanning alerts → Read-only**. Nothing else
+  (Metadata read is added automatically).
+- *Only on this account*. Create it, note the **App ID**, and *Generate a
+  private key* (a `.pem` downloads).
+- *Install App* → the org → **Only select repositories →
+  nineteenseventytwo-platform**. The installation ID is the number at the end
+  of the URL on the page that follows.
+
+Then, with the root token as above:
+
+```bash
+read -rs VAULT_TOKEN && export VAULT_TOKEN    # paste the root token
+vault kv put kv/platform/findings-github-app \
+  app_id="<app id>" \
+  installation_id="<installation id>" \
+  private_key=@"$HOME/Downloads/<app-name>.<date>.private-key.pem"
+unset VAULT_TOKEN
+rm "$HOME/Downloads/<app-name>.<date>.private-key.pem"
+```
+
 Back in the same vault pod shell from step 4:
 
 ```bash
