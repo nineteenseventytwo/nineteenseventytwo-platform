@@ -135,6 +135,7 @@ spec:
             - {port: "10257", protocol: TCP}   # kube-controller-manager
             - {port: "10259", protocol: TCP}   # kube-scheduler
             - {port: "2381", protocol: TCP}    # etcd metrics (see above)
+            - {port: "9965", protocol: TCP}    # hubble metrics (cilium agent)
 ---
 # Namespace-wide, not scoped to Prometheus like the rule above: every
 # component the kube-prometheus-stack chart deploys can end up needing the

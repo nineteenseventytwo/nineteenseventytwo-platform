@@ -24,7 +24,7 @@ that either passes or the phase is not finished. Gates are not suggestions.
 | Immediate | SCPs to root and the build 0004 certificate note are still open |
 | 6.1, 6.2 eightbitsaxlounge | ✅ Gate met 2026-09-12. See [08](08-eightbitsaxlounge-migration.md) |
 | 6.3 Composer | ✅ Live in `composer-dev` with the `plan` arranger since 2026-09-24. D1 recorded as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md) |
-| 6.4 Egress log-only | ❌ Not started |
+| 6.4 Egress log-only | ⚠️ Pod DNS observation built (`policy/12-egress-observe.yaml`, `tests/egress-observed.sh`). Squid on OPNsense and the node proxy flip are still to do |
 | 7 Egress control | ❌ Not started |
 | 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
 | 8.1, 8.2 Tunnel and Access | ✅ 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): `dash.` behind Access via the tunnel; [09](09-website.md)'s W.5 gate passed (phone, LAN, external port scan). Grafana and Argo CD behind Access is still open |
@@ -271,6 +271,28 @@ Two known snags, both already diagnosed:
 Not enforcement — observation. Set the proxy configs so traffic is *logged*
 while the migration is happening, and collect the real destination list as the
 services come up. Phase 7 enforces against that list rather than a guess.
+
+There are two egress paths, and one proxy sees only one of them. The node
+proxy configs (`egress_proxy_enabled`) cover apt, docker and containerd image
+pulls. Pods are masqueraded to the node IP and leave straight through
+OPNsense, so Squid never sees them, and pods are where the 0.0.0.0/0 rules
+are. Each path gets its own observation:
+
+- [x] **Pods:** `policy/12-egress-observe.yaml` sends all pod DNS through
+      Cilium's DNS proxy without enforcing anything, and Hubble's `dns`
+      metric records each query name by namespace in Prometheus.
+      `tests/egress-observed.sh` prints the list
+- [ ] **Nodes:** `os-squid` on OPNsense, listening on the VLAN 20 interface
+      at `:3128`, allowing VLAN 20 to any destination, access log on. Then
+      flip `egress_proxy_enabled: true` and converge one node at a time
+      (containerd restarts)
+- [ ] After a full week: save both lists to `docs/egress-observed.md`. That
+      file is Phase 7's allowlist input
+
+Phase 7's gate says a denied pod shows up "in Squid's log". Given the above,
+it will not: pod enforcement is per-namespace `toFQDNs` in Cilium, and the
+denial shows up in Hubble as a policy drop. Squid enforces for the nodes.
+Reword the gate when Phase 7 starts.
 
 **Gate:** every service `Synced/Healthy` in both environments; `apps/` is
 non-empty and the `100-apps` ApplicationSet has something to discover;

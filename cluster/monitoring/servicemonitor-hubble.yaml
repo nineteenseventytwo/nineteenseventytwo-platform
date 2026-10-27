@@ -1,0 +1,26 @@
+---
+# Scrapes Hubble's metrics (07 Phase 6.4). The cilium chart can create this
+# itself (hubble.metrics.serviceMonitor.enabled), but cilium syncs at wave -20
+# and the ServiceMonitor CRD arrives with monitoring at wave 70. On a rebuild
+# the cilium app would fail on an unknown kind and hold every later wave. Here
+# it syncs with platform-manifests at wave 90, after the CRD exists.
+#
+# The endpoints are the cilium agents, which run on the host network, so
+# Prometheus needs 9965 in allow-prometheus-scrape-nodes.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hubble
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: hubble
+  namespaceSelector:
+    matchNames: [kube-system]
+  endpoints:
+    - port: hubble-metrics
+      interval: 30s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
