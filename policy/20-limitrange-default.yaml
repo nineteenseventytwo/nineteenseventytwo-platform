@@ -229,3 +229,31 @@ spec:
       default: {cpu: 200m, memory: 256Mi}
       defaultRequest: {cpu: 50m, memory: 64Mi}
       max: {memory: 1Gi}
+---
+# cloudflared idles at ~20-30Mi and grows with open streams; one hostname
+# behind Access is a handful of streams. The default request is sized for that
+# rather than for a busy connector, and max leaves room to find out otherwise.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: cloudflared
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 128Mi}
+      defaultRequest: {cpu: 20m, memory: 48Mi}
+      max: {memory: 256Mi}
+---
+# dash is a static Go binary doing three GETs per page view: ~10Mi resident.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: dash
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 100m, memory: 64Mi}
+      defaultRequest: {cpu: 10m, memory: 24Mi}
+      max: {memory: 128Mi}

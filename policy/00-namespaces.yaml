@@ -171,3 +171,27 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
     platform.nineteenseventytwo/tier: infra
+---
+# The private half of the site (ADR-0018 W5, ADR-0021). Two namespaces, not
+# one: cloudflared holds the tunnel credential, dash holds a token that can
+# read two tenant namespaces. Neither should be able to reach the other's
+# secret, and a namespace is the boundary RBAC and Secrets both respect.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudflared
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dash
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    platform.nineteenseventytwo/tier: infra

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="30">
+<title>8bsl status</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<h1>8bsl status</h1>
+<p class="meta">Generated {{.Generated}}. Refreshes every 30 seconds.{{if .Viewer}} Signed in as {{.Viewer}}.{{end}}</p>
+{{range .Namespaces}}
+<section>
+<h2>{{.Name}}</h2>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<table>
+<thead><tr><th>Service</th><th>State</th><th>Ready</th><th>Restarts</th></tr></thead>
+<tbody>
+{{range .Rows}}
+<tr>
+<td>{{.Component}}</td>
+<td><span class="state state-{{.State}}">{{.State}}</span>{{if .Note}} <span class="note">{{.Note}}</span>{{end}}</td>
+<td>{{if eq .State "unknown"}}?{{else}}{{.Ready}}/{{.Desired}}{{end}}</td>
+<td>{{if eq .State "unknown"}}?{{else}}{{.Restarts}}{{end}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</section>
+{{end}}
+</main>
+</body>
+</html>

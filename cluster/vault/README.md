@@ -118,6 +118,29 @@ This is separate from the org-level GitHub Actions secret `SLACK_WEBHOOK_URL`
 reuse, but the two are read by different systems and neither substitutes for
 the other.
 
+The Cloudflare tunnel (`cluster/cloudflared/00-externalsecret.yaml`,
+[ADR-0021](../../docs/decisions/ADR-0021-private-hostnames-tunnel-only.md))
+also reads from here, and `dash.` is down until it does. The credentials file
+comes from `cloudflared tunnel create` on a workstation and is not in SOPS:
+it is the tunnel's whole identity. On a rebuild, reuse the existing tunnel's
+file if you still have it. If not, create a new tunnel, re-point the two DNS
+records with `cloudflared tunnel route dns`, and change `tunnel_id` here. The
+team name and AUD tag come from the Zero Trust dashboard; neither is secret.
+
+This needs the root token. The `mchellmer` userpass login can only sign SSH
+certificates (step 7), so it gets a 403 on `kv/platform/*`, correctly. From a
+workstation, keep the root token out of `~/.vault-token` and shell history:
+
+```bash
+read -rs VAULT_TOKEN && export VAULT_TOKEN    # paste the root token
+vault kv put kv/platform/cloudflared \
+  tunnel_id="<uuid>" \
+  credentials_json=@"$HOME/.cloudflared/<uuid>.json" \
+  access_team="<team>" \
+  access_aud="<aud tag>"
+unset VAULT_TOKEN
+```
+
 Back in the same vault pod shell from step 4:
 
 ```bash

@@ -1,0 +1,55 @@
+:root {
+  --bg: #c0c0c0;
+  --panel: #ffffff;
+  --ink: #000000;
+  --muted: #404040;
+  --edge-light: #ffffff;
+  --edge-dark: #808080;
+  --ok: #006400;
+  --warn: #8b5a00;
+  --bad: #a00000;
+  --off: #404040;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.4 "Courier New", Courier, monospace;
+}
+
+main {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1, h2 { margin: 0 0 8px; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.1rem; }
+
+.meta { color: var(--muted); margin: 0 0 16px; }
+
+section {
+  background: var(--panel);
+  border: 2px solid;
+  border-color: var(--edge-light) var(--edge-dark) var(--edge-dark) var(--edge-light);
+  padding: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--edge-dark); }
+
+.state { font-weight: bold; }
+.state-running { color: var(--ok); }
+.state-degraded { color: var(--warn); }
+.state-crashing { color: var(--bad); }
+.state-stopped { color: var(--off); }
+.state-unknown { color: var(--bad); font-style: italic; }
+
+.note { color: var(--muted); font-size: 0.85rem; }
+.error { color: var(--bad); font-weight: bold; }

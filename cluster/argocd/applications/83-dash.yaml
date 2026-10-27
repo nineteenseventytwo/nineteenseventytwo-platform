@@ -1,0 +1,31 @@
+---
+# dash: the private status page (images/dash). ADR-0018 W5, ADR-0021.
+# Namespace, quota, LimitRange and network policy come from policy/
+# (platform-policy, wave 95) - CreateNamespace below is the same
+# belt-and-braces every Application here carries.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dash
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "83"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dash
+  source:
+    repoURL: https://github.com/nineteenseventytwo/nineteenseventytwo-platform.git
+    targetRevision: main
+    path: cluster/dash
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 10m}

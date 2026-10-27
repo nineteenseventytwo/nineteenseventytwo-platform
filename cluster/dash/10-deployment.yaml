@@ -1,0 +1,64 @@
+---
+# dash - the 8bsl service status page at dash.eightbitsaxlounge.com
+# (ADR-0018 W5). Source and image: images/dash. Reached only through the
+# Cloudflare tunnel (ADR-0021); there is deliberately no HTTPRoute for it.
+#
+# Its ServiceAccount and the two Roles it holds are in policy/42-dash.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash
+  namespace: dash
+  labels:
+    app.kubernetes.io/name: dash
+  annotations:
+    # ADR-0016: requests/limits come from the namespace LimitRange.
+    checkov.io/skip1: "CKV_K8S_10=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip2: "CKV_K8S_11=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip3: "CKV_K8S_12=requests come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip4: "CKV_K8S_13=limits come from the namespace LimitRange (ADR-0016)"
+    checkov.io/skip5: "CKV_K8S_38=reading the API server is this workload's whole job"
+spec:
+  # One replica: when the cluster is down the page is down, and that is the
+  # signal (09 F8). A second replica buys nothing a viewer would notice.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dash
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dash
+    spec:
+      serviceAccountName: dash
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dash
+          # dash 0.1.1, arm64. Pinned by digest, like every image here.
+          image: ghcr.io/nineteenseventytwo/dash@sha256:bb99dd629362b6aa3c6df15729833b53a828ca699d37f16300bbf95c2c66f399
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DASH_NAMESPACES
+              value: "eightbitsaxlounge-prod,eightbitsaxlounge-dev"
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # /healthz does not call the API server, so these restart a broken
+          # process, not a healthy one waiting on a slow apiserver.
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            periodSeconds: 20
+            failureThreshold: 3
