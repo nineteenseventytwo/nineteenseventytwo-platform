@@ -22,5 +22,6 @@ spec:
     - port: hubble-metrics
       interval: 30s
       relabelings:
-        - sourceLabels: [__meta_kubernetes_pod_node_name]
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: node
