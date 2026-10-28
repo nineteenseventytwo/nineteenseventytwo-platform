@@ -59,7 +59,7 @@ spec:
           # come from the LimitRange.
           resources:
             requests: {memory: 32Mi}
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:9c3bff4773cd27489222b66fb68e12eafc6588528f7f8318c0d132a230c02560
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-data@sha256:fab8ab8fdfabf05f8cee1ff547625d3a4e7618cef65aa1a975564ca5096f3569
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
