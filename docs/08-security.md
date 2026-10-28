@@ -20,8 +20,8 @@ the others cannot.
 | **Kubescape** | The **live** cluster, chart defaults included | Nightly, 03:30 | Does the running cluster still match its reviewed baseline? | Alertmanager → Slack, new failures only ([ADR-0017](decisions/ADR-0017-kubescape-accepted-controls.md)) |
 | **Falco** | System calls on every node | Continuously | Is something *doing* something bad right now? | Alertmanager → Slack |
 | **Prowler** | AWS account configuration (CIS, AWS FSBP) | Daily, 05:00 | Is the AWS estate configured safely? | S3 findings bucket (kept out of the public repo's logs) |
-| **IAM Access Analyzer** | Resource and trust policies, org as zone of trust | Continuously | Can anything outside the org reach this? | Its findings list; external-by-design ones archived |
-| **GuardDuty** | AWS API activity and threat intelligence | Continuously | Is someone attacking or misusing an account? | GuardDuty console — no notification route yet |
+| **IAM Access Analyzer** | Resource and trust policies, org as zone of trust | Continuously | Can anything outside the org reach this? | EventBridge → Slack for each new ACTIVE finding; external-by-design ones archived |
+| **GuardDuty** | AWS API activity and threat intelligence | Continuously | Is someone attacking or misusing an account? | EventBridge → Slack, Medium and up, new findings only |
 | **CloudTrail + EventBridge** | Root sign-in, break-glass, `OrganizationAccountAccessRole` | On the event | Did one of the never-routine things happen? | SNS → email |
 | **Asset graph** (Steampipe, cloud repo) | Every AWS account, as SQL tables | When you ask | Attack-path questions the managed tools cannot express | Write-ups in the cloud repo's `docs/asset-graph/` |
 
@@ -78,7 +78,11 @@ radius in [04-secrets.md](04-secrets.md#secret-inventory).
 
 - **Slack**: Falco, Kubescape regressions, and every Alertmanager alert,
   including the ones that say a detector has stopped (`KubeJobFailed`,
-  `FindingsSourceDown`, `ProwlerReportStale`).
+  `FindingsSourceDown`, `ProwlerReportStale`). Node OS updates too: a
+  pending reboot, stuck security updates, stale unattended-upgrades.
+- **Slack, from AWS**: GuardDuty and Access Analyzer findings through an
+  EventBridge API destination (cloud `live/aws/security/notifications.tf`),
+  and a weekly cost report on Mondays (cloud `cost-report.yml`).
 - **The `Findings` dashboard** in Grafana: Falco, Kubescape, Trivy, Checkov and
   Prowler as counts by source, severity, item and age (`cluster/findings`,
   `images/findings-exporter`). Detail stays where each tool keeps it.
@@ -86,7 +90,6 @@ radius in [04-secrets.md](04-secrets.md#secret-inventory).
 
 ## Known gaps
 
-- **GuardDuty findings** have no notification route.
 - **API-server audit logs** are not collected anywhere central.
 - **Grafana and Argo CD** are LAN-only behind their own logins, not Cloudflare
   Access (07 8.2).
