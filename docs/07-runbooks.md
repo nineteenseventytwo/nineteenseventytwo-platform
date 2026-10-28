@@ -1,11 +1,55 @@
 # 07 — Runbooks
 
 Incidents worth a documented fix rather than rediscovering them from scratch
-next time. Both entries below share the same shape: an unclean host reboot
+next time, and the one planned procedure that avoids them. The two incident
+entries after it share the same shape: an unclean host reboot
 left stale local state behind, and a plain **restart** of the affected
 process reused that state instead of clearing it — only a **recreate** did.
 Worth remembering as a pattern, not just two one-off fixes, going into any
 future work on scheduled reboots or planned cluster downtime.
+
+## Applying node updates
+
+**When:** `NodeRebootRequired`, `NodeUpdatesPending` or
+`NodeSecurityUpdatesPending` fires in Slack. The metrics come from the
+`node-apt-metrics` timer (`ansible/roles/common`), which runs hourly, so an
+alert clears within an hour of the fix.
+
+`unattended-upgrades` already installs security updates every day and never
+reboots. Routine updates and reboots are this procedure. Do it **one node at a
+time: workers first, the control plane last.** Longhorn keeps two replicas on
+the workers, so a second worker must not go down while the first one's
+replicas are still rebuilding.
+
+```bash
+export KUBECONFIG=build/kubeconfig
+NODE=1972-worker-1 IP=192.168.20.203
+
+# 1. Every Longhorn volume healthy before starting
+kubectl -n longhorn-system get volumes.longhorn.io \
+  -o custom-columns=NAME:.metadata.name,ROBUSTNESS:.status.robustness
+
+# 2. Move the workloads off
+kubectl drain $NODE --ignore-daemonsets --delete-emptydir-data
+
+# 3. Update and reboot. kubelet, kubeadm, kubectl, containerd stay held.
+make ssh-ws HOST=$IP
+sudo apt-get update && sudo apt-get upgrade -y && sudo reboot
+
+# 4. Back in service, then wait for step 1 to show healthy again before the
+#    next node
+kubectl wait --for=condition=Ready node/$NODE --timeout=10m
+kubectl uncordon $NODE
+```
+
+**The control plane (`1972-master-1`) last.** Its reboot is a few minutes of
+API outage: Argo CD, kubectl and CI pause, and running workloads carry on.
+Afterwards, check the next entry. A control plane that comes back with stale
+static pods is the known failure here.
+
+`1972-console-1` and `1972-gpu-1` get the same `unattended-upgrades` and
+timer, but no node-exporter scrapes them. Check them by hand while you are at
+it: `cat /var/lib/node_exporter/textfile/apt.prom`.
 
 ## Control plane static pods stuck after a node reboot
 

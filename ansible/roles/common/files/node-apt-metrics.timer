@@ -1,0 +1,12 @@
+# Managed by ansible/roles/common. Do not edit on the host.
+[Unit]
+Description=Hourly apt update state for node-exporter
+
+[Timer]
+OnBootSec=5min
+OnCalendar=hourly
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

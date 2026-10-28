@@ -1,0 +1,8 @@
+# Managed by ansible/roles/common. Do not edit on the host.
+[Unit]
+Description=Write apt update state for node-exporter's textfile collector
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/node-apt-metrics
+Nice=19

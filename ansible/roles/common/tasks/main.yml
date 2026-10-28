@@ -36,6 +36,38 @@
     state: started
   become: true
 
+# Update state as Prometheus metrics: pending updates, a waiting reboot, and
+# whether unattended-upgrades is still running. node-exporter reads the file
+# through its host-root mount; the alerts are in cluster/monitoring/values.yaml.
+- name: Install the apt metrics script
+  ansible.builtin.copy:
+    src: node-apt-metrics
+    dest: /usr/local/sbin/node-apt-metrics
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Install the apt metrics service and timer
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - node-apt-metrics.service
+    - node-apt-metrics.timer
+  become: true
+
+- name: Enable the apt metrics timer
+  ansible.builtin.systemd:
+    name: node-apt-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
 - name: Configure chrony
   ansible.builtin.template:
     src: chrony.conf.j2
