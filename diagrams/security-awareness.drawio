@@ -143,7 +143,7 @@
         <mxCell id="fe8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="al1" target="al2"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="al2" target="al3"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe10" value="threshold breach" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="srcSpend" target="al4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="588" /><mxPoint x="1180" y="502" /></Array></mxGeometry></mxCell>
-        <mxCell id="fe11" value="GuardDuty findings&#10;(no SNS route yet — findings&#10;live in the console)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=9;" edge="1" parent="1" source="d2" target="al2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe11" value="GuardDuty Medium+ and new Access Analyzer&#10;findings: EventBridge API destination → Slack" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;" edge="1" parent="1" source="d2" target="slack"><mxGeometry relative="1" as="geometry" /></mxCell>
 
         <!-- Bottom: gaps -->
         <mxCell id="gapBox" value="KNOWN GAPS — written down rather than left to be discovered" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
@@ -152,7 +152,7 @@
         <mxCell id="g1" value="CLOSED 2026-10-26&#10;Prowler runs daily on GitHub&#10;Actions (gha-prowler) and writes&#10;to the findings bucket; its&#10;counts are on the Findings&#10;dashboard (band 5)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="35" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
-        <mxCell id="g2" value="GuardDuty findings have no&#10;notification route.&#10;The detector is on and&#10;org-wide, but findings sit in&#10;the console. Only root sign-in&#10;and break-glass reach SNS." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="g2" value="CLOSED 2026-10-28&#10;GuardDuty (Medium and up, new&#10;only) and new Access Analyzer&#10;findings post to Slack through&#10;an EventBridge API destination,&#10;both regions (cloud #43)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="380" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
         <mxCell id="g3" value="The email subscription is&#10;only real once confirmed.&#10;Until someone clicks the link&#10;in the inbox, every alert&#10;above terminates in a&#10;PendingConfirmation topic." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
@@ -161,7 +161,7 @@
         <mxCell id="g4" value="MOSTLY CLOSED 2026-10-27&#10;Falco (runtime) and the nightly&#10;Kubescape gate watch the cluster&#10;and alert into Slack (band 5).&#10;Still open: API-server audit&#10;logs are not centralised." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1070" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
-        <mxCell id="g5" value="No on-call, no escalation.&#10;AWS paths end at one mailbox,&#10;cluster paths at one Slack&#10;channel. Proportionate for a&#10;homelab, and stated rather than&#10;implying a rota." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="g5" value="No on-call, no escalation.&#10;Everything ends at one Slack&#10;channel or one mailbox. Proportionate for a&#10;homelab, and stated rather than&#10;implying a rota." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1415" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
 
