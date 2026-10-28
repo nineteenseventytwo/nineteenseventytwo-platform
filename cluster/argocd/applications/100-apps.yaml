@@ -11,6 +11,11 @@ kind: ApplicationSet
 metadata:
   name: apps
   namespace: argocd
+  annotations:
+    # Wave 100, after policy/ (95) and the secret store (90). The wave on the
+    # template below orders nothing here: the Applications this generates are
+    # not the parent app's children. Without this, they sync at wave 0.
+    argocd.argoproj.io/sync-wave: "100"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
