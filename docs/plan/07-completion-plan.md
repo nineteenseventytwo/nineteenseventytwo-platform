@@ -17,20 +17,26 @@ sequencing it badly is the main way it does not get done.
 Every phase has a **gate**, in the sense `REBUILD.md` uses the word: a check
 that either passes or the phase is not finished. Gates are not suggestions.
 
-### Progress, 2026-10-26
+### Progress, 2026-10-28
 
 | Phase | State |
 |---|---|
 | Immediate | ✅ SCPs at the root (cloud #42) and the admin-certificate note carried into build 0004, both 2026-10-27 |
 | 6.1, 6.2 eightbitsaxlounge | ✅ Gate met 2026-09-12. See [08](08-eightbitsaxlounge-migration.md) |
 | 6.3 Composer | ✅ Live in `composer-dev` with the `plan` arranger since 2026-09-24. D1 recorded as [ADR-0020](../decisions/ADR-0020-composer-inference-off-cluster.md) |
-| 6.4 Egress log-only | ⚠️ Pod DNS observation built (`policy/12-egress-observe.yaml`, `tests/egress-observed.sh`). Squid on OPNsense and the node proxy flip are still to do |
+| 6.4 Egress log-only | ⚠️ Collecting. Nodes: Squid on OPNsense, log-only, `egress_proxy_enabled` on since 2026-10-27 (#234). Pods: Cilium DNS proxy and Hubble (`policy/12-egress-observe.yaml`), recording since 2026-10-27 only — ufw had dropped every Hubble scrape until #254. Write-up due ~2026-11-04 |
 | 7 Egress control | ❌ Not started |
 | 8.3 Public site | ✅ Live at `sev.eightbitsaxlounge.com`. See [09](09-website.md) W.1–W.4 |
 | 8.1, 8.2 Tunnel and Access | ✅ 2026-10-27 (#230, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)): `dash.` behind Access via the tunnel; [09](09-website.md)'s W.5 gate passed (phone, LAN, external port scan). Grafana and Argo CD behind Access is still open |
 | 9 Hybrid | ❌ Not started |
-| 10 CNAPP | ⚠️ 10.1 Falco (#235, #236), 10.2 nightly Kubescape gate (#237, #238) and 10.4 the `Findings` dashboard (#239, #241; cloud#39) done 2026-10-27. 10.3 asset graph and 10.5 the drill not started |
+| 10 CNAPP | ⚠️ 10.1 Falco, 10.2 the nightly Kubescape gate, 10.3 the asset graph (cloud `asset-graph/`, 0001) and 10.4 the `Findings` dashboard all done 2026-10-27; see [08-security](../08-security.md). 10.5, the drill, not run |
 | 11, 12 | ❌ Not started |
+
+**Tabled 2026-10-28:** Phases 7, 9, 11 (except composer), 12 and the rest of
+8.2. The focus is consolidation and composer's training examples. Phase 7
+waits on 6.4's write-up regardless. Phase 9's design now also needs a
+carve-out from `DenyExpensiveResources`, which reached the org root on
+2026-10-27 and denies the Elastic IP a tunnel endpoint needs.
 
 ---
 
@@ -490,10 +496,13 @@ the drill.**
 
 ### 10.3 — Asset graph
 
-- [ ] Steampipe or CloudQuery against the AWS org. One real query answered that
+- [x] Steampipe or CloudQuery against the AWS org. One real query answered that
       would otherwise take an afternoon in the console — the attack-path
       question, e.g. "which roles in any account can be assumed from outside the
-      org" — and write it down as the artefact
+      org" — and write it down as the artefact. **Done 2026-10-27:** cloud
+      repo `asset-graph/`, answered in `docs/asset-graph/0001-external-trust.md`
+      (nothing assumable from outside the org); its guardrail is Access
+      Analyzer archive rules
 
 ### 10.4 — Findings in one place
 
@@ -584,15 +593,19 @@ keys and private-networking sections.
 
 The original documents get to be closed when all of these hold:
 
-1. ✅ `apps/` carries every eightbitsaxlounge service and composer, reconciled by
-   Argo CD, and `eightbitsaxlounge/server` no longer exists.
+1. ⚠️ `apps/` carries every eightbitsaxlounge service and composer, reconciled by
+   Argo CD (✅), and `eightbitsaxlounge/server` no longer exists (❌ — still in
+   that repo as of 2026-10-28).
 2. All three proxy types are in service: reverse, forward, ZTNA.
-3. ⚠️ A public site is reachable from the internet and survives the cluster being
-   rebuilt (✅ 2026-10-20); a private area behind identity is reachable and
-   cannot be bypassed (❌).
+3. ✅ A public site is reachable from the internet and survives the cluster being
+   rebuilt (2026-10-20); a private area behind identity is reachable and cannot
+   be bypassed (`dash.`, 2026-10-27, [ADR-0021](../decisions/ADR-0021-private-hostnames-tunnel-only.md)).
 4. On-prem and AWS reach each other privately, and at least one cloud node has
    run real work scheduled by the on-prem control plane.
-5. All six CNAPP pillars are live, on a schedule, reporting into one place.
+5. ⚠️ All six CNAPP pillars are live, on a schedule, reporting into one place.
+   Runtime, cluster posture, cloud posture, image vulnerabilities, IaC and
+   the asset graph exist and report into Slack and the `Findings` dashboard;
+   GuardDuty findings still have no route ([08-security](../08-security.md#known-gaps)).
 6. A detection-and-response drill has been run against controls you did not
    touch, and its postmortem names a guardrail that now exists.
 7. The AWS↔GCP mapping table is filled in from experience.

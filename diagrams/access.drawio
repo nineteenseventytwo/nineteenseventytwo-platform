@@ -1,12 +1,12 @@
-<mxfile host="app.diagrams.net" modified="2026-08-25T06:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-10-28T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
   <diagram name="Access Bootstrap" id="access-bootstrap-1">
-    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" shadow="0">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2100" pageHeight="1000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
         <!-- Title -->
-        <mxCell id="title" value="Access Bootstrap: key -&gt; SSH CA / temporary certs (nineteenseventytwo lab)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="title" value="Access Bootstrap: key -&gt; SSH CA / temporary certs -&gt; remote access (nineteenseventytwo lab)  (updated 2026-10-28)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="20" y="-30" width="900" height="30" as="geometry" />
         </mxCell>
 
@@ -26,19 +26,19 @@
 
         <!-- Lane backgrounds -->
         <mxCell id="laneComputer" value="MY COMPUTER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="50" width="1630" height="140" as="geometry" />
+          <mxGeometry x="20" y="50" width="2040" height="140" as="geometry" />
         </mxCell>
         <mxCell id="laneOpn" value="OPNSENSE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="190" width="1630" height="90" as="geometry" />
+          <mxGeometry x="20" y="190" width="2040" height="90" as="geometry" />
         </mxCell>
         <mxCell id="lanePi" value="PI CLUSTER (incl. Vault, cert-manager)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="280" width="1630" height="320" as="geometry" />
+          <mxGeometry x="20" y="280" width="2040" height="320" as="geometry" />
         </mxCell>
         <mxCell id="laneAws" value="AWS" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="600" width="1630" height="150" as="geometry" />
+          <mxGeometry x="20" y="600" width="2040" height="150" as="geometry" />
         </mxCell>
         <mxCell id="laneCf" value="CLOUDFLARE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="750" width="1630" height="110" as="geometry" />
+          <mxGeometry x="20" y="750" width="2040" height="110" as="geometry" />
         </mxCell>
 
         <!-- Phase divider lines -->
@@ -108,10 +108,10 @@
         <mxCell id="C1" value="Terraform: create_jwks_bucket=true&#10;S3 bucket for OIDC discovery docs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="1">
           <mxGeometry x="690" y="615" width="260" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="C2" value="publish_cluster_oidc=true&#10;register IAM OIDC provider&#10;+ create 4 IAM roles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="1">
+        <mxCell id="C2" value="publish_cluster_oidc=true&#10;register IAM OIDC provider&#10;+ one role per ServiceAccount" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="1">
           <mxGeometry x="960" y="615" width="260" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="C3" value="AWS STS verifies pod SA tokens against the published JWKS -&gt; AssumeRoleWithWebIdentity (Vault, Longhorn, Argo CD, Prowler each get one scoped role)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="1">
+        <mxCell id="C3" value="AWS STS verifies pod SA tokens against the published JWKS -&gt; AssumeRoleWithWebIdentity (Vault, Longhorn, findings-exporter each get one scoped role; Prowler now runs on GitHub Actions)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;arcSize=10;" vertex="1" parent="1">
           <mxGeometry x="690" y="680" width="530" height="55" as="geometry" />
         </mxCell>
         <mxCell id="C8" value="Deploy OIDC Worker (bootstrap/oidc/worker.js) for eightbitsaxlounge.com&#10;Route oidc.eightbitsaxlounge.com/* -&gt; Worker&#10;(proxies to S3 origin over real TLS, so discovery docs are reachable publicly)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=10;" vertex="1" parent="1">
@@ -166,7 +166,7 @@
 
         <!-- Legend -->
         <mxCell id="legendBox" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;" vertex="1" parent="1">
-          <mxGeometry x="20" y="880" width="420" height="70" as="geometry" />
+          <mxGeometry x="20" y="880" width="420" height="90" as="geometry" />
         </mxCell>
         <mxCell id="legendTitle" value="Legend" style="text;html=1;fontStyle=1;fontSize=11;align=left;" vertex="1" parent="1">
           <mxGeometry x="30" y="884" width="100" height="20" as="geometry" />
@@ -193,6 +193,39 @@
           <mxGeometry x="95" y="945" width="240" height="16" as="geometry" />
         </mxCell>
 
+        <!-- PHASE E: remote access and app identities (W.5 and 10.4, 2026-10) -->
+        <mxCell id="hdrE" value="PHASE E&#10;Remote Access &amp; App Identities (2026-10)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="10" width="380" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="divDE" style="endArrow=none;html=1;dashed=1;strokeColor=#999999;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1660" y="50" as="sourcePoint" />
+            <mxPoint x="1660" y="860" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="E1" value="cloudflared tunnel create (workstation)&#10;-&gt; tunnel ID + credentials JSON (its whole identity)&#10;GitHub App nineteenseventytwo-findings&#10;-&gt; app ID, installation ID, private key (.pem)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="65" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E2" value="★ root token: vault kv put&#10;kv/platform/cloudflared · kv/platform/findings-github-app&#10;(the userpass login can only sign SSH certs)&#10;then delete the .pem and keep the JSON offline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e6ff;strokeColor=#9673a6;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="295" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E3" value="ESO renders both; cloudflared dials OUT to&#10;Cloudflare and forwards dash. only (ADR-0021);&#10;findings-exporter signs a JWT -&gt; 1h GitHub token&#10;narrowed to security_events:read" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="375" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E4" value="pod-identity-webhook: the findings namespace&#10;added to its allowlist, or no AWS creds (#241)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="455" width="360" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="E5" value="cluster-findings-exporter (cloud #39):&#10;read the newest Prowler report, nothing else" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="615" width="360" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="E6" value="Tunnel DNS route dash. + Zero Trust Access app&#10;(team, AUD) — access.required checked by&#10;cloudflared itself, not just at the edge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="765" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="eE1E2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="E1" target="E2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eE2E3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="E2" target="E3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eE3E4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="E3" target="E4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eE1E6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1" source="E1" target="E6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eE5E4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1" source="E5" target="E4"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

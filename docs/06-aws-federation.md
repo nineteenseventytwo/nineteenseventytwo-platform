@@ -319,7 +319,16 @@ almost always one of four things, in this order of likelihood:
 |---|---|---|---|
 | Vault | `vault:vault` | `cluster-vault-unseal` | Encrypt/Decrypt on the unseal CMK |
 | Longhorn | `longhorn-system:longhorn-service-account` | `cluster-longhorn-backup` | R/W on the backup bucket + its key |
-| Prowler | `security:prowler` | `cluster-prowler` | Write findings to the security account |
+| findings-exporter | `findings:findings-exporter` | `cluster-findings-exporter` | List and read `findings/` in the Prowler bucket, decrypt with its key |
+
+Prowler had a cluster role here until 2026-10-26. It now runs on GitHub
+Actions as `gha-prowler` (cloud repo `prowler.yml`), so its credential comes
+from GitHub OIDC, not this issuer.
+
+**Adding a role here takes two changes, not one:** the role in the cloud repo,
+and the workload's namespace in the pod-identity webhook's `namespaceSelector`
+(`cluster/pod-identity-webhook/30-mutatingwebhook.yaml`). Without the second,
+the pod starts with no AWS credentials at all (#241).
 
 One role per workload, never one shared "cluster" role. The point of
 per-service-account trust is that a compromised pod in one namespace gets that

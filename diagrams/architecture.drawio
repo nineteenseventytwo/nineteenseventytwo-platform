@@ -1,0 +1,135 @@
+<mxfile host="app.diagrams.net" modified="2026-10-28T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+  <diagram name="Architecture" id="architecture-1">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="nineteenseventytwo — what runs where, and what talks to what  (2026-10-28)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-30" width="1200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rCf" value="CLOUDFLARE  ·  the only thing the internet reaches" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2e6;strokeColor=#f38020;fontSize=13;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="1740" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="cfDns" value="DNS  eightbitsaxlounge.com&#10;public records + DNS-01 for&#10;cert-manager (zone-scoped token)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f38020;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="55" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cfAccess" value="ACCESS (Zero Trust)&#10;sign-in at the edge; signed JWT&#10;for dash. (ADR-0018 W5, -0021)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f38020;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="310" y="55" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cfTunnel" value="TUNNEL edge&#10;receives cloudflared&#x27;s OUTBOUND&#10;QUIC; no inbound port at home" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f38020;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="580" y="55" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cfWorker" value="OIDC WORKER&#10;oidc.eightbitsaxlounge.com →&#10;the JWKS in S3 (ADR-0014)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f38020;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="850" y="55" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="users" value="YOU, anywhere&#10;browser / phone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;arcSize=6;align=center;verticalAlign=middle;spacingLeft=8;spacingTop=4;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="55" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="twitch" value="TWITCH&#10;api.twitch.tv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9146ff;fontSize=11;arcSize=6;align=center;verticalAlign=middle;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="55" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="slack" value="SLACK&#10;every cluster alert,&#10;one channel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=6;align=center;verticalAlign=middle;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="55" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="rHome" value="HOME LAB  ·  OPNsense, VLAN 20 (192.168.20.0/24)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f8f8;strokeColor=#666666;fontSize=13;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="175" width="1000" height="630" as="geometry" />
+        </mxCell>
+        <mxCell id="opn" value="OPNSENSE  ·  inter-VLAN firewall · Kea DHCP (authority) · Unbound DNS&#10;Squid on :3128, LOG-ONLY (6.4) — the nodes&#x27; proxy for apt and image pulls&#10;no inbound port-forwards (external scan 2026-10-27: all filtered)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="205" width="960" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="console" value="1972-console-1  (.201)&#10;bootstrap + break-glass runner&#10;(compose); NOT in the cluster&#10;(ADR-0007)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="285" width="230" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="gpu" value="1972-gpu-1  (.210)  NOT a node&#10;Linux: Ollama behind Caddy&#10;(allowlisted paths, ufw: nodes only)&#10;Windows: midi PC build + the&#10;physical MIDI device (ADR-0020)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="385" width="230" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="rCluster" value="KUBEADM CLUSTER  ·  master-1 .202 · worker-1 .203 · worker-2 .204 (Pi 5, 4 GB, arm64)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=13;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="290" y="285" width="710" height="505" as="geometry" />
+        </mxCell>
+        <mxCell id="plat" value="PLATFORM&#10;cilium: CNI, kube-proxy replacement, WireGuard,&#10;   Gateway API on .241 (MetalLB), Hubble&#10;cert-manager · kubelet-csr-approver&#10;longhorn: replicated volumes, S3 backups&#10;argo cd: reconciles everything from git&#10;ARC: lab-deploy + lab-dind runner scale sets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="305" y="320" width="330" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="secrets" value="SECRETS &amp; IDENTITY&#10;vault (KMS auto-unseal over IRSA, SSH CA)&#10;external-secrets: Vault → Secrets&#10;pod-identity-webhook: IRSA for non-EKS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="650" y="320" width="335" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="policy" value="POLICY  (policy/, wave 95)&#10;namespaces + Pod Security labels · default-deny&#10;in every namespace · LimitRange · quota · RBAC&#10;observe-dns: pod DNS through Cilium&#x27;s proxy (6.4)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="650" y="420" width="335" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="obs" value="OBSERVE &amp; DETECT&#10;monitoring: Prometheus 3.15, Alertmanager,&#10;   Grafana (LAN, Gateway) · node-exporter&#10;falco: eBPF runtime detection, every node&#10;kubescape: nightly NSA gate vs accepted list&#10;findings: exporter + &#x27;Findings&#x27; dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="305" y="475" width="330" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="apps" value="APPLICATIONS  (apps/, ApplicationSet)&#10;eightbitsaxlounge-prod / -dev: db (CouchDB),&#10;   state (NATS JetStream), data, midi (.NET),&#10;   overlay (OBS overlay, LAN Gateway), chat&#10;   (Twitch bot; 0 replicas where not live)&#10;composer-dev: composer → Ollama on the GPU PC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="650" y="515" width="335" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="dash" value="dash + cloudflared&#10;the 8bsl status page, reachable&#10;ONLY through the tunnel, Access-gated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#f38020;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="305" y="620" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Everything above is declared in nineteenseventytwo-platform and reconciled&#10;by Argo CD; app repos publish images and own nothing cluster-side (ADR-0012).&#10;Rebuild path: docs/REBUILD.md. Detail per layer: argocd.drawio,&#10;access-controls.drawio, security-awareness.drawio, shift-left.drawio." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;fontSize=10;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="305" y="705" width="680" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="rGh" value="GITHUB  ·  org nineteenseventytwo (all repos public)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f8fa;strokeColor=#24292f;fontSize=13;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="175" width="330" height="630" as="geometry" />
+        </mxCell>
+        <mxCell id="repos" value="REPOS&#10;platform — cluster, policy, apps, Ansible&#10;cloud — AWS org (Terraform), asset-graph&#10;eightbitsaxlounge — 6 service images&#10;composer — composer image&#10;web — the public site" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="210" width="300" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="actionsHosted" value="ACTIONS · hosted runners&#10;lint (required: secret scan BLOCKS),&#10;image builds (cosign, Trivy), Terraform&#10;plan/apply (OIDC, aws-prod reviewer),&#10;prowler daily, image-vuln-scan weekly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="335" width="300" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="actionsLab" value="ACTIONS · lab runners&#10;ARC lab-deploy in the cluster (no docker&#10;socket); console compose stack (break-glass)&#10;push/dispatch only, never pull_request&#10;(ADR-0010)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="460" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ghcr" value="GHCR  ghcr.io/nineteenseventytwo/*&#10;signed images, pinned by digest in git" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="575" width="300" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="codescan" value="CODE SCANNING&#10;Trivy (images, fs) + Checkov alerts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="645" width="300" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="apps2" value="GITHUB APPS&#10;ARC runner registration · findings&#10;(code scanning: read)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#24292f;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="710" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rAws" value="AWS ORG  ·  5 accounts, eu-west-2 (+ us-east-1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8ee;strokeColor=#ff9900;fontSize=13;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1390" y="175" width="370" height="630" as="geometry" />
+        </mxCell>
+        <mxCell id="mgmt" value="mgmt&#10;Organizations: SCPs + RCPs at the root&#10;(region + cost denies since 2026-10-27)&#10;Identity Center (SSO) · EventBridge alarms&#10;→ SNS → email · budgets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ff9900;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="210" width="340" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="security" value="security  (delegated admin)&#10;org CloudTrail → Object-Lock bucket&#10;GuardDuty · Access Analyzer (archive rules)&#10;Prowler findings bucket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ff9900;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="330" width="340" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="pprod" value="platform-prod&#10;KMS: vault-unseal, sops · S3: Longhorn backups&#10;S3: JWKS · cluster-* roles (IRSA)&#10;public site: S3 + CloudFront + ACM&#10;(sev.eightbitsaxlounge.com) · gha-* roles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ff9900;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="440" width="340" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="shared" value="shared  ·  ECR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ff9900;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="560" width="165" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sandbox" value="sandbox  ·  extra SCPs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ff9900;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="560" width="165" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="assetg" value="ASSET GRAPH (Steampipe, workstation)&#10;SecurityAudit in every account — 0001:&#10;nothing assumable from outside the org" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="615" width="340" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="colours: green platform · purple identity &amp; secrets · orange policy · red detection · blue applications · Cloudflare orange: the edge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=10;arcSize=6;align=left;verticalAlign=middle;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="815" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="x1" value="cloudflared dials OUT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f38020;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dash" target="cfTunnel"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x2" value="sign in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f38020;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="users" target="cfAccess"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f38020;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="cfAccess" target="cfTunnel"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x4" value="STS fetches the JWKS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="secrets" target="cfWorker"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x5" value="IRSA: 1h creds per ServiceAccount" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="secrets" target="pprod"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x6" value="Argo CD pulls git" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="plat" target="repos"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x7" value="jobs on ARC runners" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#24292f;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="actionsLab" target="plat"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x8" value="images, via Squid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#24292f;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="ghcr" target="apps"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x9" value="Alertmanager" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="obs" target="slack"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x10" value="findings: GitHub App" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="obs" target="codescan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x11" value="findings: newest Prowler report (IRSA)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="obs" target="security"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x12" value="prowler daily" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#24292f;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="actionsHosted" target="security"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x13" value="SARIF" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#24292f;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="actionsHosted" target="codescan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x14" value="composer → Ollama :11434" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="apps" target="gpu"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x15" value="chat" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="apps" target="twitch"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x16" value="DNS-01" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="plat" target="cfDns"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="x17" value="Terraform, site deploy (OIDC)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#24292f;fontSize=9;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="actionsHosted" target="pprod"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

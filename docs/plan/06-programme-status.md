@@ -1,9 +1,10 @@
 # 06 — Programme status
 
-> **Snapshot, kept as written.** By 2026-10-26 both applications are on the
-> platform (blocks 1 and 2 below) and the public site is live (half of
-> block 3). For current state, see the progress table at the top of
-> [07](07-completion-plan.md#progress-2026-10-26).
+> **Snapshot, kept as written.** By 2026-10-28 both applications are on the
+> platform (blocks 1 and 2 below), the public site and the private `dash.`
+> are live (block 3), and Phase 10's detection is in place. For current state,
+> see the progress table at the top of
+> [07](07-completion-plan.md#progress-2026-10-28).
 
 _Written 2026-09-05, against the four repos as committed. Assessed against the
 original planning set: the 90-day cloud security plan, `01-current-state-inventory`,

@@ -1,11 +1,11 @@
-<mxfile host="app.diagrams.net" modified="2026-08-25T07:30:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-10-28T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
   <diagram name="Security Shifted Left" id="shift-left-1">
     <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="Security shifted left — every gate between a keystroke and a change in AWS or the cluster" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="title" value="Security shifted left — every gate between a keystroke and a change in AWS or the cluster  (updated 2026-10-28)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="20" y="-30" width="1200" height="30" as="geometry" />
         </mxCell>
 
@@ -44,33 +44,33 @@
         <mxCell id="s1p" value="nineteenseventytwo-PLATFORM   ·   lint.yml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=10;" vertex="1" parent="1">
           <mxGeometry x="320" y="60" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="s1a" value="yaml        yamllint&#10;ansible     ansible-lint (ansible-core 2.21.3)&#10;            + make lint-inventory — inventory&#10;              parses and every host resolves&#10;shell       shellcheck&#10;helm        every values file is valid YAML and&#10;            every chart templates cleanly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="320" y="92" width="340" height="130" as="geometry" />
+        <mxCell id="s1a" value="yaml        yamllint&#10;ansible     ansible-lint + make lint-inventory&#10;shell       shellcheck&#10;helm        every values file valid; every pinned&#10;            chart templates cleanly (incl. falco)&#10;go          go vet + go test -race for images/dash,&#10;            kubescape-gate, findings-exporter&#10;REQUIRED on main: security yaml ansible shell&#10;            actions helm go" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="320" y="92" width="340" height="150" as="geometry" />
         </mxCell>
 
         <mxCell id="s1c" value="nineteenseventytwo-CLOUD   ·   lint.yml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;arcSize=10;" vertex="1" parent="1">
-          <mxGeometry x="320" y="240" width="340" height="26" as="geometry" />
+          <mxGeometry x="320" y="260" width="340" height="26" as="geometry" />
         </mxCell>
         <mxCell id="s1d" value="terraform   fmt is canonical (lint-fmt)&#10;            every stack AND module validates&#10;            pinned: terraform 1.15.8&#10;tflint      provider-aware linting&#10;policies    every policy document is valid JSON&#10;            jq -e . config/aws.json&#10;yaml/shell  yamllint · shellcheck" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="320" y="272" width="340" height="130" as="geometry" />
+          <mxGeometry x="320" y="292" width="340" height="130" as="geometry" />
         </mxCell>
 
         <mxCell id="s1e" value="WHY LINT THE POLICY JSON&#10;An SCP with a typo'd Action is valid JSON,&#10;applies cleanly, and enforces nothing. The&#10;lint is the only thing between &quot;committed&quot;&#10;and &quot;believed to be enforcing&quot;." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f2ff;strokeColor=#6c8ebf;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="320" y="420" width="340" height="100" as="geometry" />
+          <mxGeometry x="320" y="440" width="340" height="100" as="geometry" />
         </mxCell>
 
         <!-- ===== STAGE 2 ===== -->
-        <mxCell id="s2a" value="CHECKOV   bridgecrewio/checkov-action@v12&#10;framework: terraform + github_actions&#10;&#10;&quot;Advisory-with-teeth&quot;: hard-fail on the checks&#10;that map to a control this landing zone actually&#10;CLAIMS to enforce; skip the ones that are wrong&#10;for a five-account homelab — each with a reason." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="680" y="60" width="340" height="130" as="geometry" />
+        <mxCell id="s2a" value="CHECKOV   bridgecrewio/checkov-action@v12&#10;platform: kubernetes + dockerfile + github_actions&#10;cloud:    terraform + github_actions&#10;&#10;SARIF → code scanning; a NEW alert in changed code&#10;fails the PR&#x27;s Checkov check. Skips live next to the&#10;resource (checkov.io/skipN annotations, .checkov.yaml),&#10;each with its reason — e.g. CPU limits from the&#10;LimitRange (ADR-0016)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="680" y="60" width="340" height="150" as="geometry" />
         </mxCell>
         <mxCell id="s2b" value="&quot;A skip with no reason is a finding you have&#10;decided not to look at.&quot;&#10;&#10;Every skip-check entry in .checkov.yaml carries&#10;its justification inline — e.g. CKV_AWS_18 (S3&#10;access logging) is skipped because logging the&#10;state and log buckets needs a further bucket,&#10;which would itself need logging; CloudTrail data&#10;events already cover the buckets that matter." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="680" y="200" width="340" height="155" as="geometry" />
+          <mxGeometry x="680" y="220" width="340" height="155" as="geometry" />
         </mxCell>
-        <mxCell id="s2c" value="TRIVY   aquasecurity/trivy-action@v0.36.0&#10;scan-type: fs&#10;scanners: secret, misconfig&#10;&#10;Catches a committed credential and a vulnerable&#10;pin in the same pass." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="680" y="370" width="340" height="105" as="geometry" />
+        <mxCell id="s2c" value="TRIVY   aquasecurity/trivy-action@v0.36.0&#10;1. secret scan, EVERY severity, BLOCKING — first step&#10;   of each repo&#x27;s REQUIRED job (ADR-0019): the repos&#10;   stay public, so a committed key is public at once&#10;2. fs scan (secret, vuln, misconfig) → SARIF, advisory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="680" y="390" width="340" height="105" as="geometry" />
         </mxCell>
         <mxCell id="s2d" value="→ SARIF → github/codeql-action/upload-sarif@v4&#10;      if: always()&#10;&#10;permissions: security-events: write&#10;Findings land in the repo's Code Scanning tab —&#10;reviewable in the PR, and a record that persists&#10;after the run log expires.&#10;&#10;if: always() matters — a failing scan still has&#10;to publish what it found." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="680" y="490" width="340" height="160" as="geometry" />
+          <mxGeometry x="680" y="505" width="340" height="150" as="geometry" />
         </mxCell>
 
         <!-- ===== STAGE 3 ===== -->
@@ -83,7 +83,7 @@
         <mxCell id="s3c" value="ROLLOUT FLAGS ARE A REVIEWABLE DIFF&#10;No .tfvars, no -var passthrough. The committed&#10;config is the only variable source (ADR-0004),&#10;so turning on create_jwks_bucket or&#10;publish_cluster_oidc is a one-line PR — not&#10;something typed at a terminal and forgotten.&#10;&#10;Terraform enforces the ORDERING between those&#10;two with a variable validation rather than&#10;trusting you to remember it." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e6ff;strokeColor=#9673a6;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1040" y="320" width="330" height="165" as="geometry" />
         </mxCell>
-        <mxCell id="s3d" value="BRANCH PROTECTION ON main&#10;so `push` triggers cannot come from a fork&#10;&#10;Settings → Actions → Require approval for&#10;all external contributors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="s3d" value="RULESETS ON main&#10;required checks (above) · signed commits · PRs&#10;so `push` triggers cannot come from a fork&#10;&#10;Settings → Actions → Require approval for&#10;all external contributors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1040" y="500" width="330" height="95" as="geometry" />
         </mxCell>
 
@@ -120,7 +120,7 @@
         <mxCell id="adr3" value="THE WEAKNESS, STATED&#10;&#10;&quot;This must be enforced per workflow, in every&#10;workflow, forever. It is a CONVENTION, NOT A&#10;CONTROL — one runs-on: self-hosted in a&#10;pull_request job reopens the hole silently.&#10;That is the weakness of this decision and the&#10;reason it is written down.&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="885" y="720" width="410" height="140" as="geometry" />
         </mxCell>
-        <mxCell id="adr4" value="BELT AND BRACES&#10;&#10;· Require approval for all external&#10;   contributors (secondary — approval fatigue&#10;   is a documented failure mode, so it is not&#10;   the primary control)&#10;· Branch protection on main&#10;· Deployment jobs must not be triggerable by&#10;   pull_request AT ALL&#10;· This repo is unaffected — it is private&#10;   (ADR-0002), so the path does not exist here" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="adr4" value="BELT AND BRACES&#10;&#10;· Require approval for all external&#10;   contributors (secondary — approval fatigue&#10;   is a documented failure mode, so it is not&#10;   the primary control)&#10;· Rulesets on main; deployment jobs never&#10;   triggerable by pull_request at all&#10;· EVERY repo is public now (ADR-0013, -0019),&#10;   this one included — the rule applies here too" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1310" y="720" width="435" height="140" as="geometry" />
         </mxCell>
 
@@ -129,7 +129,7 @@
           <mxGeometry x="20" y="895" width="1740" height="270" as="geometry" />
         </mxCell>
 
-        <mxCell id="rt1" value="SERVICE CONTROL POLICIES   (org root)&#10;&#10;deny-iam-users-and-keys&#10;   makes &quot;there is no long-lived key to leak&quot;&#10;   TRUE rather than aspirational — it is what&#10;   guarantees the only three credential paths&#10;   are SSO, GitHub OIDC and cluster OIDC&#10;deny-root-actions&#10;deny-leave-organization&#10;deny-regions-outside-allowlist&#10;deny-expensive-resources&#10;deny-security-service-tampering&#10;   nobody turns off GuardDuty or the trail&#10;sandbox-extra-restrictions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="rt1" value="SERVICE CONTROL POLICIES   (org root)&#10;&#10;deny-iam-users-and-keys&#10;   no long-lived key exists to leak: the only&#10;   paths are SSO, GitHub OIDC and cluster OIDC&#10;deny-root-actions · deny-leave-organization&#10;deny-security-service-tampering&#10;deny-regions-outside-allowlist   } root since&#10;deny-expensive-resources         } 2026-10-27,&#10;   on 90 days of CloudTrail evidence (cloud #42)&#10;sandbox-extra-restrictions (sandbox only)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="35" y="925" width="410" height="225" as="geometry" />
         </mxCell>
 
@@ -137,7 +137,7 @@
           <mxGeometry x="460" y="925" width="410" height="225" as="geometry" />
         </mxCell>
 
-        <mxCell id="rt3" value="IN THE CLUSTER&#10;&#10;policy/ at sync wave 95&#10;   default-deny NetworkPolicy in every&#10;   namespace, applied BEFORE any tenant&#10;   workload exists at wave 100&#10;LimitRange defaults&#10;&#10;Ansible asserts, not comments:&#10;   kube_prereqs asserts on cgroups&#10;   kube_control_plane asserts the OIDC issuer&#10;   matches before it will run kubeadm init —&#10;   getting it wrong means rebuilding the&#10;   control plane, so it refuses instead" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="rt3" value="IN THE CLUSTER&#10;&#10;policy/ at wave 95: namespaces + Pod Security&#10;   Admission labels, default-deny, LimitRange,&#10;   quota — before tenant apps at 100&#10;Falco: runtime, every node, → Slack&#10;Kubescape: nightly gate vs an accepted list&#10;Trivy: weekly scan of every running image&#10;&#10;Ansible asserts, not comments: kube_prereqs&#10;   on cgroups; kube_control_plane on the OIDC&#10;   issuer before kubeadm init — wrong means a&#10;   control-plane rebuild, so it refuses" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="885" y="925" width="410" height="225" as="geometry" />
         </mxCell>
 

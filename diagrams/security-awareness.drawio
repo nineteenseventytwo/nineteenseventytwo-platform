@@ -1,11 +1,11 @@
-<mxfile host="app.diagrams.net" modified="2026-08-25T07:20:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-10-28T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
   <diagram name="Security Awareness" id="security-awareness-1">
-    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1180" math="0" shadow="0">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1480" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="Security awareness — what generates a signal, where it lands, and what actually wakes someone up" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="title" value="Security awareness — what generates a signal, where it lands, and what actually wakes someone up  (updated 2026-10-28)" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="20" y="-30" width="1200" height="30" as="geometry" />
         </mxCell>
 
@@ -47,7 +47,7 @@
           <mxGeometry x="48" y="228" width="234" height="26" as="geometry" />
         </mxCell>
 
-        <mxCell id="srcCluster" value="THE PI CLUSTER&#10;on-prem kubeadm, VLAN 20&#10;· Prowler CronJob (security ns)&#10;   — not deployed yet;&#10;     enable_prowler_role stays off&#10;     until the CronJob exists&#10;· reaches AWS only via IRSA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="srcCluster" value="THE PI CLUSTER&#10;on-prem kubeadm, VLAN 20&#10;watched in-cluster since Phase 10:&#10;see band 5 below&#10;· reaches AWS only via IRSA&#10;  (pod-identity-webhook)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="35" y="300" width="260" height="115" as="geometry" />
         </mxCell>
 
@@ -75,11 +75,11 @@
           <mxGeometry x="345" y="195" width="480" height="150" as="geometry" />
         </mxCell>
 
-        <mxCell id="d3" value="IAM ACCESS ANALYZER — type: ORGANIZATION&#10;What in any account can be reached from OUTSIDE the&#10;org. Organisation-scoped, so it sees across account&#10;boundaries — exactly where an over-broad bucket or&#10;role trust policy hides." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="d3" value="IAM ACCESS ANALYZER — type: ORGANIZATION&#10;What in any account can be reached from OUTSIDE the org.&#10;Archive rules (2026-10-27) file what is external by design —&#10;Identity Center roles, the JWKS bucket — so ACTIVE is only&#10;the 15 OIDC roles; a new outside trust is a 16th." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="345" y="355" width="480" height="95" as="geometry" />
         </mxCell>
 
-        <mxCell id="d4" value="PROWLER — CIS posture, on a schedule, in JSON&#10;Runs elsewhere (cluster CronJob or a GitHub Actions&#10;job) and writes ACROSS an account boundary into the&#10;security account. Either way no stored credential.&#10;Bucket policy is scoped to findings/ so the scanner's&#10;credential is not also a general-purpose upload path." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="d4" value="PROWLER — CIS + AWS FSBP, daily 05:00, in OCSF JSON&#10;GitHub Actions (cloud repo prowler.yml) as gha-prowler,&#10;GitHub OIDC, aws-audit environment — no stored credential.&#10;Left the cluster 2026-10-26: a scan peaked at 650-840Mi.&#10;Writes ACROSS the account boundary into findings/ only;&#10;console output kept out of the public repo&#x27;s logs." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="345" y="460" width="480" height="110" as="geometry" />
         </mxCell>
 
@@ -112,7 +112,7 @@
           <mxGeometry x="1200" y="40" width="400" height="20" as="geometry" />
         </mxCell>
 
-        <mxCell id="al1" value="EVENTBRIDGE RULES&#10;· {org}-root-sign-in&#10;· {org}-break-glass-assumed&#10;&#10;⚠  BOTH IN us-east-1, ON PURPOSE.&#10;Console sign-in events — including root —&#10;are delivered to EventBridge only in&#10;us-east-1, whatever region the sign-in&#10;appears to come from. A rule in eu-west-2&#10;looks correct, costs nothing, and&#10;NEVER FIRES." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+        <mxCell id="al1" value="EVENTBRIDGE RULES&#10;· {org}-root-sign-in&#10;· {org}-break-glass-assumed&#10;· {org}-org-access-role-assumed&#10;   (OrganizationAccountAccessRole: admin in mgmt is&#10;   admin everywhere — ADR-0007, asset-graph 0001)&#10;&#10;⚠  SIGN-IN RULES IN us-east-1, ON PURPOSE: console&#10;sign-in events reach EventBridge only there." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
           <mxGeometry x="1205" y="65" width="540" height="165" as="geometry" />
         </mxCell>
 
@@ -136,7 +136,7 @@
         <mxCell id="fe1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="acctBox" target="d1"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="acctBox" target="d2"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;" edge="1" parent="1" source="acctBox" target="d3"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="fe4" value="IRSA — cluster-prowler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=9;" edge="1" parent="1" source="srcCluster" target="d4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe4" value="GitHub OIDC — gha-prowler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=9;" edge="1" parent="1" source="ghActions" target="d4"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="d1" target="e1"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="d4" target="e2"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="fe7" value="sign-in event" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="srcSignIn" target="al1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="475" /><mxPoint x="1180" y="147" /></Array></mxGeometry></mxCell>
@@ -147,29 +147,64 @@
 
         <!-- Bottom: gaps -->
         <mxCell id="gapBox" value="KNOWN GAPS — written down rather than left to be discovered" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;align=left;fontStyle=1;fontSize=12;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="690" width="1740" height="150" as="geometry" />
+          <mxGeometry x="20" y="990" width="1740" height="150" as="geometry" />
         </mxCell>
-        <mxCell id="g1" value="Prowler is not deployed.&#10;enable_prowler_role stays off&#10;until the CronJob and its&#10;`security` namespace exist.&#10;The bucket and the role are&#10;ready; nothing writes to them." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="35" y="720" width="330" height="105" as="geometry" />
+        <mxCell id="g1" value="CLOSED 2026-10-26&#10;Prowler runs daily on GitHub&#10;Actions (gha-prowler) and writes&#10;to the findings bucket; its&#10;counts are on the Findings&#10;dashboard (band 5)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
         <mxCell id="g2" value="GuardDuty findings have no&#10;notification route.&#10;The detector is on and&#10;org-wide, but findings sit in&#10;the console. Only root sign-in&#10;and break-glass reach SNS." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="380" y="720" width="330" height="105" as="geometry" />
+          <mxGeometry x="380" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
         <mxCell id="g3" value="The email subscription is&#10;only real once confirmed.&#10;Until someone clicks the link&#10;in the inbox, every alert&#10;above terminates in a&#10;PendingConfirmation topic." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="725" y="720" width="330" height="105" as="geometry" />
+          <mxGeometry x="725" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
-        <mxCell id="g4" value="Nothing watches the CLUSTER.&#10;GuardDuty cannot read an&#10;on-prem kubeadm control plane&#10;(EKS_AUDIT_LOGS is off because&#10;there is no EKS). Cluster audit&#10;logging is not centralised&#10;anywhere in this picture." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="1070" y="720" width="330" height="105" as="geometry" />
+        <mxCell id="g4" value="MOSTLY CLOSED 2026-10-27&#10;Falco (runtime) and the nightly&#10;Kubescape gate watch the cluster&#10;and alert into Slack (band 5).&#10;Still open: API-server audit&#10;logs are not centralised." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
-        <mxCell id="g5" value="No on-call, no escalation.&#10;Every path above ends at one&#10;mailbox. That is proportionate&#10;for a homelab and worth&#10;stating rather than implying&#10;a rota that does not exist." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="1415" y="720" width="330" height="105" as="geometry" />
+        <mxCell id="g5" value="No on-call, no escalation.&#10;AWS paths end at one mailbox,&#10;cluster paths at one Slack&#10;channel. Proportionate for a&#10;homelab, and stated rather than&#10;implying a rota." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;arcSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="1415" y="1020" width="330" height="105" as="geometry" />
         </mxCell>
 
         <!-- Why delegated admin -->
         <mxCell id="whyBox" value="WHY THE SECURITY ACCOUNT, NOT THE MANAGEMENT ACCOUNT&#10;&#10;Every security service that supports it is administered from `security` — GuardDuty, Access Analyzer, and the CloudTrail organisation trail. The management account holds the keys to the organisation; giving it day-to-day operation of the detectors and the log archive as well means the account with the most power is also the account you sign into most often.&#10;&#10;Registration is a management-account action, which is why the delegation lives in the org-management stack — and why org-management must be applied BEFORE security. The security stack's GuardDuty organisation configuration fails with a BadRequestException if it has not run.&#10;&#10;CloudTrail's delegated administrator owns the trail, so the trail and its log bucket live in the same account. The alternative — a trail in mgmt writing to a bucket in security — works, but splits the thing being protected from the thing protecting it across an account boundary for no benefit." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;verticalAlign=top;align=left;fontSize=11;spacingLeft=10;spacingTop=8;spacingRight=10;" vertex="1" parent="1">
-          <mxGeometry x="20" y="860" width="1740" height="200" as="geometry" />
+          <mxGeometry x="20" y="1160" width="1740" height="200" as="geometry" />
         </mxCell>
 
+        <!-- Band 5: cluster and code (Phase 10, 2026-10) -->
+        <mxCell id="hdr5" value="5 — CLUSTER &amp; CODE  (07 Phase 10, 2026-10)  ·  everything here lands in Slack via Alertmanager, or on the Findings dashboard" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="20" y="680" width="1400" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ghActions" value="GITHUB ACTIONS (hosted runners)&#10;· prowler.yml, daily — AWS posture&#10;· image-vuln-scan.yml, weekly — Trivy&#10;  on every image the cluster runs&#10;· lint.yml, every PR — Checkov, Trivy&#10;  secret scan (BLOCKING, ADR-0019)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="710" width="260" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ghSec" value="GITHUB SECURITY TAB&#10;code-scanning alerts&#10;(Trivy images, Checkov)&#10;the detail view for both" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="840" width="260" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="falco" value="FALCO — runtime (10.1)&#10;DaemonSet, modern eBPF probe on every node.&#10;Watches syscalls: a shell in a container, a&#10;sensitive file read, a dropped binary.&#10;Warning+ → Falcosidekick → Alertmanager." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="345" y="710" width="240" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="kubescape" value="KUBESCAPE GATE — config (10.2)&#10;Nightly 03:30 NSA scan of the LIVE cluster,&#10;diffed against a reviewed accepted list&#10;(ADR-0017). Only NEW (control, resource)&#10;pairs alert. A broken scan fails its Job." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="595" y="710" width="240" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="alertmgr" value="ALERTMANAGER (monitoring)&#10;slack-alerts: everything by namespace&#10;slack-falco: Falco by rule, no RESOLVED&#10;+ KubeJobFailed, FindingsSourceDown,&#10;ProwlerReportStale" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="345" y="835" width="490" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="findings" value="FINDINGS EXPORTER → GRAFANA &#x27;Findings&#x27; (10.4)&#10;One view of five sources, as counts by&#10;source · severity · item · age:&#10;Falco, Kubescape (Alertmanager) · Trivy, Checkov&#10;(GitHub App, code-scanning read) · Prowler (newest&#10;report in S3, over IRSA). Detail stays at source." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="875" y="710" width="280" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="slack" value="SLACK — one channel&#10;where a human actually looks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="835" width="540" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="assetgraph" value="ASSET GRAPH — Steampipe (10.3)&#10;Ad-hoc SQL over all five accounts as SecurityAudit,&#10;run from a workstation. 0001: no role is assumable&#10;by anyone outside the org; every federated trust&#10;is Identity Center or pinned to one subject." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;arcSize=6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="710" width="540" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="fe12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;" edge="1" parent="1" source="falco" target="alertmgr"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;" edge="1" parent="1" source="kubescape" target="alertmgr"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=9;endArrow=block;" edge="1" parent="1" source="alertmgr" target="slack"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe15" value="Falco, Kubescape" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;" edge="1" parent="1" source="alertmgr" target="findings"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe16" value="Trivy, Checkov" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;" edge="1" parent="1" source="ghSec" target="findings"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe17" value="newest OCSF report" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=9;endArrow=block;" edge="1" parent="1" source="e2" target="findings"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="fe18" value="SARIF" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=9;endArrow=block;" edge="1" parent="1" source="ghActions" target="ghSec"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
