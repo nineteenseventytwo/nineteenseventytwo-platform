@@ -17,10 +17,10 @@ Argo CD. See [the boundary rule](#the-boundary-rule).
 
 | Host | Model | RAM | Address | Role |
 |---|---|---|---|---|
-| `1972-console-1` | RPi 5 | 2 GB | `192.168.20.201` | Bootstrap node. Break-glass runner. **Not** in the cluster. |
-| `1972-master-1` | RPi 5 | 2 GB | `192.168.20.202` | Control plane |
-| `1972-worker-1` | RPi 5 | 2 GB | `192.168.20.203` | Worker (Longhorn replica) |
-| `1972-worker-2` | RPi 5 | 2 GB | `192.168.20.204` | Worker (Longhorn replica) |
+| `1972-console-1` | RPi 5 | 4 GB | `192.168.20.201` | Bootstrap node. Break-glass runner. **Not** in the cluster. |
+| `1972-master-1` | RPi 5 | 4 GB | `192.168.20.202` | Control plane |
+| `1972-worker-1` | RPi 5 | 4 GB | `192.168.20.203` | Worker (Longhorn replica) |
+| `1972-worker-2` | RPi 5 | 4 GB | `192.168.20.204` | Worker (Longhorn replica) |
 
 All four boards are now identical hardware. `1972-console-1` still stays out of
 the cluster deliberately — it builds the cluster, so putting it in creates a
@@ -28,8 +28,11 @@ circular dependency: a rebuild would need the cluster already running to run
 the runner that rebuilds it. That argument holds regardless of hardware. See
 [ADR-0007](docs/decisions/ADR-0007-console-outside-cluster.md).
 
-The x86 GPU PC is **not** in scope for this repo yet — see
-[ADR-0011](docs/decisions/ADR-0011-arm64-only.md).
+The x86 GPU PC (`1972-gpu-1`, `192.168.20.210`) is **not** a cluster node
+([ADR-0011](docs/decisions/ADR-0011-arm64-only.md)). It serves composer's
+inference — Ollama behind a path-allowlisting Caddy, reachable only from the
+nodes — and, booted into Windows, runs midi against the physical MIDI device.
+See [ADR-0020](docs/decisions/ADR-0020-composer-inference-off-cluster.md).
 
 ---
 
@@ -81,17 +84,37 @@ After step 6 there is no more `helm install` from a laptop. Argo CD reconciles
 
 ---
 
+## What runs
+
+Everything below is declared here and reconciled by Argo CD, in the order shown
+in [`diagrams/argocd.drawio`](diagrams/argocd.drawio). The whole picture — the
+lab, GitHub, AWS, Cloudflare and what talks to what — is
+[`diagrams/architecture.drawio`](diagrams/architecture.drawio).
+
+| Group | Components |
+|---|---|
+| Platform | Cilium (CNI, kube-proxy replacement, WireGuard, Gateway API on `.241`, Hubble) · MetalLB · cert-manager · kubelet-csr-approver · Longhorn · Argo CD · ARC runner scale sets |
+| Identity & secrets | Vault (KMS auto-unseal, SSH CA) · External Secrets · pod-identity-webhook (IRSA on a non-EKS cluster) |
+| Guardrails | `policy/`: namespaces and Pod Security labels, default-deny everywhere, LimitRange, quota, RBAC |
+| Observe & detect | kube-prometheus-stack (Prometheus, Alertmanager → Slack, Grafana) · Falco · the nightly Kubescape gate · the findings exporter and `Findings` dashboard — see [docs/08-security.md](docs/08-security.md) |
+| Edge | cloudflared, the tunnel behind Cloudflare Access for private hostnames ([ADR-0021](docs/decisions/ADR-0021-private-hostnames-tunnel-only.md)) · dash, the status page it serves |
+| Applications | eightbitsaxlounge (prod, dev) · composer (dev), under `apps/` |
+
+---
+
 ## Layout
 
 ```
 bootstrap/   pre-Ansible. Run by hand, exactly once per node.
 ansible/     node configuration. Roles + inventory + playbooks.
-images/      ansible-runner and gha-runner container images.
+images/      container images built here: ansible-runner, gha-runner, dash,
+             kubescape-gate, findings-exporter.
 cluster/     everything after `kubeadm init`. Helm values, reconciled by Argo CD.
 policy/      default-deny NetworkPolicies, PSS labels, per-tenant quota (guardrails).
 apps/        application workload manifests, reconciled by the same Argo CD instance.
 tests/       network and node validation, re-runnable after any firewall change.
 docs/        guides and decision records.
+diagrams/    draw.io: architecture, sync waves, access layers, detection, CI gates.
 ```
 
 ## The boundary rule
@@ -103,9 +126,9 @@ nothing about the cluster.
 
 | Owned here | Owned by app repos |
 |---|---|
-| CNI, MetalLB, ingress, cert-manager, Longhorn, monitoring, ARC, Vault, Argo CD | Build, test, and push the image to GHCR |
+| CNI, MetalLB, Gateway, cert-manager, Longhorn, monitoring, ARC, Vault, Argo CD, Falco, Kubescape, cloudflared | Build, test, and push the image to GHCR |
 | Namespaces, PSS labels, ResourceQuota, LimitRange, default-deny policy ([`policy/tenants/`](policy/tenants/)) | `CHANGELOG.md` / `version.txt` for their own image |
-| Deployments, Services, Ingresses, ExternalSecrets — everything that actually runs ([`apps/`](apps/)) | Nothing cluster-side. No kubeconfig, no `kubectl`, no deploy step. |
+| Deployments, Services, HTTPRoutes, ExternalSecrets — everything that actually runs ([`apps/`](apps/)) | Nothing cluster-side. No kubeconfig, no `kubectl`, no deploy step. |
 
 Adding an app, or a namespace for one, is a PR here — see
 [`policy/tenants/README.md`](policy/tenants/README.md) and
@@ -137,5 +160,7 @@ what it can reach, rotation cadence, blast radius — is
 | [04-secrets.md](docs/04-secrets.md) | Secret inventory and rotation |
 | [06-aws-federation.md](docs/06-aws-federation.md) | IRSA on kubeadm: the OIDC issuer, the JWKS bucket, Cloudflare, and the rollout order |
 | [07-runbooks.md](docs/07-runbooks.md) | Documented fixes for recurring incidents, starting with what an unclean reboot leaves behind |
+| [08-security.md](docs/08-security.md) | Every security control: what it looks at, when it runs, where its findings go |
+| [diagrams/](diagrams/) | Architecture, sync waves, access layers, detection, CI gates ([index](diagrams/README.md)) |
 | [decisions/](docs/decisions/) | ADRs |
 | [plan/](docs/plan/) | The originating plan this repo was built from |
