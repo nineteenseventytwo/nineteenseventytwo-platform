@@ -19,6 +19,52 @@ defaultRules:
     KubeMemoryOvercommit: true
     KubeCPUOvercommit: true
 
+# Node OS updates. unattended-upgrades installs security updates by itself and
+# never reboots; these say when a reboot is waiting, when it has stopped, and
+# when routine updates have piled up. Procedure: docs/07-runbooks.md.
+additionalPrometheusRulesMap:
+  node-updates:
+    groups:
+      - name: node-updates
+        rules:
+          - alert: NodeRebootRequired
+            expr: max by (instance) (node_reboot_required) == 1
+            for: 3d
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.instance }} has waited 3 days for a reboot"
+              description: "An installed kernel or library is not running yet. Drain, reboot, uncordon: docs/07-runbooks.md#applying-node-updates."
+          - alert: NodeSecurityUpdatesPending
+            expr: max by (instance) (node_apt_upgrades_pending{kind="security"}) > 0
+            for: 2d
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.instance }}: {{ $value }} security updates pending for 2 days"
+              description: "unattended-upgrades installs these daily, so it is failing or they are held. Check its log on the node."
+          - alert: NodeUnattendedUpgradesStale
+            expr: (time() - node_apt_unattended_upgrade_timestamp_seconds > 3 * 86400) and node_apt_unattended_upgrade_timestamp_seconds > 0
+            for: 1h
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.instance }}: unattended-upgrades has not run for 3 days"
+              description: "Security updates have stopped installing. systemctl status apt-daily-upgrade.timer on the node."
+          - alert: NodeUpdatesPending
+            expr: max by (instance) (node_apt_upgrades_pending{kind="all"} - ignoring(kind) node_apt_upgrades_pending{kind="security"}) > 0
+            for: 14d
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.instance }}: {{ $value }} routine updates waiting 2 weeks"
+              description: "Non-security updates are never installed unattended. Apply them node by node: docs/07-runbooks.md#applying-node-updates."
+          - alert: NodeAptMetricsMissing
+            expr: count by (instance) (node_uname_info) unless count by (instance) (node_apt_upgrades_pending{kind="all"})
+            for: 3h
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.instance }} is not reporting apt update state"
+              description: >-
+                The node-apt-metrics timer (ansible/roles/common) or node-exporter's
+                textfile collector is not working, so the update alerts cannot fire.
+
 prometheus:
   # Chart 90 moved the control-plane ServiceMonitors (kubelet, apiserver,
   # controller-manager, scheduler, etcd, coredns) from a token file on the
@@ -285,6 +331,13 @@ prometheus-node-exporter:
   resources:
     requests: {cpu: 25m, memory: 32Mi}
     limits: {memory: 64Mi}
+  # The chart's two filesystem excludes, restated (a list replaces, it does
+  # not merge), plus the textfile directory ansible/roles/common writes to.
+  extraArgs:
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    # yamllint disable-line rule:line-length
+    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+    - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile
 
 kubeStateMetrics:
   enabled: true

@@ -1,0 +1,41 @@
+#!/bin/sh
+# Managed by ansible/roles/common. Do not edit on the host.
+#
+# Writes package-update state for node-exporter's textfile collector, so
+# Prometheus can alert on it (cluster/monitoring/values.yaml, node-updates).
+# unattended-upgrades installs security updates on its own; what nothing else
+# reports is a reboot it is waiting for, or that it has stopped running.
+# Uses apt-get's own simulation (held packages excluded) and the apt periodic
+# stamps, so there is nothing to install.
+set -eu
+
+dir=/var/lib/node_exporter/textfile
+mkdir -p "$dir"
+tmp=$(mktemp "$dir/.apt.prom.XXXXXX")
+
+sim=$(LC_ALL=C apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep '^Inst ' || true)
+all=$(printf '%s\n' "$sim" | grep -c '^Inst ' || true)
+security=$(printf '%s\n' "$sim" | grep '^Inst ' | grep -c -- '-security' || true)
+
+reboot=0
+[ -f /var/run/reboot-required ] && reboot=1
+
+stamp() { stat -c %Y "$1" 2>/dev/null || echo 0; }
+
+cat > "$tmp" <<PROM
+# HELP node_apt_upgrades_pending Packages apt would upgrade now, held packages excluded.
+# TYPE node_apt_upgrades_pending gauge
+node_apt_upgrades_pending{kind="all"} ${all}
+node_apt_upgrades_pending{kind="security"} ${security}
+# HELP node_reboot_required 1 if /var/run/reboot-required exists (an installed kernel or library waits for a reboot).
+# TYPE node_reboot_required gauge
+node_reboot_required ${reboot}
+# HELP node_apt_update_success_timestamp_seconds Last successful apt list update (apt periodic stamp).
+# TYPE node_apt_update_success_timestamp_seconds gauge
+node_apt_update_success_timestamp_seconds $(stamp /var/lib/apt/periodic/update-success-stamp)
+# HELP node_apt_unattended_upgrade_timestamp_seconds Last unattended-upgrades run (apt periodic stamp).
+# TYPE node_apt_unattended_upgrade_timestamp_seconds gauge
+node_apt_unattended_upgrade_timestamp_seconds $(stamp /var/lib/apt/periodic/unattended-upgrades-stamp)
+PROM
+chmod 0644 "$tmp"
+mv "$tmp" "$dir/apt.prom"
