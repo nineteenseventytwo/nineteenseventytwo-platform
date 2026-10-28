@@ -100,3 +100,31 @@ valid across any number of toggles. Never delete an environment's directory
 from the ApplicationSet generator to "park" it — that prunes its PVCs along
 with everything else and costs a full re-authorisation of both Twitch
 accounts for that environment.
+
+## db and state run with a read-only root
+
+Both entrypoints write config into the image at every start. CouchDB writes
+`local.d/docker.ini` and `vm.args` under `/opt/couchdb/etc`. NATS renders
+`/etc/nats/nats.conf` from the template beside it. Under a read-only root both
+failed (confirmed 2026-09-08). Since 2026-10-27, an init container from the
+same image (`seed-etc`, `seed-config`) copies that directory into an emptyDir,
+which is mounted over it, so the writes land in the emptyDir. Nothing there
+needs to persist: `docker.ini` and `nats.conf` are regenerated from the
+environment, and `init-couchdb.sh` re-applies single-node setup on every start.
+
+Two things only a rollout found, both in dev first:
+
+- **`cp -R`, not `cp -a`.** `-a` also sets the times on `/seed` itself, which
+  is the emptyDir's root-owned mount point, and a non-root uid may not do
+  that: `preserving times for '/seed/.': Operation not permitted`. busybox's
+  `cp -a` in the NATS image tolerates it; coreutils' in CouchDB's does not.
+- **An Erlang cookie in `vm.args`.** With no `-setcookie`, the Erlang VM
+  creates `$HOME/.erlang.cookie`. `$HOME` is `/opt/couchdb`, on the read-only
+  root, so the VM died (`Failed to create cookie file … erofs`). `seed-etc`
+  appends a random cookie to the writable `vm.args`. It is a single node, so
+  nothing else needs to know the cookie, and a new one each start costs
+  nothing. db's NetworkPolicy admits only 5984, so the distribution ports are
+  unreachable anyway.
+
+chat's root is read-only too. Its token database is on the PVC, which stays
+writable, and `/tmp` is an emptyDir.

@@ -84,28 +84,15 @@ spec:
         # Kubescape C-0013 counts a container with no explicit non-root
         # group as possibly running as group 0 (ADR-0017, 2026-10-27).
         runAsGroup: 5984
-      # The entrypoint writes its runtime config into /opt/couchdb/etc at
-      # every start (local.d/docker.ini, and vm.args for NODENAME), which
-      # failed under a read-only root (confirmed 2026-09-08). seed-etc copies
-      # the image's etc into an emptyDir that is mounted over it, so those
-      # writes land in the emptyDir and the root can be read-only. Nothing
-      # there needs to persist: docker.ini is regenerated from the env and
-      # init-couchdb.sh re-applies single-node setup on every start.
+      # seed-etc copies /opt/couchdb/etc into an emptyDir mounted over it, so
+      # the entrypoint can write its config under a read-only root:
+      # ../README.md#db-and-state-run-with-a-read-only-root
       initContainers:
         - name: seed-etc
           image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-db@sha256:7be893b0f92023b859f014849763febcc26ab0bcd26ab6d5b96ccc9467ac018b
           imagePullPolicy: IfNotPresent
-          # cp -R, not -a: -a also sets the times on /seed itself, the
-          # emptyDir's root-owned mount point, and a non-root uid may not -
-          # "preserving times for '/seed/.': Operation not permitted", the
-          # first rollout. Contents only; their owner is this uid anyway.
-          #
-          # Then a cookie. With no -setcookie, Erlang creates
-          # $HOME/.erlang.cookie (/opt/couchdb, the read-only root) and the
-          # VM dies: "Failed to create cookie file ... erofs", the second
-          # rollout. A random cookie in vm.args, which is in the writable
-          # seeded etc, means it never tries. Single node: nothing else
-          # needs to know it, and a new one each start costs nothing.
+          # cp -R, not -a; and a random Erlang cookie in vm.args, or the VM
+          # tries to write $HOME/.erlang.cookie on the read-only root (see README).
           command:
             - sh
             - -c

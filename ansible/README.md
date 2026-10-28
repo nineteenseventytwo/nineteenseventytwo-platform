@@ -158,6 +158,18 @@ the private key stays out of the runner's reach entirely.
 
 ## Versions
 
+### Changing a live apiserver manifest
+
+`make apiserver-memlimit` (`30-cluster.yml`) applies `kubeadm-config.yaml.j2`'s
+`apiServer.extraEnvs` (GOMEMLIMIT) to an existing control plane, the same way
+`make etcd-metrics` applies its change. Regenerating the apiserver manifest
+re-renders every flag, not just the new environment variable, so a template
+that had drifted from the running apiserver would go live with it. So the
+play renders with `--dry-run` first and refuses unless the image, command and
+volumes are unchanged: the environment is the only thing allowed to differ.
+The kubelet then restarts the apiserver. The API is down for 30-60 seconds,
+while workloads keep running. Pick a quiet moment, not mid-deploy.
+
 ### etcd is pinned because kubeadm's version map lags the release
 
 kubeadm's `SupportedEtcdVersion` map holds at most three minors and is often not
@@ -194,6 +206,22 @@ the live cluster is `cluster/cilium/values.yaml`'s own `kubeProxyReplacement`.
 It is kept in sync here so a from-scratch rebuild starts in the same mode instead
 of needing the migration (`make remove-kube-proxy`) re-run on a brand new
 cluster.
+
+## Egress proxy
+
+### The egress proxy is on the image-pull path
+
+`egress_proxy_enabled` points three separate configs at Squid on OPNsense: the
+shell environment and the docker daemon (the `docker` role, on the console and
+the GPU host) and containerd (`kube_prereqs`, on the cluster nodes). Miss one
+and you get a different confusing symptom each time
+([docs/01-network-validation.md](../docs/01-network-validation.md)).
+
+Since 07 Phase 6.4 Squid is log-only: it allows VLAN 20 to anything and
+records it. Phase 7 adds the allowlist on the Squid side, and nothing here
+changes. But Squid is now on the image-pull path: if it is down, containerd
+and docker pulls fail, while running pods carry on. Pod traffic never goes
+through it at all; `policy/12-egress-observe.yaml` is how that is observed.
 
 ## Inventory
 

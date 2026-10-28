@@ -308,6 +308,44 @@ the wrong tool wastes the time all three of these already cost:
 
 ## Monitoring
 
+### The overcommit alerts are off
+
+`KubeMemoryOvercommit` and `KubeCPUOvercommit` ask "would every pod still fit
+if the biggest node died?" Their HA branch is OR'd in, so the question is
+asked of this single-control-plane cluster too. With two 3.3Gi workers the
+answer is no, and stays no: honest requests (#220) add up to more than one
+worker holds, and only a third worker changes that. An alert that fires
+forever is noise. What it would stand in for is covered: a pod that cannot be
+placed fires `KubePodNotReady` (the Argo CD controller sat Pending on
+2026-10-24), and a node running short fires node-exporter's memory alerts
+(worker-2's `NodeMemoryMajorPagesFaults`, the same day). Re-enable them with a
+third worker.
+
+### The Prometheus token Secret is kept
+
+Chart 90 moved the control-plane ServiceMonitors (kubelet, apiserver,
+controller-manager, scheduler, etcd, coredns) from a token file on the
+scraper's filesystem to a token in a Secret, because a ServiceMonitor can only
+reference credentials that way. Kubernetes no longer creates such a Secret, so
+the chart does: a `kubernetes.io/service-account-token` for Prometheus's
+ServiceAccount, which does not expire. It is kept deliberately
+(`prometheus.serviceAccount.createTokenSecret: true`). Supplying our own Secret
+would be the same long-lived credential under a different name. It can do what
+Prometheus's ClusterRole allows, reading nodes, their metrics endpoints,
+services, endpoints and pods, and only someone who can read Secrets in
+`monitoring` can read it. It is in the secret inventory
+(`docs/04-secrets.md`).
+
+### Falco alerts have their own Slack route
+
+Falcosidekick's alerts have no `alertname` or `namespace` label, and they
+carry per-event labels (`evt_time`, `container_id`). Under the default route
+they posted as `FIRING: ` with an empty title, and posted again as RESOLVED
+when they expired fifteen minutes later. The `slack-falco` route groups them
+by rule and namespace instead, with a template that reads Falco's own labels
+and no resolved message. It uses the same channel, so findings still land in
+one place.
+
 ### Alertmanager holds a token that grants nothing
 
 The second of the two genuine Kubescape C-0034 findings, and the one that
@@ -435,3 +473,39 @@ kubectl -n argocd get application monitoring \
 If it is still `Running` well past that, then it is the build-0003 case and a
 controller restart is the documented fix — `argocd.argoproj.io/refresh=hard`
 and an `.operation` reset were both established there not to clear it.
+
+## Kubescape
+
+### Both versions are pinned, and a bump means a new snapshot
+
+The CronJob pins the Kubescape CLI image and, with `--controls-version`, the
+control library. Unpinned, Kubescape downloads the newest library on every run,
+and a control that changed upstream reads as a regression in the cluster.
+Bumping either one means re-running the scan and re-snapshotting
+`kubescape/00-accepted.yaml` in the same PR.
+
+### Read-only, local, and no host scan
+
+The ServiceAccount is bound to `view` plus a few cluster-scoped reads
+(`policy/43-kubescape.yaml`): no Secrets, no writes. Results stay in the
+cluster (`--keep-local`). Host scanning is off: it deploys a privileged
+DaemonSet, and watching the hosts is Falco's job here, not a nightly scan's.
+`backoffLimit: 0`, because a retry would only hide a broken scan until the
+next night.
+
+## cloudflared
+
+### Changing the ingress list needs a pod restart
+
+ESO re-renders the Secret as soon as Argo applies the changed spec (a change
+made only in Vault waits for `refreshInterval`), but cloudflared reads its
+config only at startup. Once the Secret has updated, delete the pod:
+`kubectl -n cloudflared delete pod -l app.kubernetes.io/name=cloudflared`. The
+ReplicaSet replaces it, and nothing Argo manages changes, so selfHeal has
+nothing to fight.
+
+### Why one Vault entry holds four values
+
+Only `credentials_json` is secret. Keeping the tunnel ID, the Access team name
+and the AUD tag with it means one Vault write sets the tunnel up, and none of
+the IDs ever has to be re-derived from the Cloudflare dashboard.
