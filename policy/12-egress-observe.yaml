@@ -1,33 +1,13 @@
 ---
-# 07 Phase 6.4: observe pod egress, do not enforce it.
-#
-# The host proxy configs (egress_proxy_enabled) cover apt, docker and
-# containerd image pulls on the nodes. They do not cover pods. Pod traffic is
-# masqueraded to the node IP and leaves straight through OPNsense, so a Squid
-# log never sees it. Pods are where the 0.0.0.0/0 egress rules in
-# 10-default-deny.yaml are, so pods are what Phase 7's allowlist most needs to
-# know about.
-#
-# This policy sends every pod's DNS through Cilium's DNS proxy, which is what
-# makes the names visible: Hubble records each query, and its `dns` metric
-# (cluster/cilium/values.yaml) carries the query name and source namespace into
-# Prometheus. tests/egress-observed.sh prints the list.
-#
-# enableDefaultDeny false on both sides: selecting a pod here must not put it
-# into default-deny, which a plain egress rule would. The policy only allows,
-# and only DNS to kube-dns.
-#
-# It does widen one thing. A namespace that allows DNS only for some of its
-# pods (dash, cloudflared) now allows it for all of them. Every pod in those
-# namespaces needs DNS anyway. Excluded:
-#   default, security  default-deny with no DNS allow at all, on purpose
-#   kube-system        CoreDNS forwards upstream on its own rule, not through
-#                      kube-dns, so there is nothing to observe; keeping the
-#                      proxy out of the system namespace keeps a DNS proxy
-#                      fault from reaching CoreDNS and hubble-relay
-#
-# Phase 7 replaces this with enforcing toFQDNs rules per namespace, built from
-# what this observed. Delete it then.
+# 07 Phase 6.4: observe pod egress, do not enforce it. Pod traffic never goes
+# through the nodes' Squid proxy, so this sends every pod's DNS through
+# Cilium's DNS proxy instead: Hubble's `dns` metric records each name by
+# namespace, and tests/egress-observed.sh lists them.
+# enableDefaultDeny false: it only allows, and only DNS to kube-dns, so
+# selecting a pod never puts it into default-deny.
+# Excluded: default and security (no DNS, on purpose) and kube-system.
+# What it widens, and why those three: README.md#observing-pod-dns
+# Phase 7 replaces it with per-namespace toFQDNs rules. Delete it then.
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:

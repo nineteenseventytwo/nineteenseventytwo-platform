@@ -5,15 +5,8 @@
 # The heaviest thing in the cluster by some distance. Everything below is
 # trimmed for 2 GB nodes; the defaults will OOM a worker.
 
-# KubeMemoryOvercommit / KubeCPUOvercommit ask "would every pod still fit if
-# the biggest node died?" - and their HA branch is OR'd in, so it is asked of
-# this single-control-plane cluster too. With two 3.3Gi workers the answer is
-# no and stays no: honest requests (#220) sum to more than one worker holds,
-# and only a third worker changes that. Firing forever is noise, not signal.
-# What it would stand in for is covered: a pod that cannot be placed fires
-# KubePodNotReady (the Argo CD controller sat Pending on 2026-10-24), and a
-# node running short fires node-exporter's memory alerts (worker-2's
-# NodeMemoryMajorPagesFaults, same day). Re-enable with a third worker.
+# Off until a third worker: with two, the answer is always "no", so they only
+# ever fired. Why, and what covers them: ../README.md#the-overcommit-alerts-are-off
 defaultRules:
   disabled:
     KubeMemoryOvercommit: true
@@ -66,18 +59,8 @@ additionalPrometheusRulesMap:
                 textfile collector is not working, so the update alerts cannot fire.
 
 prometheus:
-  # Chart 90 moved the control-plane ServiceMonitors (kubelet, apiserver,
-  # controller-manager, scheduler, etcd, coredns) from a token file on the
-  # scraper's filesystem to a token in a Secret, because a ServiceMonitor can
-  # only reference credentials that way. Kubernetes no longer creates such a
-  # Secret, so the chart does: a kubernetes.io/service-account-token for
-  # Prometheus's ServiceAccount, which does not expire.
-  #
-  # Kept, deliberately: supplying our own Secret would be the same long-lived
-  # credential under a different name. What it can do is what Prometheus's
-  # ClusterRole allows - read nodes, their metrics endpoints, services,
-  # endpoints and pods - and it is readable only by whoever can read Secrets
-  # in monitoring. Stated rather than left as the chart's default.
+  # A non-expiring token Secret for the control-plane ServiceMonitors (chart
+  # 90+), kept deliberately: ../README.md#the-prometheus-token-secret-is-kept
   serviceAccount:
     createTokenSecret: true
   prometheusSpec:
@@ -201,13 +184,8 @@ alertmanager:
         - receiver: "null"
           matchers:
             - alertname =~ "Watchdog|InfoInhibitor"
-        # Falco (07 Phase 10.1), via Falcosidekick. Its alerts have no
-        # alertname or namespace label and carry per-event labels (evt_time,
-        # container_id), so under the default route they post as "FIRING: "
-        # with an empty title, and again as RESOLVED when they expire 15
-        # minutes later. Grouped by rule and namespace instead, with a
-        # template that reads Falco's own labels. Same Slack channel: one
-        # place findings land.
+        # Falco, via Falcosidekick: its own grouping and template, same
+        # channel. Why: ../README.md#falco-alerts-have-their-own-slack-route
         - receiver: slack-falco
           matchers:
             - source = "falco"

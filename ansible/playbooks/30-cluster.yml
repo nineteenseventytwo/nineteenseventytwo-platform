@@ -362,15 +362,9 @@
           changed_when: true
 
 # Applies kubeadm-config.yaml.j2's apiServer.extraEnvs (GOMEMLIMIT) to an
-# EXISTING control plane - same shape, and same reason, as etcd-metrics above.
-# `never`-tagged: run it explicitly with `make apiserver-memlimit`.
-#
-# Regenerating the apiserver manifest re-renders every flag, not just the new
-# env var, so a template that has drifted from the running apiserver would go
-# live with it. Rendered with --dry-run first; refuses unless the image,
-# command and volumes are unchanged - the env is the only thing allowed to
-# differ. The kubelet then restarts the apiserver: the API is down for
-# ~30-60s (workloads keep running). Pick a quiet moment, not mid-deploy.
+# EXISTING control plane; `never`-tagged, run with `make apiserver-memlimit`.
+# The API is down ~30-60s. Why it dry-runs and refuses on drift:
+# ../README.md#changing-a-live-apiserver-manifest
 - name: Cap the apiserver's Go heap (GOMEMLIMIT)
   hosts: control_plane
   gather_facts: true

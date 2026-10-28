@@ -100,15 +100,9 @@ kubernetes_apiserver_extra_sans:
 cilium_kube_proxy_replacement: true
 
 # ---------------------------------------------------------------------------
-# Egress proxy: Squid on OPNsense. On since 07 Phase 6.4 in log-only mode:
-# Squid allows VLAN 20 to anything and logs it, so this observes, it does not
-# enforce. Phase 7 adds the allowlist on the Squid side; nothing here changes.
-# Three separate configs: shell env and the docker daemon (`docker` role, on
-# cicd and gpu), and containerd (`kube_prereqs`, on the cluster nodes).
-#
-# Squid is now on the image-pull path. If it is down, containerd and docker
-# pulls fail and running pods do not. Pod traffic never goes through it: see
-# policy/12-egress-observe.yaml for how that is observed.
+# Egress proxy: Squid on OPNsense, log-only since 07 Phase 6.4 (it allows
+# everything and records it). On the image-pull path:
+# ../../../../README.md#the-egress-proxy-is-on-the-image-pull-path
 # ---------------------------------------------------------------------------
 egress_proxy_enabled: true
 egress_proxy_url: "http://192.168.20.1:3128"

@@ -44,3 +44,37 @@ it audits AWS, not the cluster - so it moved to a daily GitHub Actions job in
 `nineteenseventytwo-cloud` (`.github/workflows/prowler.yml`), with its mutelist
 and the hard-won notes on its flags (`prowler/README.md` there). The `security`
 namespace stays for `41-ci-image-inventory.yaml`.
+
+## Observing pod DNS
+
+`12-egress-observe.yaml` exists because the nodes' egress proxy
+(`egress_proxy_enabled`) covers apt, docker and containerd image pulls, not
+pods. Pod traffic is masqueraded to the node IP and leaves straight through
+OPNsense, so a Squid log never sees it, and pods are where the `0.0.0.0/0`
+egress rules in `10-default-deny.yaml` are.
+
+**What it widens.** A namespace that allowed DNS only for some of its pods
+(dash, cloudflared) now allows it for all of them. Every pod in those
+namespaces needs DNS anyway.
+
+**Why three namespaces are excluded.** `default` and `security` are
+default-deny with no DNS allow at all, on purpose. `kube-system`'s CoreDNS
+forwards upstream on its own rule, not through kube-dns, so there is nothing
+to observe, and keeping the proxy out of that namespace keeps a DNS-proxy
+fault away from CoreDNS and hubble-relay.
+
+**It only worked from 2026-10-27.** Hubble's metrics port (9965) was allowed
+in the pod-network policy but not in the nodes' ufw, so every scrape was
+dropped for the first two days (#254).
+
+## Grafana could not reach its datasources for two months
+
+`allow-grafana-datasources-egress` and `allow-datasources-from-grafana` in
+`10-default-deny.yaml` were added on 2026-10-27. Before that, nothing allowed
+Grafana's server-side queries to Prometheus or Alertmanager:
+`default-deny-all` had covered the `monitoring` namespace's egress since
+2026-08-23, and every Prometheus-backed panel had timed out since then
+(`dial tcp 10.99.53.71:9090: i/o timeout`). The dashboard sidecar kept
+working, because it talks to the API server, which `allow-monitoring-apiserver`
+covers. So dashboards appeared while every panel on them was empty. Nobody
+noticed until the Findings dashboard was the first thing anyone opened.

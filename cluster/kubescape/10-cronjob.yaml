@@ -1,23 +1,11 @@
 ---
 # Nightly Kubescape NSA scan, compared with the accepted list (07 Phase 10.2,
-# ADR-0017). Two steps in one pod, sharing an emptyDir:
-#
-#   1. scan (init container): Kubescape writes its JSON to /scan
-#   2. gate: images/kubescape-gate diffs it with 00-accepted.yaml and sends
-#      one Alertmanager alert per control with newly failing resources
-#
-# A scan that fails, or a gate that cannot run, fails the Job, and the
-# kube-prometheus KubeJobFailed alert fires instead (backoffLimit 0: a retry
-# would hide the failure until the next night anyway).
-#
-# Both versions are pinned. Kubescape would otherwise download the newest
-# control library on every run, and a changed control would read as a
-# regression in the cluster. Bumping either means re-snapshotting the list.
-#
-# Read-only: the ServiceAccount is bound to `view` plus a few cluster-scoped
-# reads (policy/43-kubescape.yaml). No Secrets. Results stay in the cluster
-# (--keep-local), and host scanning is off: it would deploy a privileged
-# DaemonSet, which is Falco's job here, not a nightly scan's.
+# ADR-0017). One pod, two steps sharing an emptyDir: the `scan` init container
+# writes Kubescape's JSON to /scan; `gate` (images/kubescape-gate) diffs it
+# with 00-accepted.yaml and alerts once per control with new failures. A
+# failed scan or gate fails the Job, so KubeJobFailed fires instead.
+# Read-only RBAC (policy/43-kubescape.yaml); why both versions are pinned and
+# why host scanning is off: ../README.md#kubescape
 apiVersion: batch/v1
 kind: CronJob
 metadata:
