@@ -30,6 +30,9 @@ spec:
         app.kubernetes.io/name: findings-exporter
     spec:
       serviceAccountName: findings-exporter
+      # No Kubernetes API calls. The AWS token is the webhook's own projected
+      # volume (aws-iam-token), not this one.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
