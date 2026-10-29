@@ -303,6 +303,7 @@ data:
     C-0270 external-secrets/Deployment/external-secrets-webhook
     C-0270 falco/DaemonSet/falco
     C-0270 falco/Deployment/falco-falcosidekick
+    C-0270 findings/Deployment/findings-exporter
     C-0270 kube-system/DaemonSet/cilium
     C-0270 kube-system/DaemonSet/cilium-envoy
     C-0270 kube-system/Deployment/cilium-operator
