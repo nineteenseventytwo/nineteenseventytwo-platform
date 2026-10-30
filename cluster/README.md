@@ -189,8 +189,14 @@ hand.
 
 Listeners share port 443 and are separated by SNI — standard Gateway API listener
 merging, the same way ingress-nginx served every host off one IP:port. Each app's
-HTTPRoute attaches by hostname match alone; no `sectionName` is needed while the
-hostnames do not overlap.
+HTTPRoute must name its HTTPS listener with `sectionName`. Hostname match alone
+is not enough: a route with no `sectionName` binds every listener it can, and that
+includes the `http` listener on port 80, which has no hostname filter. There, the
+app's route has a specific hostname and the redirect route
+([`gateway/10-http-redirect.yaml`](gateway/10-http-redirect.yaml)) has none.
+Gateway API gives precedence to the more specific hostname, so the app was served
+over plain HTTP and the redirect only caught hosts that had no route. Found
+2026-10-30: `http://grafana.` returned Grafana's own 302, not a 301 to HTTPS.
 
 ### Pinning the LoadBalancer IP goes through an annotation, not spec.addresses
 

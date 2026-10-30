@@ -270,6 +270,7 @@ grafana:
       parentRefs:
         - name: gateway
           namespace: gateway
+          sectionName: grafana-https   # see cluster/README.md#one-gateway-one-ip
   admin:
     existingSecret: grafana-admin
     userKey: admin-user
