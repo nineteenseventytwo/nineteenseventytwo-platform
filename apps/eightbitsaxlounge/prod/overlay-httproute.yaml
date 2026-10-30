@@ -1,7 +1,8 @@
 ---
-# Attaches to the shared Gateway's overlay-https listener by hostname
-# match alone (cluster/gateway/00-gateway.yaml) — no sectionName needed
-# while hostnames don't overlap (cluster/README.md#one-gateway-one-ip).
+# Attaches to the shared Gateway's overlay-https listener
+# (cluster/gateway/00-gateway.yaml). sectionName is required: without it the
+# route also binds the hostname-less HTTP listener and outranks the HTTPS
+# redirect there (cluster/README.md#one-gateway-one-ip).
 # Requires an OPNsense Unbound host override for overlay under
 # eightbitsaxlounge.com pointing at the Gateway's pinned LB IP
 # (192.168.20.241) — docs/01-network-validation.md.
@@ -16,6 +17,7 @@ spec:
       kind: Gateway
       name: gateway
       namespace: gateway
+      sectionName: overlay-https
   hostnames:
     - "overlay.eightbitsaxlounge.com"
   rules:
