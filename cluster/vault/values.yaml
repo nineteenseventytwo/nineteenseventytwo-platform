@@ -95,6 +95,7 @@ server:
     parentRefs:
       - name: gateway
         namespace: gateway
+        sectionName: vault-https   # see cluster/README.md#one-gateway-one-ip
 
 ui:
   enabled: true
