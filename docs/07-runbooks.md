@@ -21,31 +21,66 @@ time: workers first, the control plane last.** Longhorn keeps two replicas on
 the workers, so a second worker must not go down while the first one's
 replicas are still rebuilding.
 
+**Shed first.** Draining one worker puts everything on the other, and one
+4 GB worker cannot carry the whole cluster. On 2026-10-31 worker-2 took
+worker-1's pods, ran out of memory, and its kubelet stopped renewing its
+lease (NotReady, load ~50, nothing OOM-killed) while it held the only
+current copy of seven volumes. `make maintenance-on` scales the tenants and
+other non-essential workloads to 0 for the whole round: both
+eightbitsaxlounge environments, composer-dev, dash, findings, Grafana,
+Falcosidekick, and Argo CD. Argo CD's controller stops first so selfHeal
+does not scale everything straight back. The list, and what stays up, is
+in [`ops/node-maintenance.sh`](../ops/node-maintenance.sh).
+
+While shed: the stream bot and the eightbitsaxlounge sites are down, CI
+deploys that wait on Argo CD (`argocd-sync-wait`) fail, and the "Chat Set
+Active Environment" workflow must not be run. Prometheus and Alertmanager
+stay up, so expect node alerts in Slack.
+
 ```bash
 export KUBECONFIG=build/kubeconfig
+
+# 0. Once, before the first node. Refuses unless every attached Longhorn
+#    volume is healthy, then waits until the shed pods are gone.
+make maintenance-on
+
+# Then for each node, workers first:
 NODE=1972-worker-1 IP=192.168.20.203
 
-# 1. Every Longhorn volume healthy before starting
-kubectl -n longhorn-system get volumes.longhorn.io \
-  -o custom-columns=NAME:.metadata.name,ROBUSTNESS:.status.robustness
+# 1. Every attached Longhorn volume healthy. Detached ones read "unknown":
+#    that is expected, and these are the shed volumes.
+make maintenance-check
 
-# 2. Move the workloads off
+# 2. Move what is left off
 kubectl drain $NODE --ignore-daemonsets --delete-emptydir-data
 
 # 3. Update and reboot. kubelet, kubeadm, kubectl, containerd stay held.
 make ssh-ws HOST=$IP
 sudo apt-get update && sudo apt-get upgrade -y && sudo reboot
 
-# 4. Back in service, then wait for step 1 to show healthy again before the
-#    next node
+# 4. Back in service. Step 1 must pass again before the next node.
 kubectl wait --for=condition=Ready node/$NODE --timeout=10m
 kubectl uncordon $NODE
+
+# 5. After the last node: restore the recorded replica counts, Argo CD
+#    last. Restored pods schedule on whichever node is emptier.
+make maintenance-off
 ```
 
+Shedding once for the whole round is safe because a detached volume takes
+no writes. Its replicas stay identical however many nodes reboot under it,
+so there is nothing to rebuild between nodes. The attached ones (Vault,
+Prometheus, Alertmanager) do rebuild, which is what step 1 waits for.
+
+`maintenance-off` restores each workload's own recorded count, not the one
+in git. That includes which environment's chat was the live one, a value
+that is never in git. Running `maintenance-on` again before `off` keeps the
+first recorded counts. If a run stops partway, run the same command again.
+
 **The control plane (`1972-master-1`) last.** Its reboot is a few minutes of
-API outage: Argo CD, kubectl and CI pause, and running workloads carry on.
-Afterwards, check the next entry. A control plane that comes back with stale
-static pods is the known failure here.
+API outage: kubectl and CI pause, and running workloads carry on. Argo CD is
+already shed. Afterwards, check the next entry. A control plane that comes
+back with stale static pods is the known failure here.
 
 `1972-console-1` and `1972-gpu-1` get the same `unattended-upgrades` and
 timer, but no node-exporter scrapes them. Check them by hand while you are at
