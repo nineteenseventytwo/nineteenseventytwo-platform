@@ -57,6 +57,39 @@ falcoctl:
     follow:
       enabled: false
 
+# Exceptions for behaviour that is expected here, each scoped to namespace,
+# image and process so the rule still fires for anything else. Mounted into
+# /etc/falco/rules.d, which loads after falco_rules.yaml.
+#
+# Longhorn's instance-manager runs the iSCSI target (tgtd) and initiator for
+# every volume it serves. Both fired on 2026-10-31, whenever volumes attached
+# after a node reboot:
+#   - Clear Log Activities: `tee /var/log/tgtd.log` truncates tgtd's own log
+#     at start.
+#   - Linux Kernel Module Injection Detected: `iscsiadm -m discovery` loads
+#     the iSCSI kernel module (finit_module) for the attach.
+# Same repository for every instance-manager version, so a Longhorn upgrade
+# does not need a change here.
+customRules:
+  longhorn.yaml: |-
+    - rule: Clear Log Activities
+      exceptions:
+        - name: longhorn_tgtd_log
+          fields: [k8s.ns.name, container.image.repository, proc.name, fd.name]
+          values:
+            - [longhorn-system, docker.io/longhornio/longhorn-instance-manager, tee, /var/log/tgtd.log]
+      override:
+        exceptions: append
+
+    - rule: Linux Kernel Module Injection Detected
+      exceptions:
+        - name: longhorn_iscsiadm
+          fields: [k8s.ns.name, container.image.repository, proc.name]
+          values:
+            - [longhorn-system, docker.io/longhornio/longhorn-instance-manager, iscsiadm]
+      override:
+        exceptions: append
+
 falco:
   json_output: true
   # Notice is where "Terminal shell in container" sits. Below that is noise.
