@@ -48,7 +48,9 @@ make maintenance-on
 NODE=1972-worker-1 IP=192.168.20.203
 
 # 1. Every attached Longhorn volume healthy. Detached ones read "unknown":
-#    that is expected, and these are the shed volumes.
+#    that is expected, and these are the shed volumes. Also every pod that
+#    federates to AWS has its credentials: one created while
+#    pod-identity-webhook was down has none (below), so delete it.
 make maintenance-check
 
 # 2. Move what is left off
@@ -71,6 +73,18 @@ Shedding once for the whole round is safe because a detached volume takes
 no writes. Its replicas stay identical however many nodes reboot under it,
 so there is nothing to rebuild between nodes. The attached ones (Vault,
 Prometheus, Alertmanager) do rebuild, which is what step 1 waits for.
+
+**Credentials after a reboot.** pod-identity-webhook's `failurePolicy` is
+`Ignore`, so a pod created while no webhook replica is Ready starts with no
+AWS credentials and nothing in its events says so. On 2026-10-31 the single
+replica was evicted by the drain, could not fit on worker-2, and was still
+Pending when Longhorn recreated worker-1's instance-manager. The next night's
+S3 backup failed for 9 of 11 volumes ("no EC2 IMDS role found", alert
+`KubeJobFailed` on `daily-backup-*`). The webhook now runs one replica per
+worker behind a PodDisruptionBudget, so a one-node-at-a-time round always
+has a webhook. Step 1 still checks, because a power cut takes both. Deleting
+a listed instance-manager restarts every engine on that node: Vault and the
+monitoring pods with volumes there restart too, and Vault auto-unseals.
 
 `maintenance-off` restores each workload's own recorded count, not the one
 in git. That includes which environment's chat was the live one, a value

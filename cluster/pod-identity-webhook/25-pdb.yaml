@@ -1,0 +1,18 @@
+---
+# Keeps `kubectl drain` from taking the last Ready replica. With one replica
+# per worker (20-deployment.yaml), draining a worker evicts its own replica
+# only while the other worker's is Ready; if that one is down too, the drain
+# waits instead of leaving the cluster with no webhook. docs/07-runbooks.md
+# drains one node at a time, so this never blocks the normal procedure.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pod-identity-webhook
+  namespace: pod-identity-webhook
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pod-identity-webhook
