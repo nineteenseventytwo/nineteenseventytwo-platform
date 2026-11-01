@@ -3,7 +3,7 @@
 # back afterwards. Used by "Applying node updates" in docs/07-runbooks.md.
 #
 #   ops/node-maintenance.sh on      # scale the shed list to 0, record counts
-#   ops/node-maintenance.sh check   # attached Longhorn volumes all healthy?
+#   ops/node-maintenance.sh check   # volumes healthy, AWS credentials injected?
 #   ops/node-maintenance.sh off     # restore the recorded counts
 #
 # Why it exists: draining one worker puts everything on the other, and a
@@ -73,6 +73,7 @@ targets() {
 
 # Attached volumes must be healthy. Detached ones report robustness
 # "unknown", which is expected; they are listed but do not fail the check.
+# Then the AWS credentials check below, which a reboot can also break.
 check() {
   local vols bad
   vols=$(kubectl -n longhorn-system get volumes.longhorn.io --no-headers \
@@ -86,10 +87,41 @@ check() {
     return 1
   fi
   echo "ok: every attached volume is healthy"
+  credentials
+}
+
+# Every running pod whose ServiceAccount federates to AWS must have been
+# given credentials by pod-identity-webhook. Its failurePolicy is Ignore, so a
+# pod created while no webhook replica was Ready starts without them and says
+# nothing. On 2026-10-31 that was worker-1's Longhorn instance-manager, and the
+# next night's S3 backup failed for 9 of 11 volumes. The fix is to delete the
+# pod so it is recreated through the webhook.
+credentials() {
+  local ns roles pods bad="" webhook=pod-identity-webhook
+  for ns in $(kubectl get mutatingwebhookconfiguration "$webhook" \
+    -o jsonpath='{.webhooks[0].namespaceSelector.matchExpressions[0].values[*]}'); do
+    roles=$(kubectl -n "$ns" get serviceaccounts \
+      -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.annotations.eks\.amazonaws\.com/role-arn}{"\n"}{end}' |
+      awk 'NF == 2 {printf "%s ", $1}')
+    [[ -n "$roles" ]] || continue
+    pods=$(kubectl -n "$ns" get pods --field-selector=status.phase=Running \
+      -o jsonpath='{range .items[*]}{.metadata.name} {.spec.serviceAccountName} {.spec.containers[*].env[*].name}{"\n"}{end}')
+    bad+=$(awk -v ns="$ns" -v roles="$roles" '
+      BEGIN { n = split(roles, r, " "); for (i = 1; i <= n; i++) federated[r[i]] = 1 }
+      ($2 in federated) && !/ AWS_ROLE_ARN( |$)/ { print ns "/" $1 }' <<<"$pods")$'\n'
+  done
+  bad=$(sed '/^$/d' <<<"$bad")
+  if [[ -n "$bad" ]]; then
+    echo >&2
+    echo "no AWS credentials: created while $webhook was down; delete to recreate" >&2
+    echo "$bad" >&2
+    return 1
+  fi
+  echo "ok: every federated pod has AWS credentials"
 }
 
 on() {
-  check >/dev/null || die "fix the volumes above before shedding (run: $0 check)"
+  check >/dev/null || die "fix what $0 check reports before shedding"
 
   local ns obj current
   while read -r ns obj; do

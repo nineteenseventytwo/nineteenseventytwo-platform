@@ -25,7 +25,22 @@ metadata:
   labels:
     app.kubernetes.io/name: pod-identity-webhook
 spec:
-  replicas: 1
+  # One per worker, because failurePolicy is Ignore (30-mutatingwebhook.yaml):
+  # any moment with no Ready replica, pods in the federated namespaces start
+  # without AWS credentials and nothing says so. With one replica, the
+  # 2026-10-31 drain of worker-1 evicted it, worker-2 had no memory to take it
+  # (98% requested), and it stayed Pending until worker-1 came back — after
+  # Longhorn had already recreated that node's instance-manager. That
+  # instance-manager ran 26h without credentials, and the next night's backup
+  # failed for 9 of 11 volumes ("no EC2 IMDS role found").
+  replicas: 2
+  # Surge would need a third node: the anti-affinity below allows one per
+  # worker and the control plane is tainted, so a surge pod sits Pending and
+  # the rollout never finishes. Replace in place instead; the other replica
+  # serves meanwhile.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
   selector:
     matchLabels:
       app.kubernetes.io/name: pod-identity-webhook
@@ -34,6 +49,20 @@ spec:
       labels:
         app.kubernetes.io/name: pod-identity-webhook
     spec:
+      # Required, not preferred: two replicas on one node is the single-replica
+      # failure again the next time that node is drained.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: pod-identity-webhook
+      # Both workers sit near 100% of requested memory, so without this the
+      # second replica, or a replacement after a reboot, can wait Pending
+      # behind tenant pods. It admits Vault's and Longhorn's pods, so it ranks
+      # with them: above longhorn-critical, alongside the control plane.
+      priorityClassName: system-cluster-critical
       # The webhook's own controller loop needs this token: its ClusterRole
       # (10-rbac.yaml) grants `serviceaccounts: get/list/watch`, and it uses
       # its own projected token to authenticate those calls to the API
