@@ -160,6 +160,28 @@ spec:
   egress:
     - toEntities: [kube-apiserver]
 ---
+# The mirror direction for the prometheus-operator's admission webhook
+# (PrometheusRule mutate/validate on 10250), same shape as pod-identity-
+# webhook's allow-webhook-apiserver-ingress: the apiserver arrives as
+# remote-node (or host), and only an unscoped fromEntities matches it.
+# Without it every call timed out at 10s and failed open - 2968 times
+# between 2026-10-31 16:55 and 2026-11-02 06:25 per the apiserver log, Hubble
+# showing "remote-node ... :10250 ... Policy denied DROPPED". Nothing was
+# admitted unvalidated that Argo CD had not already rendered, but monitoring
+# uses ServerSideDiff, so every compare dry-runs 35 PrometheusRules through
+# both webhooks: ~12 minutes per reconcile instead of seconds.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-operator-webhook-apiserver-ingress
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app: kube-prometheus-stack-operator
+  ingress:
+    - fromEntities: [remote-node, host]
+---
 # Alertmanager's only receiver needing internet egress: the Slack webhook
 # wired up in cluster/monitoring/values.yaml. Scoped to the exact FQDN
 # rather than an ipBlock/0.0.0.0-0 rule, since Slack's webhook IPs aren't
