@@ -37,6 +37,12 @@ RUN apt-get update \
       sshpass jq make shellcheck \
  && rm -rf /var/lib/apt/lists/*
 
+# pip is only needed to build the image, so it goes once the install is done.
+# pip 26.2.1 vendors its own certifi 2026.6.17 (GHSA-6q48-6c7w-9gw2, critical),
+# msgpack, setuptools and urllib3, all flagged; the copies ansible actually
+# imports are the site-packages ones and were already fixed. Nothing runs pip
+# inside this image: CI's pip installs use setup-python on hosted runners.
+# Same fix as eightbitsaxlounge chat 7.0.6 (#103).
 RUN pip install --no-cache-dir \
       "ansible-core==${ANSIBLE_CORE_VERSION}" \
       ansible-lint \
@@ -44,7 +50,8 @@ RUN pip install --no-cache-dir \
       kubernetes \
       jmespath \
       netaddr \
-      passlib
+      passlib \
+ && pip uninstall -y pip
 
 # kubectl and helm: the deploy-cluster jobs need both, and installing them here
 # rather than in the workflow keeps the "CI runs the same thing you do"
