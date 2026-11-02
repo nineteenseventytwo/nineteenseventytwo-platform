@@ -64,6 +64,10 @@ controller:
   resources:
     requests: {cpu: 100m, memory: 896Mi}
     limits: {memory: 2Gi}
+  # Both workers run near 100% of requested memory, so a request this size
+  # only reschedules if it can preempt; see priorityclass.yaml for the
+  # 2026-11-01 outage this fixes.
+  priorityClassName: platform-critical
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:

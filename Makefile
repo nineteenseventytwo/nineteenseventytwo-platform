@@ -418,6 +418,8 @@ bootstrap-argocd: ## Install Argo CD and hand it cluster/ via the app-of-apps
 	# cluster/README.md#bootstrap-argocd-has-to-be-re-runnable-not-just-runnable
 	$(KUBECTL) apply --server-side --force-conflicts \
 	  -f cluster/gateway-api-crds/standard-install.yaml
+	# controller.priorityClassName names this class; it must exist first
+	$(KUBECTL) apply -f cluster/argocd/priorityclass.yaml
 	$(HELM) repo add argo https://argoproj.github.io/argo-helm
 	$(HELM) repo update argo
 	$(HELM) upgrade --install argocd argo/argo-cd \
