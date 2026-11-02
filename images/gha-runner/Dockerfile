@@ -20,7 +20,14 @@ LABEL org.opencontainers.image.source="https://github.com/nineteenseventytwo/nin
 
 USER root
 
-RUN apt-get update \
+# Set by _build-image.yml from version.txt. Declared here, right above the
+# apt step, so a version bump is a cache miss for apt and everything after it:
+# the registry build cache keys this layer on the base digest and the RUN text
+# alone, so without it a bump republished the previous build's packages
+# (ansible-runner 1.3.1 shipped 1.3.0's libbrotli1, 2026-11-02).
+ARG IMAGE_VERSION=dev
+RUN echo "image ${IMAGE_VERSION}" \
+ && apt-get update \
  && apt-get install --no-install-recommends -y \
       ca-certificates curl git jq make openssl unzip \
  && rm -rf /var/lib/apt/lists/*

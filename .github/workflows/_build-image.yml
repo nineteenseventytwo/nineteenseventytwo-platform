@@ -99,6 +99,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Dockerfiles that declare ARG IMAGE_VERSION above their apt step get a
+          # fresh apt layer on every version bump; see images/ansible-runner.
+          build-args: IMAGE_VERSION=${{ steps.version.outputs.value }}
           # Ephemeral runners have no warm layer cache. The fix is a
           # registry-backed cache, not a persistent runner (§3.1).
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}:buildcache
