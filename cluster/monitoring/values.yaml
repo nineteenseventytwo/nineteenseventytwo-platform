@@ -223,10 +223,14 @@ alertmanager:
 grafana:
   enabled: true
   replicas: 1
-  # No image override: chart 92.3.1's Grafana subchart (13.5.1) ships
-  # 13.2.4, the version this file used to pin ahead of 88.6.2's 13.2.0. Its
-  # remaining fixable highs (78 in the 2026-10-27 scan) are fixed in 13.2.5,
-  # released 2026-10-27 - an image override again once that is two weeks old.
+  # Ahead of the chart: 92.3.1's Grafana subchart (13.5.1) ships 13.2.4,
+  # which carries 1 critical and 95 fixable highs (arm64, 2026-11-11);
+  # 13.2.5 (released 2026-10-27) carries 49 highs. A patch release on the
+  # same minor, so no migration. Drop this override when a chart bump ships
+  # 13.2.5 or later - leaving it would silently pin grafana behind every
+  # later chart.
+  image:
+    tag: "13.2.5"
   # 256Mi OOMKilled under real interactive use (exitCode 137, confirmed live
   # on build 0003) - ran fine for ~10 hours at idle/scrape-only load, then
   # crashed once someone actually opened the UI and browsed dashboards.
