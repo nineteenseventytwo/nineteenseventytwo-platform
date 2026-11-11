@@ -3,7 +3,7 @@
 # Deliberately does NOT contain Ansible. Baking it in means a collection bump
 # forces a runner rebuild and a runner CVE forces an Ansible revalidation; the
 # workflow instead does `docker run ansible-runner ...` from inside this one.
-ARG RUNNER_VERSION=2.336.0
+ARG RUNNER_VERSION=2.338.2
 FROM ghcr.io/actions/actions-runner:${RUNNER_VERSION}
 
 ARG DOCKER_CLI_VERSION=29.7.2
@@ -25,9 +25,14 @@ USER root
 # the registry build cache keys this layer on the base digest and the RUN text
 # alone, so without it a bump republished the previous build's packages
 # (ansible-runner 1.3.1 shipped 1.3.0's libbrotli1, 2026-11-02).
+#
+# upgrade, not just install: apt and zlib1g ship in the base image, so
+# install alone never replaces them (CVE-2026-109518 and CVE-2026-85091 were
+# fixed in noble-security before the upstream image picked them up).
 ARG IMAGE_VERSION=dev
 RUN echo "image ${IMAGE_VERSION}" \
  && apt-get update \
+ && apt-get upgrade -y \
  && apt-get install --no-install-recommends -y \
       ca-certificates curl git jq make openssl unzip \
  && rm -rf /var/lib/apt/lists/*
