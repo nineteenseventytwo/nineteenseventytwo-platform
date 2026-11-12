@@ -81,6 +81,10 @@ gatewayAPI:
 # gateway stopped answering on 80 and 443 (2026-11-12).
 envoy:
   xdsMode: ads
+  # Envoy reads its bootstrap only at start, and rollOutCiliumPods below
+  # covers the agent, not this DaemonSet. Without it the xdsMode fix synced
+  # a correct configmap that the running Envoy pods never loaded.
+  rollOutPods: true
 
 # Required for Gateway API, not just a performance choice.
 # See ../README.md#kube-proxy-replacement-is-what-unblocks-gateway-api
