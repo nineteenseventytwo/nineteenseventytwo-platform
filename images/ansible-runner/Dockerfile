@@ -12,12 +12,12 @@
 # marked will-not-fix there (zlib CVE-2023-45853, sqlite CVE-2025-7458), and
 # image-vuln-scan.yml runs with ignore-unfixed — so they were real and
 # invisible. Nothing here depended on bookworm; it was the init default.
-FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
 
 # Renovate/dependabot-friendly pins. Bump deliberately, in a PR, with lint green.
 ARG ANSIBLE_CORE_VERSION=2.21.3
-ARG KUBECTL_VERSION=v1.36.4
-ARG HELM_VERSION=v4.2.3
+ARG KUBECTL_VERSION=v1.37.2
+ARG HELM_VERSION=v4.3.1
 ARG SOPS_VERSION=v3.13.3
 ARG AGE_VERSION=v1.3.2
 ARG TARGETARCH=arm64
@@ -36,9 +36,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # the registry build cache keys this layer on the base digest and the RUN text
 # alone, so without it a bump republished the previous build's packages
 # (ansible-runner 1.3.1 shipped 1.3.0's libbrotli1, 2026-11-02).
+#
+# upgrade, not just install: apt and zlib1g ship in the base image, so
+# install alone never replaces them. Debian's zlib fix (CVE-2026-85091) was
+# in trixie-security while python:3.14-slim still shipped the old one
+# (2026-11-11). The digest still pins everything else.
 ARG IMAGE_VERSION=dev
 RUN echo "image ${IMAGE_VERSION}" \
  && apt-get update \
+ && apt-get upgrade -y \
  && apt-get install --no-install-recommends -y \
       ca-certificates curl git openssh-client rsync \
       sshpass jq make shellcheck \
