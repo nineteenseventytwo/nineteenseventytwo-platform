@@ -81,7 +81,7 @@ spec:
       # the render lands there - db's seed-etc, same shape.
       initContainers:
         - name: seed-config
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:e59fc13e002f60076f2e4f1036c71895a42066b994e03a44a3f3a32f871cb612
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:0896e1f853dc7d1d0497a8d484594ba8aaf733562b724224deb62a561c4e06c7
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "cp -a /etc/nats/. /seed/"]
           securityContext:
@@ -102,7 +102,7 @@ spec:
           # mounted), 0.0.22 for a pre-existing smoke-test gap unrelated
           # to this migration (the runner's own network topology). See
           # eightbitsaxlounge#69, #70, #71.
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:e59fc13e002f60076f2e4f1036c71895a42066b994e03a44a3f3a32f871cb612
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-state@sha256:0896e1f853dc7d1d0497a8d484594ba8aaf733562b724224deb62a561c4e06c7
           imagePullPolicy: IfNotPresent
           args: ["-c", "/etc/nats/nats.conf"]
           securityContext:
