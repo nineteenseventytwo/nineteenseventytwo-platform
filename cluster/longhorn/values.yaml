@@ -33,7 +33,15 @@ defaultSettings:
 defaultBackupStore:
   backupTarget: "s3://nineteenseventytwo-longhorn-backups-972034964468@eu-west-2/"
   backupTargetCredentialSecret: "longhorn-backup-credential"
-  pollInterval: 300
+  # Hourly, not the 5-minute default. Each poll re-lists every backup of every
+  # volume in the bucket, about 200 ListBucket calls per pass at 11 volumes x 7
+  # retained, so 300s meant tens of thousands of S3 requests a day: billed per
+  # request, and the largest recurring AWS cost in Nov 2026, far above the
+  # storage itself. On one cluster the poll only refreshes Longhorn's view of a
+  # bucket nothing else writes to; a backup records its own result when it
+  # finishes, and KubeJobFailed watches the daily-backup CronJob, not this.
+  # Lower it only while restoring from a bucket another cluster writes.
+  pollInterval: 3600
 
 longhornManager:
   # 256Mi was not enough: longhorn-manager on 1972-worker-1 was OOMKilled
