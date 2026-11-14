@@ -16,6 +16,35 @@ defaultRules:
 # never reboots; these say when a reboot is waiting, when it has stopped, and
 # when routine updates have piled up. Procedure: docs/07-runbooks.md.
 additionalPrometheusRulesMap:
+  pod-identity-webhook:
+    groups:
+      - name: pod-identity-webhook
+        rules:
+          # Longhorn instance-managers are admitted with failurePolicy Fail
+          # (cluster/pod-identity-webhook/30-mutatingwebhook.yaml), so while
+          # this fires a restarted instance-manager cannot come back and its
+          # node's volumes stay down. Everything else in the AWS-federated
+          # namespaces starts without credentials instead.
+          - alert: PodIdentityWebhookUnavailable
+            expr: kube_deployment_status_replicas_available{namespace="pod-identity-webhook", deployment="pod-identity-webhook"} < 1
+            for: 5m
+            labels: {severity: critical}
+            annotations:
+              summary: "pod-identity-webhook has no available replicas"
+              description: >-
+                No pod gets AWS credentials, and Longhorn instance-managers are
+                refused outright. Fix the webhook first; the emergency back-out
+                is in the webhook manifest's comments.
+          - alert: LonghornInstanceManagerAdmissionRejected
+            expr: sum(increase(apiserver_admission_webhook_rejection_count{name="instance-manager.pod-identity-webhook.amazonaws.com"}[10m])) > 0
+            for: 10m
+            labels: {severity: critical}
+            annotations:
+              summary: "Longhorn instance-manager pods are being refused by the pod-identity webhook"
+              description: >-
+                A node cannot start its instance-manager, so its Longhorn volumes
+                are down. A minute or two after a cold boot is expected; ten
+                minutes is not.
   node-updates:
     groups:
       - name: node-updates
