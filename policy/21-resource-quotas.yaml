@@ -40,8 +40,8 @@ spec:
 # repeatedly on build 0002, orphaning in-progress syncs on every restart).
 # Bumping that limit without this would just swap an OOMKill for
 # FailedCreate: exceeded quota - same mistake already made twice this build
-# for metallb-system and longhorn-system. 4Gi leaves ~1Gi headroom above the
-# other four argocd components' own limits (384+256+192+128Mi) plus the
+# for metallb-system and longhorn-system. 4Gi leaves ~0.9Gi headroom above the
+# other four argocd components' own limits (512+256+192+128Mi) plus the
 # controller's new 2Gi.
 apiVersion: v1
 kind: ResourceQuota

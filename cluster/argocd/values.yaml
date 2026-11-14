@@ -26,9 +26,31 @@ configs:
     # apps/ (ADR-0012). App repos publish images to GHCR; they hold no cluster
     # credential and get no Argo project of their own.
     application.resourceTrackingMethod: annotation
-    resource.exclusions: |
-      - apiGroups: ["cilium.io"]
-        kinds: ["CiliumIdentity", "CiliumEndpoint"]
+    # Appended to the chart's default resource.exclusions, not substituted for
+    # them. Setting resource.exclusions here used to replace the whole default
+    # list (Endpoints, EndpointSlices, Leases, the authz review kinds, CSRs,
+    # cert-manager CertificateRequests, Cilium's internals) - the Cilium kinds
+    # this file listed are all in the defaults anyway.
+    #
+    # Longhorn's runtime CRs are its own status bookkeeping, created by
+    # longhorn-manager rather than by git: Argo tracks exactly one longhorn.io
+    # object (platform-manifests' RecurringJob, which is not excluded). Engine,
+    # Volume and BackupVolume alone were ~135k of the controller's ~220k watch
+    # events over 12 days (argocd_cluster_events_total, 2026-11-14), every one
+    # of them cached and processed for nothing.
+    resourceExclusionsAdditional:
+      - apiGroups: ["longhorn.io"]
+        kinds:
+          - Engine
+          - Volume
+          - Replica
+          - BackupVolume
+          - Backup
+          - BackupTarget
+          - Snapshot
+          - VolumeAttachment
+          - InstanceManager
+          - Node
         clusters: ["*"]
 
 controller:
@@ -64,6 +86,17 @@ controller:
   resources:
     requests: {cpu: 100m, memory: 896Mi}
     limits: {memory: 2Gi}
+  # The live heap is ~250Mi at steady state, but with no memory limit known
+  # to it the Go runtime sizes the heap off GOGC alone and had grown to
+  # 1.2Gi reserved (go_memstats_sys_bytes, 2026-11-14) - after a sync peak it
+  # holds on to far more than it is using, on the node that is already the
+  # tightest. GOMEMLIMIT is a soft target, not a cap: past it the GC runs
+  # harder rather than the process dying, so a from-scratch sync that really
+  # needs more than this still gets it, up to the 2Gi limit above. Once a
+  # week of steady state is in, the 896Mi request can come down to match.
+  env:
+    - name: GOMEMLIMIT
+      value: 768MiB
   # Both workers run near 100% of requested memory, so a request this size
   # only reschedules if it can preempt; see priorityclass.yaml for the
   # 2026-11-01 outage this fixes.
@@ -83,7 +116,12 @@ repoServer:
   replicas: 1
   resources:
     requests: {cpu: 50m, memory: 128Mi}
-    limits: {memory: 384Mi}
+    # 384Mi OOMKilled it (exit 137, 2026-11-08; 4 restarts in 13 days):
+    # rendering kube-prometheus-stack and cilium is a short burst well above
+    # its ~60Mi steady state, too brief for a 30s scrape to catch - the 7-day
+    # Prometheus max reads 228Mi. Still inside the argocd infra-quota:
+    # 2Gi + 512 + 256 + 192 + 128Mi = ~3.1Gi of 4Gi.
+    limits: {memory: 512Mi}
 
 server:
   replicas: 1
