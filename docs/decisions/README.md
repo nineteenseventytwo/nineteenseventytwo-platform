@@ -27,6 +27,7 @@ inconvenient.
 | [0019](ADR-0019-public-repos-blocking-secret-scan.md) | The repos stay public; secrets block in every repo's required check | Accepted |
 | [0020](ADR-0020-composer-inference-off-cluster.md) | Composer runs in the cluster; its inference runs on the GPU host outside it | Accepted |
 | [0021](ADR-0021-private-hostnames-tunnel-only.md) | Private hostnames reach their Service through the tunnel only, not the Gateway | Accepted |
+| [0022](ADR-0022-two-week-version-rule.md) | Pin versions at least two weeks old; security fixes are the stated exception | Accepted |
 
 ## Template
 
