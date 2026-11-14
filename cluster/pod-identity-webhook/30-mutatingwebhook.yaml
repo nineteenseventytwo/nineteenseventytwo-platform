@@ -40,10 +40,15 @@ webhooks:
         - key: kubernetes.io/metadata.name
           operator: In
           values: ["argocd", "vault", "longhorn-system", "security", "findings"]
+    # Longhorn instance-managers are left to the Fail entry below. The two
+    # selectors must not overlap, or a matching pod is mutated twice.
     objectSelector:
       matchExpressions:
         - key: eks.amazonaws.com/skip-pod-identity-webhook
           operator: DoesNotExist
+        - key: longhorn.io/component
+          operator: NotIn
+          values: ["instance-manager"]
     rules:
       - operations: ["CREATE"]
         apiGroups: [""]
@@ -76,4 +81,52 @@ webhooks:
     # a future apiserver, worse for being intermittent across upgrades rather
     # than an outright negotiation failure at admission-webhook-registration
     # time.
+    admissionReviewVersions: ["v1beta1"]
+
+  # The same webhook again, Fail, for Longhorn instance-managers only. They
+  # run the backups, and they are long-lived: one created while the webhook
+  # is down keeps no AWS credentials until someone deletes it. After the
+  # 2026-11-08 power cut both came up before the webhook did, and every
+  # nightly S3 backup failed for three days.
+  #
+  # With Fail, creating one is refused until the webhook answers, and
+  # longhorn-manager retries until it does. That moves the failure from
+  # silent to loud. The cost is that if the webhook stays broken, a node
+  # whose instance-manager restarts cannot run its volumes. Nothing the
+  # webhook needs lives on Longhorn (its cert is a cert-manager Secret, its
+  # pods are stateless, one per worker), so there is no boot deadlock.
+  # PodIdentityWebhookUnavailable and LonghornInstanceManagerAdmissionRejected
+  # in cluster/monitoring/values.yaml say when this is biting.
+  #
+  # To back out in an emergency, delete this entry (or the whole object) and
+  # let Argo restore it once the webhook is fixed; instance-managers are then
+  # created without credentials, as before.
+  - name: instance-manager.pod-identity-webhook.amazonaws.com
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: pod-identity-webhook
+        namespace: pod-identity-webhook
+        path: /mutate
+        port: 443
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["longhorn-system"]
+    objectSelector:
+      matchExpressions:
+        - key: eks.amazonaws.com/skip-pod-identity-webhook
+          operator: DoesNotExist
+        - key: longhorn.io/component
+          operator: In
+          values: ["instance-manager"]
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    # Same timeout as the default, and the same v1beta1 reason as above.
+    timeoutSeconds: 10
     admissionReviewVersions: ["v1beta1"]
