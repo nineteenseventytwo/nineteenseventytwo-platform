@@ -307,11 +307,11 @@ verify-limitrange: ## Assert every namespace has a LimitRange or is on the docum
 # Node reboots only - see "Applying node updates" in docs/07-runbooks.md.
 .PHONY: maintenance-on maintenance-off maintenance-check
 maintenance-on: ## Shed non-essential workloads (Argo CD paused) before node reboots
-	KUBECONFIG=$(abspath $(KUBECONFIG)) ops/node-maintenance.sh on
+	KUBECONFIG=$(abspath $(KUBECONFIG)) bash ops/node-maintenance.sh on
 maintenance-off: ## Restore what maintenance-on shed, Argo CD last
-	KUBECONFIG=$(abspath $(KUBECONFIG)) ops/node-maintenance.sh off
+	KUBECONFIG=$(abspath $(KUBECONFIG)) bash ops/node-maintenance.sh off
 maintenance-check: ## Every attached Longhorn volume healthy? (detached is fine)
-	KUBECONFIG=$(abspath $(KUBECONFIG)) ops/node-maintenance.sh check
+	KUBECONFIG=$(abspath $(KUBECONFIG)) bash ops/node-maintenance.sh check
 
 # Plain kubectl on the host, not $(KUBECTL) — port-forward binds a socket
 # your browser needs to reach directly. Routed through the containerized
