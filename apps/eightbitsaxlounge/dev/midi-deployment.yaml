@@ -66,7 +66,7 @@ spec:
         runAsGroup: 1654
       containers:
         - name: midi-api
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-midi@sha256:dbc74ab068f1c44f5c0921af658a8c1baf7a7b8b500ccb88d151cb5aca2655f7
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-midi@sha256:92245177d91c96e87c354bcbc6438cf5dac8125cfb92a9fb95790f9db64a093a
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
