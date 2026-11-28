@@ -170,7 +170,7 @@ The workflow then reads:
 - run: docker run --rm \
     -v $PWD:/work -w /work \
     -v ${{ runner.temp }}/ssh:/root/.ssh:ro \
-    ghcr.io/nineteenseventytwo/ansible-runner:1.4.1 \
+    ghcr.io/nineteenseventytwo/ansible-runner:1.4.2 \
     ansible-playbook -i inventory/lab playbooks/20-cicd-host.yml
 ```
 
