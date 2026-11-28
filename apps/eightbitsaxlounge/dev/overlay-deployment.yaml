@@ -60,7 +60,7 @@ spec:
         runAsGroup: 1000
       containers:
         - name: overlay
-          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-overlay@sha256:ca98ca0d07e1ec76bce74e23fd142003f09ad8c94aafe5d804413f8708eda203
+          image: ghcr.io/nineteenseventytwo/eightbitsaxlounge-overlay@sha256:6758c3c2457bcfbeb2235644eb87def7c6835b18a82864ab0ece92cfa1286d90
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
