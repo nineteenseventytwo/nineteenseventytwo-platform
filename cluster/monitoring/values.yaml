@@ -260,6 +260,13 @@ grafana:
   # later chart.
   image:
     tag: "13.2.5"
+  # Same reasoning for the dashboard/datasource sidecar: 92.3.1 ships
+  # k8s-sidecar 2.14.1, with 2 criticals (certifi) and 9 highs (arm64,
+  # 2026-11-23); 2.14.3 (released 2026-11-02) has 0 and 5. Drop this with
+  # the image override above, once a chart bump ships 2.14.3 or later.
+  sidecar:
+    image:
+      tag: "2.14.3"
   # 256Mi OOMKilled under real interactive use (exitCode 137, confirmed live
   # on build 0003) - ran fine for ~10 hours at idle/scrape-only load, then
   # crashed once someone actually opened the UI and browsed dashboards.
