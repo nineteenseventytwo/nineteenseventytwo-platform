@@ -26,7 +26,7 @@ spec:
   sources:
     - repoURL: https://falcosecurity.github.io/charts
       chart: falco
-      targetRevision: 9.2.0
+      targetRevision: 9.2.2
       helm:
         releaseName: falco
         valueFiles:
